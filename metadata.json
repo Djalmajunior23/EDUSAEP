@@ -1,0 +1,5 @@
+{
+  "name": "EduDiagnóstico SAEP",
+  "description": "Plataforma de diagnóstico educacional por competências e geração de planos de estudos personalizados seguindo o padrão SAEP.",
+  "requestFramePermissions": []
+}
