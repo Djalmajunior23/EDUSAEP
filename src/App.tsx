@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { generateDiagnostic, DiagnosticResult } from './services/geminiService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import PinComponent from './components/PinComponent';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -237,6 +238,8 @@ export default function App() {
                     </div>
                     <div className="absolute -right-8 -bottom-8 w-48 h-48 bg-emerald-800 rounded-full blur-3xl opacity-50"></div>
                   </div>
+
+                  <PinComponent />
 
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                     <h4 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Prévia dos Dados</h4>
