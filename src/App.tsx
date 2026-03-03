@@ -33,11 +33,55 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import PinComponent from './components/PinComponent';
 
+// Functional Error Boundary Wrapper
+function SafeApp({ children }: { children: React.ReactNode }) {
+  const [hasError, setHasError] = useState(false);
+
+  React.useEffect(() => {
+    const handleError = (error: ErrorEvent) => {
+      console.error("Runtime error caught:", error);
+      setHasError(true);
+    };
+    window.addEventListener("error", handleError);
+    return () => window.removeEventListener("error", handleError);
+  }, []);
+
+  if (hasError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 text-center space-y-4 max-w-md">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">Ops! Algo deu errado</h2>
+          <p className="text-gray-500 text-sm">A aplicação encontrou um erro inesperado na renderização.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
+          >
+            Recarregar Aplicação
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export default function App() {
+  return (
+    <SafeApp>
+      <AppContent />
+    </SafeApp>
+  );
+}
+
+function AppContent() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticResult | null>(null);

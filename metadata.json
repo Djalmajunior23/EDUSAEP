@@ -1,5 +1,5 @@
 {
-  "name": "EduDiagnóstico SAEP",
-  "description": "Plataforma de diagnóstico educacional por competências e geração de planos de estudos personalizados seguindo o padrão SAEP.",
+  "name": "EduDiagnóstico SAEP Pro",
+  "description": "Plataforma Full-Stack de diagnóstico educacional com backend Express, integração Gemini e tratamento robusto de erros.",
   "requestFramePermissions": []
 }

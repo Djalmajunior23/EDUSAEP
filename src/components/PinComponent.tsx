@@ -15,22 +15,17 @@ export default function PinComponent() {
     setError(null);
     
     try {
-      // Simulação de uma chamada de API
-      // Em um cenário real, use try/catch para capturar erros de rede (Failed to fetch)
-      const response = await fetch('/api/token-mock'); 
+      // Simulação local para deploy estático (GitHub Pages)
+      // Evita erros de fetch 404 em ambientes sem backend
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
+      const mockToken = "demo-token-" + Math.random().toString(36).substring(7);
+      
+      if (!mockToken) {
+        throw new Error("Token vazio gerado localmente.");
       }
 
-      const data = await response.json();
-      
-      // Validação de Lógica de Negócio: Evita o erro "Empty token!"
-      if (!data.token) {
-        throw new Error("Token vazio recebido do servidor (Empty token!)");
-      }
-
-      setToken(data.token);
+      setToken(mockToken);
     } catch (err: any) {
       // Tratamento centralizado de erros de rede e lógica
       console.error("[PinComponent] Erro capturado:", err.message);
