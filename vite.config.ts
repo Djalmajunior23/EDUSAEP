@@ -6,7 +6,22 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    plugins: [react(), tailwindcss()],
+    base: './',
+    plugins: [
+      react(), 
+      tailwindcss(),
+      {
+        name: 'fix-mime-types',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url && (req.url.endsWith('.ts') || req.url.endsWith('.tsx'))) {
+              res.setHeader('Content-Type', 'application/javascript');
+            }
+            next();
+          });
+        }
+      }
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

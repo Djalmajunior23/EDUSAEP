@@ -39,7 +39,7 @@ export interface DiagnosticResult {
 
 export async function generateDiagnostic(data: any[]): Promise<DiagnosticResult> {
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp", // Using a fast model for processing
+    model: "gemini-3-flash-preview", // Using a fast model for processing
     contents: [
       {
         role: "user",

@@ -1,0 +1,155 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID from Firebase Auth)
+    // Fields:
+    //   - uid: string (required) - The unique ID of the user.
+    //   - email: string (required) - The email of the user.
+    //   - displayName: string (optional) - The display name of the user.
+    //   - photoURL: string (optional) - The photo URL of the user.
+    //   - createdAt: string (optional) - When the profile was created.
+    //
+    // Collection: diagnostics
+    // Document ID: diagnosticId (auto-generated)
+    // Fields:
+    //   - userId: string (required) - The ID of the user who generated this diagnostic.
+    //   - aluno: string (required) - The name of the student or group.
+    //   - result: map (required) - The full diagnostic result from Gemini.
+    //   - createdAt: string (required) - When the diagnostic was generated.
+    //
+    // Collection: tasks
+    // Document ID: taskId (auto-generated)
+    // Fields:
+    //   - userId: string (required) - The ID of the user who owns this task.
+    //   - title: string (required) - The title of the task.
+    //   - completed: boolean (required) - Whether the task is completed.
+    //   - createdAt: string (required) - When the task was created.
+    //   - updatedAt: string (optional) - When the task was last updated.
+    //
+    // Collection: chat_messages
+    // Document ID: messageId (auto-generated)
+    // Fields:
+    //   - userId: string (required) - The ID of the user who sent or received this message.
+    //   - text: string (required) - The content of the message.
+    //   - role: string (required) - The role of the message sender (user or model).
+    //   - createdAt: string (required) - When the message was sent.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "djalmabatistajunior@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('emailVerified' in data) || data.emailVerified is bool) &&
+             (!('createdAt' in data) || isValidDateString(data.createdAt));
+    }
+
+    function isValidDiagnostic(data) {
+      return hasRequiredFields(['userId', 'aluno', 'result', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.aluno is string && data.aluno.size() > 0 && data.aluno.size() < 200 &&
+             data.result is map &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidTask(data) {
+      return hasRequiredFields(['userId', 'title', 'completed', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 500 &&
+             data.completed is bool &&
+             isValidDateString(data.createdAt) &&
+             (!('updatedAt' in data) || isValidDateString(data.updatedAt));
+    }
+
+    function isValidChatMessage(data) {
+      return hasRequiredFields(['userId', 'text', 'role', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 5000 &&
+             data.role in ['user', 'model'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && isOwner(userId);
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && isOwner(userId);
+      allow delete: if isAdmin();
+    }
+
+    match /diagnostics/{diagnosticId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidDiagnostic(request.resource.data);
+      allow update: if isAuthenticated() && isValidDiagnostic(request.resource.data) && isDocOwner();
+      allow delete: if isAuthenticated() && isDocOwner() || isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      allow update: if isAuthenticated() && isValidTask(request.resource.data) && isDocOwner();
+      allow delete: if isAuthenticated() && isDocOwner() || isAdmin();
+    }
+
+    match /chat_messages/{messageId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner() || isAdmin();
+    }
+  }
+}
