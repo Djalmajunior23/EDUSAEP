@@ -10,7 +10,23 @@
         "displayName": { "type": "string", "description": "The display name of the user." },
         "photoURL": { "type": "string", "description": "The photo URL of the user." },
         "emailVerified": { "type": "boolean", "description": "Whether the user's email is verified." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." }
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
+        "settings": {
+          "type": "object",
+          "description": "User account settings.",
+          "properties": {
+            "theme": { "type": "string", "enum": ["light", "dark"], "description": "UI theme preference." },
+            "notifications": { "type": "boolean", "description": "Whether notifications are enabled." }
+          }
+        },
+        "preferences": {
+          "type": "object",
+          "description": "User pedagogical preferences.",
+          "properties": {
+            "defaultGrade": { "type": "string", "description": "Default grade level for diagnostics." },
+            "language": { "type": "string", "description": "Preferred language for the interface." }
+          }
+        }
       },
       "required": ["uid", "email"]
     },

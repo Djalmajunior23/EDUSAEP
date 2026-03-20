@@ -93,7 +93,9 @@ service cloud.firestore {
              (!('displayName' in data) || data.displayName is string) &&
              (!('photoURL' in data) || data.photoURL is string) &&
              (!('emailVerified' in data) || data.emailVerified is bool) &&
-             (!('createdAt' in data) || isValidDateString(data.createdAt));
+             (!('createdAt' in data) || isValidDateString(data.createdAt)) &&
+             (!('settings' in data) || data.settings is map) &&
+             (!('preferences' in data) || data.preferences is map);
     }
 
     function isValidDiagnostic(data) {

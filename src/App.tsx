@@ -25,7 +25,8 @@ import {
   Pencil,
   MessageSquare,
   Send,
-  Loader2
+  Loader2,
+  User as UserIcon
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -109,6 +110,23 @@ interface FirestoreErrorInfo {
       photoUrl: string | null;
     }[];
   }
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  photoURL: string | null;
+  emailVerified: boolean;
+  createdAt: string;
+  settings?: {
+    theme: 'light' | 'dark';
+    notifications: boolean;
+  };
+  preferences?: {
+    defaultGrade: string;
+    language: string;
+  };
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -257,6 +275,23 @@ function TasksView({ user }: { user: User | null }) {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskTitle, setEditingTaskTitle] = useState('');
 
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const draft = localStorage.getItem('tasks_draft_title');
+    if (draft) {
+      setNewTaskTitle(draft);
+    }
+  }, []);
+
+  // Save draft to localStorage whenever newTaskTitle changes
+  useEffect(() => {
+    if (newTaskTitle) {
+      localStorage.setItem('tasks_draft_title', newTaskTitle);
+    } else {
+      localStorage.removeItem('tasks_draft_title');
+    }
+  }, [newTaskTitle]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -294,6 +329,7 @@ function TasksView({ user }: { user: User | null }) {
         updatedAt: new Date().toISOString()
       });
       setNewTaskTitle('');
+      localStorage.removeItem('tasks_draft_title');
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, path);
     }
@@ -462,7 +498,7 @@ function ChatView({ user, diagnostic }: { user: User | null, diagnostic: Diagnos
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
+  
   useEffect(() => {
     if (!user) return;
 
@@ -649,6 +685,274 @@ function ChatView({ user, diagnostic }: { user: User | null, diagnostic: Diagnos
   );
 }
 
+function ProfileView({ user, profile }: { user: User | null, profile: UserProfile | null }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [theme, setTheme] = useState(profile?.settings?.theme || 'light');
+  const [notifications, setNotifications] = useState(profile?.settings?.notifications ?? true);
+  const [defaultGrade, setDefaultGrade] = useState(profile?.preferences?.defaultGrade || '');
+  const [language, setLanguage] = useState(profile?.preferences?.language || 'Português');
+
+  useEffect(() => {
+    if (profile) {
+      setTheme(profile.settings?.theme || 'light');
+      setNotifications(profile.settings?.notifications ?? true);
+      setDefaultGrade(profile.preferences?.defaultGrade || '');
+      setLanguage(profile.preferences?.language || 'Português');
+    }
+  }, [profile]);
+
+  const saveProfile = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    const path = `users/${user.uid}`;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        settings: { theme, notifications },
+        preferences: { defaultGrade, language },
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-2xl mx-auto space-y-8"
+    >
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-bold">Perfil do Usuário</h2>
+        <p className="text-gray-500">Gerencie suas configurações de conta e preferências pedagógicas.</p>
+      </div>
+
+      <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm space-y-8">
+        {/* Account Info */}
+        <div className="flex items-center gap-6 pb-8 border-b border-gray-100">
+          {user?.photoURL ? (
+            <img src={user.photoURL} alt="Profile" className="w-20 h-20 rounded-2xl border border-gray-200 shadow-sm" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-2xl shadow-sm">
+              {user?.displayName?.charAt(0) || user?.email?.charAt(0)}
+            </div>
+          )}
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">{user?.displayName}</h3>
+            <p className="text-gray-500">{user?.email}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                user?.emailVerified ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+              )}>
+                {user?.emailVerified ? 'E-mail Verificado' : 'E-mail não verificado'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Settings */}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tema da Interface</label>
+              <select 
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+              >
+                <option value="light">Claro</option>
+                <option value="dark">Escuro</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Idioma Preferido</label>
+              <select 
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+              >
+                <option value="Português">Português</option>
+                <option value="English">English</option>
+                <option value="Español">Español</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Série/Ano Padrão</label>
+            <input 
+              type="text"
+              value={defaultGrade}
+              onChange={(e) => setDefaultGrade(e.target.value)}
+              placeholder="Ex: 9º Ano Ensino Fundamental"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+            <div className="space-y-0.5">
+              <p className="text-sm font-bold text-gray-900">Notificações por E-mail</p>
+              <p className="text-xs text-gray-500">Receba alertas sobre novos diagnósticos e tarefas.</p>
+            </div>
+            <button 
+              onClick={() => setNotifications(!notifications)}
+              className={cn(
+                "w-12 h-6 rounded-full transition-all relative",
+                notifications ? "bg-emerald-500" : "bg-gray-300"
+              )}
+            >
+              <div className={cn(
+                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                notifications ? "left-7" : "left-1"
+              )} />
+            </button>
+          </div>
+        </div>
+
+        <button 
+          onClick={saveProfile}
+          disabled={isSaving}
+          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        >
+          {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Settings size={20} />}
+          {isSaving ? "Salvando..." : "Salvar Alterações"}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+function AlunoView({ result }: { result: DiagnosticResult | null }) {
+  const navigate = useNavigate();
+  if (!result) return (
+    <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
+      <p className="text-gray-500">Nenhum diagnóstico selecionado. Gere um diagnóstico ou selecione um no histórico.</p>
+    </div>
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-emerald-600 transition-colors"
+        >
+          <ChevronRight size={16} className="rotate-180" />
+          Voltar ao Dashboard
+        </button>
+      </div>
+
+      <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pb-6 border-b border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
+              <UserCheck size={28} />
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">{result.aluno}</h2>
+              <p className="text-sm text-gray-500 font-medium tracking-wide uppercase">Relatório Individual de Desempenho</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <div className="px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100 text-center">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Acurácia</p>
+              <p className="text-xl font-bold text-emerald-900">{(result.summary.acuracia_ponderada * 100).toFixed(1)}%</p>
+            </div>
+            <div className="px-4 py-2 bg-blue-50 rounded-xl border border-blue-100 text-center">
+              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Acertos</p>
+              <p className="text-xl font-bold text-blue-900">{result.summary.acertos}/{result.summary.total_questoes}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center gap-2">
+            <BarChart3 size={20} className="text-emerald-600" />
+            <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {result.diagnostico_por_competencia.map((comp, idx) => (
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="group p-6 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-100 transition-all"
+              >
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-3 h-3 rounded-full",
+                        comp.nivel === 'Forte' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
+                        comp.nivel === 'Atenção' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" :
+                        "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                      )} />
+                      <h4 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">{comp.competencia}</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle size={14} className="text-amber-500" />
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Conhecimentos a Reforçar</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {comp.conhecimentos_fracos.map((c, i) => (
+                            <span key={i} className="px-3 py-1 bg-gray-50 text-gray-600 text-xs rounded-lg border border-gray-100">
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <BookOpen size={14} className="text-blue-500" />
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Recomendações Pedagógicas</p>
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed italic border-l-2 border-blue-100 pl-4">
+                          {comp.recomendacoes}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="md:w-32 flex flex-row md:flex-col items-center justify-between md:justify-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div className="text-center">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Nível</p>
+                      <p className={cn(
+                        "text-sm font-bold",
+                        comp.nivel === 'Forte' ? "text-emerald-600" :
+                        comp.nivel === 'Atenção' ? "text-amber-600" :
+                        "text-red-600"
+                      )}>{comp.nivel}</p>
+                    </div>
+                    <div className="w-px h-8 bg-gray-200 md:w-8 md:h-px" />
+                    <div className="text-center">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Acurácia</p>
+                      <p className="text-sm font-bold text-gray-900">{(comp.acuracia_ponderada * 100).toFixed(0)}%</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -675,10 +979,11 @@ function AppContent() {
   const [verificationSent, setVerificationSent] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const activeTab = useMemo(() => {
     const path = location.pathname.split('/')[1] || 'input';
-    return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat';
+    return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat' | 'profile' | 'aluno';
   }, [location]);
 
   // Auth Listener
@@ -712,6 +1017,25 @@ function AppContent() {
       setHistory(docs);
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, path);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Profile Listener
+  useEffect(() => {
+    if (!user) {
+      setUserProfile(null);
+      return;
+    }
+
+    const path = `users/${user.uid}`;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+      if (snapshot.exists()) {
+        setUserProfile(snapshot.data() as UserProfile);
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, path);
     });
 
     return () => unsubscribe();
@@ -953,6 +1277,44 @@ function AppContent() {
     }));
   }, [result]);
 
+  const exportToCSV = () => {
+    if (!result) return;
+
+    const csvData: any[] = result.diagnostico_por_competencia.map(comp => ({
+      'Aluno': result.aluno,
+      'Competência': comp.competencia,
+      'Nível': comp.nivel,
+      'Acurácia (%)': (comp.acuracia_ponderada * 100).toFixed(1),
+      'Acertos': comp.acertos,
+      'Total Questões': comp.total_questoes,
+      'Conhecimentos Fracos': comp.conhecimentos_fracos.join('; '),
+      'Recomendações': comp.recomendacoes
+    }));
+
+    // Add summary row
+    csvData.push({
+      'Aluno': result.aluno,
+      'Competência': 'RESUMO GERAL',
+      'Nível': '-',
+      'Acurácia (%)': (result.summary.acuracia_geral * 100).toFixed(1),
+      'Acertos': result.summary.acertos,
+      'Total Questões': result.summary.total_questoes,
+      'Conhecimentos Fracos': '-',
+      'Recomendações': '-'
+    });
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `diagnostico_${result.aluno.replace(/\s+/g, '_')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-emerald-100">
       {/* Header */}
@@ -998,6 +1360,7 @@ function AppContent() {
               { id: 'history', label: 'Histórico', icon: History, path: '/history' },
               { id: 'tasks', label: 'Tarefas', icon: CheckSquare, path: '/tasks' },
               { id: 'chat', label: 'Chat IA', icon: MessageSquare, path: '/chat' },
+              { id: 'profile', label: 'Perfil', icon: UserIcon, path: '/profile' },
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, disabled: !result, path: '/dashboard' },
               { id: 'plan', label: 'Plano', icon: Calendar, disabled: !result, path: '/plan' },
               { id: 'json', label: 'JSON', icon: Settings, disabled: !result, path: '/json' },
@@ -1307,6 +1670,10 @@ function AppContent() {
 
             <Route path="/chat" element={<ChatView user={user} diagnostic={result} />} />
 
+            <Route path="/profile" element={<ProfileView user={user} profile={userProfile} />} />
+
+            <Route path="/aluno" element={<AlunoView result={result} />} />
+
             <Route path="/dashboard" element={
               result ? (
                 <motion.div
@@ -1314,6 +1681,29 @@ function AppContent() {
                   animate={{ opacity: 1 }}
                   className="space-y-8"
                 >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">Dashboard de Diagnóstico</h2>
+                      <p className="text-sm text-gray-500">Visão geral do desempenho de {result.aluno}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => navigate('/aluno')}
+                        className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 group"
+                      >
+                        <UserCheck size={18} className="group-hover:scale-110 transition-transform" />
+                        Ver Detalhes do Aluno
+                      </button>
+                      <button
+                        onClick={exportToCSV}
+                        className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm group"
+                      >
+                        <Download size={18} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+                        Exportar CSV
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Summary Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
