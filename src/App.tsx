@@ -206,7 +206,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-function HistoryView({ history, deleteDiagnostic, setResult, navigate }: { history: any[], deleteDiagnostic: (id: string) => void, setResult: (res: any) => void, navigate: any }) {
+function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurrentDiagnosticId }: { history: any[], deleteDiagnostic: (id: string) => void, setResult: (res: any) => void, navigate: any, setCurrentDiagnosticId: (id: string) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -256,6 +256,7 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate }: { histo
                 <button 
                   onClick={() => {
                     setResult(item.result);
+                    setCurrentDiagnosticId(item.id);
                     navigate('/dashboard');
                   }}
                   className="text-xs font-bold text-emerald-600 hover:underline"
@@ -827,8 +828,41 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
   );
 }
 
-function AlunoView({ result }: { result: DiagnosticResult | null }) {
+function AlunoView({ result, onUpdateResult, diagnosticId }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null }) {
   const navigate = useNavigate();
+  const [filter, setFilter] = useState<'Todos' | 'Forte' | 'Atenção' | 'Crítico'>('Todos');
+  const [editingComp, setEditingComp] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const filteredCompetencias = useMemo(() => {
+    if (!result) return [];
+    if (filter === 'Todos') return result.diagnostico_por_competencia;
+    return result.diagnostico_por_competencia.filter(c => c.nivel === filter);
+  }, [result, filter]);
+
+  const handleSaveEdit = async (competenciaName: string) => {
+    if (!result) return;
+    const newCompetencias = [...result.diagnostico_por_competencia];
+    const idx = newCompetencias.findIndex(c => c.competencia === competenciaName);
+    if (idx !== -1) {
+      const updatedResult = { ...result, diagnostico_por_competencia: newCompetencias };
+      onUpdateResult(updatedResult);
+      
+      // Update in Firestore if ID exists
+      if (diagnosticId) {
+        const path = `diagnostics/${diagnosticId}`;
+        try {
+          await updateDoc(doc(db, 'diagnostics', diagnosticId), {
+            result: updatedResult
+          });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.UPDATE, path);
+        }
+      }
+    }
+    setEditingComp(null);
+  };
+
   if (!result) return (
     <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
       <p className="text-gray-500">Nenhum diagnóstico selecionado. Gere um diagnóstico ou selecione um no histórico.</p>
@@ -876,78 +910,141 @@ function AlunoView({ result }: { result: DiagnosticResult | null }) {
         </div>
 
         <div className="space-y-8">
-          <div className="flex items-center gap-2">
-            <BarChart3 size={20} className="text-emerald-600" />
-            <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 size={20} className="text-emerald-600" />
+              <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
+            </div>
+            
+            <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-center">
+              {['Todos', 'Forte', 'Atenção', 'Crítico'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f as any)}
+                  className={cn(
+                    "px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
+                    filter === f 
+                      ? "bg-white text-emerald-600 shadow-sm" 
+                      : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6">
-            {result.diagnostico_por_competencia.map((comp, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                className="group p-6 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-100 transition-all"
-              >
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-3 h-3 rounded-full",
-                        comp.nivel === 'Forte' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
-                        comp.nivel === 'Atenção' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" :
-                        "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
-                      )} />
-                      <h4 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">{comp.competencia}</h4>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle size={14} className="text-amber-500" />
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Conhecimentos a Reforçar</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {comp.conhecimentos_fracos.map((c, i) => (
-                            <span key={i} className="px-3 py-1 bg-gray-50 text-gray-600 text-xs rounded-lg border border-gray-100">
-                              {c}
-                            </span>
-                          ))}
-                        </div>
+            {filteredCompetencias.length > 0 ? (
+              filteredCompetencias.map((comp, idx) => (
+                <motion.div 
+                  key={idx}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="group p-6 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-100 transition-all"
+                >
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-3 h-3 rounded-full",
+                          comp.nivel === 'Forte' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
+                          comp.nivel === 'Atenção' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" :
+                          "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                        )} />
+                        <h4 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">{comp.competencia}</h4>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <BookOpen size={14} className="text-blue-500" />
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Recomendações Pedagógicas</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle size={14} className="text-amber-500" />
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Conhecimentos a Reforçar</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {comp.conhecimentos_fracos.map((c, i) => (
+                              <span key={i} className="px-3 py-1 bg-gray-50 text-gray-600 text-xs rounded-lg border border-gray-100">
+                                {c}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 leading-relaxed italic border-l-2 border-blue-100 pl-4">
-                          {comp.recomendacoes}
-                        </p>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <BookOpen size={14} className="text-blue-500" />
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Recomendações Pedagógicas</p>
+                            </div>
+                            {editingComp !== comp.competencia ? (
+                              <button 
+                                onClick={() => {
+                                  setEditingComp(comp.competencia);
+                                  setEditValue(comp.recomendacoes);
+                                }}
+                                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Pencil size={10} />
+                                Personalizar
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => handleSaveEdit(comp.competencia)}
+                                  className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700"
+                                >
+                                  Salvar
+                                </button>
+                                <button 
+                                  onClick={() => setEditingComp(null)}
+                                  className="text-[10px] font-bold text-gray-400 hover:text-gray-600"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {editingComp === comp.competencia ? (
+                            <textarea
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="w-full p-3 text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg focus:ring-1 focus:ring-blue-400 outline-none min-h-[100px]"
+                              autoFocus
+                            />
+                          ) : (
+                            <p className="text-sm text-gray-600 leading-relaxed italic border-l-2 border-blue-100 pl-4">
+                              {comp.recomendacoes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="md:w-32 flex flex-row md:flex-col items-center justify-between md:justify-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Nível</p>
+                        <p className={cn(
+                          "text-sm font-bold",
+                          comp.nivel === 'Forte' ? "text-emerald-600" :
+                          comp.nivel === 'Atenção' ? "text-amber-600" :
+                          "text-red-600"
+                        )}>{comp.nivel}</p>
+                      </div>
+                      <div className="w-px h-8 bg-gray-200 md:w-8 md:h-px" />
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Acurácia</p>
+                        <p className="text-sm font-bold text-gray-900">{(comp.acuracia_ponderada * 100).toFixed(0)}%</p>
                       </div>
                     </div>
                   </div>
-
-                  <div className="md:w-32 flex flex-row md:flex-col items-center justify-between md:justify-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                    <div className="text-center">
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Nível</p>
-                      <p className={cn(
-                        "text-sm font-bold",
-                        comp.nivel === 'Forte' ? "text-emerald-600" :
-                        comp.nivel === 'Atenção' ? "text-amber-600" :
-                        "text-red-600"
-                      )}>{comp.nivel}</p>
-                    </div>
-                    <div className="w-px h-8 bg-gray-200 md:w-8 md:h-px" />
-                    <div className="text-center">
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Acurácia</p>
-                      <p className="text-sm font-bold text-gray-900">{(comp.acuracia_ponderada * 100).toFixed(0)}%</p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                <p className="text-gray-500 italic">Nenhuma competência encontrada com o nível "{filter}".</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -973,6 +1070,7 @@ function AppContent() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticResult | null>(null);
+  const [currentDiagnosticId, setCurrentDiagnosticId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -982,6 +1080,7 @@ function AppContent() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
 
   const activeTab = useMemo(() => {
     const path = location.pathname.split('/')[1] || 'input';
@@ -1249,12 +1348,13 @@ function AppContent() {
       // Save to Firestore
       const path = 'diagnostics';
       try {
-        await addDoc(collection(db, path), {
+        const docRef = await addDoc(collection(db, path), {
           userId: user.uid,
           aluno: res.aluno,
           result: res,
           createdAt: new Date().toISOString()
         });
+        setCurrentDiagnosticId(docRef.id);
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, path);
       }
@@ -1282,9 +1382,18 @@ function AppContent() {
   const evolutionData = useMemo(() => {
     if (!result || !history.length) return [];
     
-    const studentHistory = history.filter(h => h.aluno === result.aluno);
+    let filteredHistory = history.filter(h => h.aluno === result.aluno);
     
-    const sorted = [...studentHistory].sort((a, b) => 
+    const now = new Date();
+    if (evolutionFilter === '7d') {
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      filteredHistory = filteredHistory.filter(h => new Date(h.createdAt) >= sevenDaysAgo);
+    } else if (evolutionFilter === '30d') {
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      filteredHistory = filteredHistory.filter(h => new Date(h.createdAt) >= thirtyDaysAgo);
+    }
+
+    const sorted = [...filteredHistory].sort((a, b) => 
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
 
@@ -1293,7 +1402,7 @@ function AppContent() {
       fullDate: new Date(h.createdAt).toLocaleString('pt-BR'),
       acuracia: Math.round(h.result.summary.acuracia_geral * 100)
     }));
-  }, [result, history]);
+  }, [result, history, evolutionFilter]);
 
   const exportToCSV = () => {
     if (!result) return;
@@ -1322,7 +1431,7 @@ function AppContent() {
     });
 
     const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -1681,7 +1790,13 @@ function AppContent() {
             } />
 
             <Route path="/history" element={
-              <HistoryView history={history} deleteDiagnostic={deleteDiagnostic} setResult={setResult} navigate={navigate} />
+              <HistoryView 
+                history={history} 
+                deleteDiagnostic={deleteDiagnostic} 
+                setResult={setResult} 
+                navigate={navigate} 
+                setCurrentDiagnosticId={setCurrentDiagnosticId}
+              />
             } />
 
             <Route path="/tasks" element={<TasksView user={user} />} />
@@ -1690,7 +1805,7 @@ function AppContent() {
 
             <Route path="/profile" element={<ProfileView user={user} profile={userProfile} />} />
 
-            <Route path="/aluno" element={<AlunoView result={result} />} />
+            <Route path="/aluno" element={<AlunoView result={result} onUpdateResult={setResult} diagnosticId={currentDiagnosticId} />} />
 
             <Route path="/dashboard" element={
               result ? (
@@ -1833,51 +1948,94 @@ function AppContent() {
                   </div>
 
                   {/* Evolution Chart */}
-                  {evolutionData.length > 1 && (
+                  {(evolutionData.length > 1 || evolutionFilter !== 'all') && (
                     <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
-                      <div className="flex items-center gap-3 mb-8">
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                          <History size={20} />
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                            <History size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold">Evolução da Acurácia Geral</h3>
+                            <p className="text-xs text-gray-500">Progresso ao longo dos diagnósticos realizados</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold">Evolução da Acurácia Geral</h3>
-                          <p className="text-xs text-gray-500">Progresso ao longo dos diagnósticos realizados</p>
+                        <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-center">
+                          <button
+                            onClick={() => setEvolutionFilter('7d')}
+                            className={cn(
+                              "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
+                              evolutionFilter === '7d' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                            )}
+                          >
+                            7 Dias
+                          </button>
+                          <button
+                            onClick={() => setEvolutionFilter('30d')}
+                            className={cn(
+                              "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
+                              evolutionFilter === '30d' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                            )}
+                          >
+                            30 Dias
+                          </button>
+                          <button
+                            onClick={() => setEvolutionFilter('all')}
+                            className={cn(
+                              "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
+                              evolutionFilter === 'all' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                            )}
+                          >
+                            Tudo
+                          </button>
                         </div>
                       </div>
-                      <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={evolutionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis 
-                              dataKey="date" 
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 11, fill: '#94a3b8' }}
-                              dy={10}
-                            />
-                            <YAxis 
-                              domain={[0, 100]}
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 11, fill: '#94a3b8' }}
-                            />
-                            <Tooltip 
-                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                              labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-                              formatter={(value: number) => [`${value}%`, 'Acurácia']}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="acuracia" 
-                              stroke="#3b82f6" 
-                              strokeWidth={3}
-                              dot={{ r: 6, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-                              activeDot={{ r: 8, strokeWidth: 0 }}
-                              animationDuration={1500}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                      
+                      {evolutionData.length > 1 ? (
+                        <div className="h-64 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={evolutionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                              <XAxis 
+                                dataKey="date" 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                                dy={10}
+                              />
+                              <YAxis 
+                                domain={[0, 100]}
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                              />
+                              <Tooltip 
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                                formatter={(value: number) => [`${value}%`, 'Acurácia']}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="acuracia" 
+                                stroke="#3b82f6" 
+                                strokeWidth={3}
+                                dot={{ r: 6, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                                activeDot={{ r: 8, strokeWidth: 0 }}
+                                animationDuration={1500}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-64 flex flex-col items-center justify-center text-center space-y-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                          <History className="text-gray-300" size={40} />
+                          <p className="text-gray-500 text-sm italic px-8">
+                            {evolutionFilter === 'all' 
+                              ? "Dados insuficientes para mostrar evolução. Realize mais diagnósticos."
+                              : "Nenhum diagnóstico encontrado neste período."}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
