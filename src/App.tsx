@@ -31,6 +31,8 @@ import {
 import { 
   BarChart, 
   Bar, 
+  LineChart,
+  Line,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -1277,6 +1279,22 @@ function AppContent() {
     }));
   }, [result]);
 
+  const evolutionData = useMemo(() => {
+    if (!result || !history.length) return [];
+    
+    const studentHistory = history.filter(h => h.aluno === result.aluno);
+    
+    const sorted = [...studentHistory].sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    return sorted.map(h => ({
+      date: new Date(h.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      fullDate: new Date(h.createdAt).toLocaleString('pt-BR'),
+      acuracia: Math.round(h.result.summary.acuracia_geral * 100)
+    }));
+  }, [result, history]);
+
   const exportToCSV = () => {
     if (!result) return;
 
@@ -1750,7 +1768,7 @@ function AppContent() {
                   )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Chart */}
+                    {/* Bar Chart */}
                     <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
                       <div className="flex items-center justify-between mb-8">
                         <h3 className="text-lg font-bold">Desempenho por Competência</h3>
@@ -1813,6 +1831,55 @@ function AppContent() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Evolution Chart */}
+                  {evolutionData.length > 1 && (
+                    <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                          <History size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold">Evolução da Acurácia Geral</h3>
+                          <p className="text-xs text-gray-500">Progresso ao longo dos diagnósticos realizados</p>
+                        </div>
+                      </div>
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={evolutionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <XAxis 
+                              dataKey="date" 
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 11, fill: '#94a3b8' }}
+                              dy={10}
+                            />
+                            <YAxis 
+                              domain={[0, 100]}
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 11, fill: '#94a3b8' }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                              labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                              formatter={(value: number) => [`${value}%`, 'Acurácia']}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="acuracia" 
+                              stroke="#3b82f6" 
+                              strokeWidth={3}
+                              dot={{ r: 6, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                              activeDot={{ r: 8, strokeWidth: 0 }}
+                              animationDuration={1500}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Detailed Competency Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
