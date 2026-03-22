@@ -21,6 +21,7 @@ export interface DiagnosticResult {
     distribuicao_bloom: Record<string, number>;
     conhecimentos_fracos: string[];
     recomendacoes: string;
+    private_notes?: string;
   }>;
   plano_de_estudos_7_dias: Array<{
     dia: number;
@@ -37,9 +38,9 @@ export interface DiagnosticResult {
   mensagem_para_o_aluno: string;
 }
 
-export async function generateDiagnostic(data: any[]): Promise<DiagnosticResult> {
+export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview"): Promise<DiagnosticResult> {
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview", // Using a fast model for processing
+    model: modelName,
     contents: [
       {
         role: "user",
@@ -91,7 +92,8 @@ RETORNE APENAS O JSON NO FORMATO:
     "pesos": number[]
   },
   "mensagem_para_o_aluno": string
-}`
+}
+`
           }
         ]
       }
@@ -102,4 +104,27 @@ RETORNE APENAS O JSON NO FORMATO:
   });
 
   return JSON.parse(response.text || "{}");
+}
+
+export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-3-flash-preview"): Promise<string[]> {
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Com base nos conhecimentos fracos: ${conhecimentos.join(", ")} e nas recomendações: ${recomendacoes}, gere uma lista de 3 a 5 sugestões de estudo detalhadas, claras e acionáveis para um aluno.
+            
+            RETORNE APENAS UM ARRAY JSON DE STRINGS.`
+          }
+        ]
+      }
+    ],
+    config: {
+      responseMimeType: "application/json",
+    }
+  });
+
+  return JSON.parse(response.text || "[]");
 }

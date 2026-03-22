@@ -10,6 +10,7 @@
         "displayName": { "type": "string", "description": "The display name of the user." },
         "photoURL": { "type": "string", "description": "The photo URL of the user." },
         "emailVerified": { "type": "boolean", "description": "Whether the user's email is verified." },
+        "role": { "type": "string", "enum": ["aluno", "professor", "admin"], "description": "The user's role in the system." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
         "settings": {
           "type": "object",
