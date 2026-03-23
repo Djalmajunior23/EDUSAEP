@@ -159,6 +159,7 @@ interface FirestoreErrorInfo {
 export interface UserProfile {
   uid: string;
   email: string;
+  matricula?: string;
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
@@ -2076,12 +2077,12 @@ function ExercisesView({ user }: { user: User | null }) {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl shadow-sm">
+          <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100">
             <CheckSquare size={28} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Exercícios de Fixação</h2>
-            <p className="text-sm text-gray-500">Prática e aprendizado com feedback imediato e correção comentada</p>
+            <h2 className="text-2xl font-bold text-gray-900">Módulo de Exercícios</h2>
+            <p className="text-sm text-gray-500">Foco em <span className="text-blue-600 font-bold">prática e aprendizado</span> com feedback imediato e correção comentada</p>
           </div>
         </div>
       </div>
@@ -2106,20 +2107,20 @@ function ExercisesView({ user }: { user: User | null }) {
               className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group"
             >
               <div className="flex items-center justify-between mb-4">
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
                   {ex.subject}
                 </span>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  {ex.questions.length} Questões
-                </span>
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-full text-[8px] font-bold uppercase tracking-tighter">
+                  <Zap size={8} /> Prática
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors">{ex.title}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{ex.title}</h3>
               <p className="text-sm text-gray-500 line-clamp-2 mb-6">{ex.description}</p>
               <button 
                 onClick={() => setActiveExercise(ex)}
-                className="w-full py-3 bg-gray-50 text-gray-900 rounded-2xl font-bold hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-blue-50 text-blue-700 rounded-2xl font-bold hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
               >
-                Começar Exercício <ArrowRight size={18} />
+                Praticar Agora <ArrowRight size={18} />
               </button>
             </motion.div>
           ))}
@@ -2172,12 +2173,12 @@ function StudentExamsView({ user }: { user: User | null }) {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl shadow-sm">
+          <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100">
             <BookOpen size={28} />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Simulados Oficiais</h2>
-            <p className="text-sm text-gray-500">Diagnóstico e avaliação formal para monitoramento de desempenho</p>
+            <p className="text-sm text-gray-500">Foco em <span className="text-emerald-600 font-bold">diagnóstico e avaliação formal</span> para monitoramento de desempenho</p>
           </div>
         </div>
       </div>
@@ -2199,7 +2200,12 @@ function StudentExamsView({ user }: { user: User | null }) {
               >
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <h3 className="font-bold text-gray-900">{exam.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-full text-[8px] font-bold uppercase tracking-tighter">
+                        Avaliação
+                      </span>
+                      <h3 className="font-bold text-gray-900">{exam.title}</h3>
+                    </div>
                     <p className="text-xs text-emerald-600 font-bold">{exam.subject}</p>
                   </div>
                   {submission && (
@@ -2688,17 +2694,52 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
             <ChevronLeft size={24} />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{exam.title}</h2>
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-tighter",
+                exam.type === 'exercicio' ? "bg-blue-600 text-white" : "bg-emerald-600 text-white"
+              )}>
+                {exam.type === 'exercicio' ? 'Modo Prática' : 'Modo Simulado'}
+              </span>
+              <h2 className="text-xl font-bold text-gray-900">{exam.title}</h2>
+            </div>
             <p className="text-xs text-gray-500">Questão {currentQuestionIdx + 1} de {exam.questions.length}</p>
           </div>
         </div>
         <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-emerald-500 transition-all" 
+            className={cn(
+              "h-full transition-all",
+              exam.type === 'exercicio' ? "bg-blue-500" : "bg-emerald-500"
+            )}
             style={{ width: `${((currentQuestionIdx + 1) / exam.questions.length) * 100}%` }}
           />
         </div>
       </div>
+
+      {exam.type === 'exercicio' && (
+        <div className="bg-blue-50 border border-blue-100 p-3 rounded-2xl flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-sm">
+            <Zap size={16} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-blue-900">Aprendizado Ativo</p>
+            <p className="text-[10px] text-blue-700">Feedback imediato e correção comentada habilitados para esta sessão.</p>
+          </div>
+        </div>
+      )}
+
+      {exam.type === 'simulado' && (
+        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl flex items-center gap-3">
+          <div className="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-sm">
+            <BookOpen size={16} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-emerald-900">Avaliação Formal</p>
+            <p className="text-[10px] text-emerald-700">O feedback detalhado será disponibilizado apenas após a finalização do simulado.</p>
+          </div>
+        </div>
+      )}
 
       <motion.div 
         key={currentQuestionIdx}
@@ -2809,7 +2850,10 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:opacity-50"
+                className={cn(
+                  "flex items-center gap-2 px-8 py-3 text-white rounded-xl font-bold transition-all shadow-lg disabled:opacity-50",
+                  exam.type === 'exercicio' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100"
+                )}
               >
                 {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
                 Finalizar {exam.type === 'exercicio' ? 'Exercício' : 'Simulado'}
@@ -2817,7 +2861,10 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
             ) : (
               <button
                 onClick={handleNext}
-                className="flex items-center gap-2 px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 shadow-lg shadow-gray-200"
+                className={cn(
+                  "flex items-center gap-2 px-8 py-3 text-white rounded-xl font-bold transition-all shadow-lg",
+                  exam.type === 'exercicio' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" : "bg-gray-900 hover:bg-gray-800 shadow-gray-200"
+                )}
               >
                 Próxima <ChevronRight size={20} />
               </button>
@@ -3376,6 +3423,9 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
           <div>
             <h3 className="text-xl font-bold text-gray-900">{user?.displayName}</h3>
             <p className="text-gray-500">{user?.email}</p>
+            {profile?.matricula && (
+              <p className="text-sm font-bold text-emerald-600 mt-1">Matrícula: {profile.matricula}</p>
+            )}
             <div className="mt-2 flex items-center gap-2">
               <span className={cn(
                 "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
@@ -4065,7 +4115,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                                               title="Adicionar Feedback à Questão"
                                             >
                                               <MessageSquare size={14} />
-                                              {q.professor_feedback ? 'Editar Feedback' : 'Feedback'}
+                                              {q.professor_feedback ? 'Editar Feedback' : 'Adicionar Feedback'}
                                             </button>
                                           ) : (
                                             <div className="flex flex-col gap-1">
@@ -4090,67 +4140,78 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                                     </div>
 
                                     {/* Question Feedback UI */}
-                                    {editingQuestionFeedback === `${comp.competencia}-${q.id}` ? (
-                                      <div className="mt-2 space-y-2">
-                                        <div className="flex items-center gap-2">
-                                          <div className="w-20">
-                                            <input
-                                              type="text"
-                                              value={notaValue}
-                                              onChange={(e) => setNotaValue(e.target.value)}
-                                              className={cn(
-                                                "w-full p-2 text-xs rounded-lg focus:ring-1 outline-none",
-                                                q.acertou 
-                                                  ? "text-emerald-900 bg-white border border-emerald-200 focus:ring-emerald-400" 
-                                                  : "text-red-900 bg-white border border-red-200 focus:ring-red-400"
-                                              )}
-                                              placeholder="Nota"
-                                            />
+                                    <div className="mt-4 pt-4 border-t border-gray-100/50">
+                                      {isProfessor && (!q.acertou || comp.nivel === 'Crítico') && editingQuestionFeedback !== `${comp.competencia}-${q.id}` && !q.professor_feedback && !q.professor_nota && (
+                                        <div className="flex items-center justify-between bg-gray-50/50 p-3 rounded-xl border border-dashed border-gray-200">
+                                          <div className="flex items-center gap-2 text-gray-500">
+                                            <MessageSquare size={14} />
+                                            <span className="text-xs font-medium">Feedback do Professor pendente</span>
                                           </div>
-                                          <div className="flex-1">
-                                            <textarea
-                                              value={feedbackValue}
-                                              onChange={(e) => setFeedbackValue(e.target.value)}
-                                              className={cn(
-                                                "w-full p-2 text-xs rounded-lg focus:ring-1 outline-none min-h-[40px]",
-                                                q.acertou 
-                                                  ? "text-emerald-900 bg-white border border-emerald-200 focus:ring-emerald-400" 
-                                                  : "text-red-900 bg-white border border-red-200 focus:ring-red-400"
-                                              )}
-                                              placeholder="Explicação personalizada..."
-                                              autoFocus
-                                            />
+                                          <button 
+                                            onClick={() => {
+                                              setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                              setFeedbackValue(q.professor_feedback || '');
+                                              setNotaValue(q.professor_nota || '');
+                                            }}
+                                            className="text-[10px] font-bold text-emerald-600 hover:underline"
+                                          >
+                                            Inserir Agora
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {editingQuestionFeedback === `${comp.competencia}-${q.id}` ? (
+                                        <div className="space-y-3">
+                                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback do Professor</p>
+                                          <div className="flex items-center gap-2">
+                                            <div className="w-24">
+                                              <input
+                                                type="text"
+                                                value={notaValue}
+                                                onChange={(e) => setNotaValue(e.target.value)}
+                                                className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                                placeholder="Nota"
+                                              />
+                                            </div>
+                                            <div className="flex-1">
+                                              <textarea
+                                                value={feedbackValue}
+                                                onChange={(e) => setFeedbackValue(e.target.value)}
+                                                className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[40px]"
+                                                placeholder="Explicação personalizada para o aluno..."
+                                                autoFocus
+                                              />
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    ) : (q.professor_feedback || q.professor_nota) ? (
-                                      <div className={cn(
-                                        "mt-2 p-3 rounded-lg border flex items-start gap-3",
-                                        q.acertou 
-                                          ? "bg-emerald-100/30 border-emerald-100/50" 
-                                          : "bg-red-100/30 border-red-100/50"
-                                      )}>
-                                        {q.professor_nota && (
-                                          <div className={cn(
-                                            "px-2 py-1 border rounded text-[10px] font-bold",
-                                            q.acertou 
-                                              ? "bg-emerald-100 border-emerald-200 text-emerald-700" 
-                                              : "bg-red-100 border-red-200 text-red-700"
-                                          )}>
-                                            Nota: {q.professor_nota}
+                                      ) : (q.professor_feedback || q.professor_nota) ? (
+                                        <div className={cn(
+                                          "p-4 rounded-xl border space-y-3",
+                                          q.acertou ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100"
+                                        )}>
+                                          <div className="flex items-center justify-between">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback do Professor</p>
+                                            {q.professor_nota && (
+                                              <span className={cn(
+                                                "px-2 py-0.5 rounded text-[10px] font-bold",
+                                                q.acertou ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                                              )}>
+                                                Nota: {q.professor_nota}
+                                              </span>
+                                            )}
                                           </div>
-                                        )}
-                                        <div className="flex-1 flex gap-2">
-                                          <MessageSquare size={12} className={q.acertou ? "text-emerald-500" : "text-red-500"} />
-                                          <p className={cn(
-                                            "text-xs font-medium italic",
-                                            q.acertou ? "text-emerald-800" : "text-red-800"
-                                          )}>
-                                            {q.professor_feedback || "Nenhuma explicação fornecida."}
-                                          </p>
+                                          <div className="flex gap-3">
+                                            <MessageSquare size={14} className={q.acertou ? "text-emerald-500" : "text-red-500"} />
+                                            <p className={cn(
+                                              "text-xs font-medium italic leading-relaxed",
+                                              q.acertou ? "text-emerald-800" : "text-red-800"
+                                            )}>
+                                              {q.professor_feedback || "Nenhuma explicação fornecida."}
+                                            </p>
+                                          </div>
                                         </div>
-                                      </div>
-                                    ) : null}
+                                      ) : null}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -4455,6 +4516,10 @@ function AppContent() {
         if (user.email === 'djalmabatistajunior@gmail.com') {
           data.role = 'admin';
         }
+        // Auto-populate matricula if missing
+        if (!data.matricula && user.email) {
+          data.matricula = user.email.substring(0, 10);
+        }
         setUserProfile(data);
       } else if (user.email === 'djalmabatistajunior@gmail.com') {
         // Fallback for Djalma if profile doesn't exist yet
@@ -4462,7 +4527,17 @@ function AppContent() {
           uid: user.uid,
           email: user.email,
           role: 'admin',
+          matricula: user.email.substring(0, 10),
           displayName: user.displayName || 'Djalma'
+        } as UserProfile);
+      } else if (user) {
+        // Fallback for any user if profile doesn't exist yet
+        setUserProfile({
+          uid: user.uid,
+          email: user.email || '',
+          role: 'aluno',
+          matricula: user.email?.substring(0, 10),
+          displayName: user.displayName || user.email?.split('@')[0] || 'Aluno'
         } as UserProfile);
       }
     }, (err) => {
@@ -4498,9 +4573,11 @@ function AppContent() {
       
       if (!userSnap.exists()) {
         const role = user.email === 'djalmabatistajunior@gmail.com' ? 'admin' : 'aluno';
+        const matricula = user.email?.substring(0, 10);
         await setDoc(userRef, {
           uid: user.uid,
           email: user.email,
+          matricula: matricula,
           displayName: user.displayName,
           photoURL: user.photoURL,
           emailVerified: user.emailVerified,
@@ -4509,10 +4586,12 @@ function AppContent() {
         });
       } else {
         // Just update last login or basic info, keep existing role
+        const matricula = user.email?.substring(0, 10);
         await updateDoc(userRef, {
           displayName: user.displayName,
           photoURL: user.photoURL,
           emailVerified: user.emailVerified,
+          matricula: matricula,
           lastLoginAt: new Date().toISOString()
         });
       }
@@ -4570,9 +4649,11 @@ function AppContent() {
       // Save user profile in Firestore
       const userRef = doc(db, 'users', user.uid);
       const role = user.email === 'djalmabatistajunior@gmail.com' ? 'admin' : 'aluno';
+      const matricula = user.email?.substring(0, 10);
       await setDoc(userRef, {
         uid: user.uid,
         email: user.email,
+        matricula: matricula,
         displayName: displayName || user.email?.split('@')[0],
         photoURL: null,
         emailVerified: false,
