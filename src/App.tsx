@@ -40,6 +40,9 @@ import {
   Users,
   Square,
   X,
+  Check,
+  XCircle,
+  HelpCircle,
   Menu,
   Database,
   Zap,
@@ -1645,7 +1648,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
 
                   // Send to Gemini to parse
                   const prompt = `Parse the following text into a list of questions in JSON format.
-                  Each question should have: text, options (array of 4 strings), correctOption (index 0-3), weight (number), competency (string).
+                  Each question should have: text, options (array of 4 strings), correctOption (index 0-3), weight (number), competency (string), and explanation (string explaining the correct answer).
                   Text: ${text}`;
                   
                   const response = await ai.models.generateContent({
@@ -1662,7 +1665,8 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
                             options: { type: Type.ARRAY, items: { type: Type.STRING } },
                             correctOption: { type: Type.INTEGER },
                             weight: { type: Type.INTEGER },
-                            competency: { type: Type.STRING }
+                            competency: { type: Type.STRING },
+                            explanation: { type: Type.STRING }
                           }
                         }
                       }
@@ -1777,6 +1781,15 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
                       value={q.weight} 
                       onChange={(e) => updateQuestion(qIdx, 'weight', parseFloat(e.target.value))}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Explicação (Correção Comentada)</label>
+                    <textarea 
+                      value={q.explanation || ''} 
+                      onChange={(e) => updateQuestion(qIdx, 'explanation', e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Explique a resposta correta..."
                     />
                   </div>
                 </div>
@@ -1940,9 +1953,14 @@ function ExercisesView({ user }: { user: User | null }) {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Exercícios de Fixação</h2>
-          <p className="text-sm text-gray-500">Pratique seus conhecimentos com feedback imediato</p>
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl shadow-sm">
+            <CheckSquare size={28} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Exercícios de Fixação</h2>
+            <p className="text-sm text-gray-500">Prática e aprendizado com feedback imediato e correção comentada</p>
+          </div>
         </div>
       </div>
 
@@ -1999,8 +2017,12 @@ function StudentExamsView({ user }: { user: User | null }) {
   useEffect(() => {
     if (!user) return;
     
-    // Fetch published exams
-    const examsQuery = query(collection(db, 'exams'), where('status', '==', 'published'));
+    // Fetch published exams (Simulados only)
+    const examsQuery = query(
+      collection(db, 'exams'), 
+      where('status', '==', 'published'),
+      where('type', '==', 'simulado')
+    );
     const unsubscribeExams = onSnapshot(examsQuery, (snapshot) => {
       const examsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
       setExams(examsData);
@@ -2026,9 +2048,16 @@ function StudentExamsView({ user }: { user: User | null }) {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Simulados Disponíveis</h2>
-        <p className="text-sm text-gray-500">Avalie seus conhecimentos e receba feedback instantâneo</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl shadow-sm">
+            <BookOpen size={28} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Simulados Oficiais</h2>
+            <p className="text-sm text-gray-500">Diagnóstico e avaliação formal para monitoramento de desempenho</p>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -2263,13 +2292,29 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [finalSubmission, setFinalSubmission] = useState<ExamSubmission | null>(null);
+  const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
   const currentQuestion = exam.questions[currentQuestionIdx];
 
   const handleAnswer = (optionIdx: number) => {
+    if (exam.type === 'exercicio' && isAnswerChecked) return;
     const newAnswers = [...answers];
     newAnswers[currentQuestionIdx] = optionIdx;
     setAnswers(newAnswers);
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIdx < exam.questions.length - 1) {
+      setCurrentQuestionIdx(prev => prev + 1);
+      setIsAnswerChecked(false);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIdx > 0) {
+      setCurrentQuestionIdx(prev => prev - 1);
+      setIsAnswerChecked(exam.type === 'exercicio' && answers[currentQuestionIdx - 1] !== -1);
+    }
   };
 
   const handleSubmit = async () => {
@@ -2328,7 +2373,7 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
             <CheckCircle2 size={40} />
           </div>
           <div className="space-y-2">
-            <h2 className="text-3xl font-bold text-gray-900">Simulado Concluído!</h2>
+            <h2 className="text-3xl font-bold text-gray-900">{exam.type === 'exercicio' ? 'Exercício Concluído!' : 'Simulado Concluído!'}</h2>
             <p className="text-gray-500">Confira seu desempenho detalhado abaixo.</p>
           </div>
           
@@ -2369,7 +2414,7 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
             onClick={onCancel}
             className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-all shadow-lg"
           >
-            Voltar para Simulados
+            Voltar para {exam.type === 'exercicio' ? 'Exercícios' : 'Simulados'}
           </button>
         </div>
       </motion.div>
@@ -2416,58 +2461,110 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
             <button
               key={idx}
               onClick={() => handleAnswer(idx)}
+              disabled={exam.type === 'exercicio' && isAnswerChecked}
               className={cn(
                 "w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 group",
                 answers[currentQuestionIdx] === idx 
-                  ? "bg-emerald-50 border-emerald-500 shadow-sm" 
-                  : "bg-gray-50 border-gray-100 hover:border-emerald-200 hover:bg-white"
+                  ? (exam.type === 'exercicio' && isAnswerChecked 
+                      ? (idx === currentQuestion.correctOption ? "bg-emerald-50 border-emerald-500 shadow-sm" : "bg-red-50 border-red-500 shadow-sm")
+                      : "bg-emerald-50 border-emerald-500 shadow-sm")
+                  : (exam.type === 'exercicio' && isAnswerChecked && idx === currentQuestion.correctOption
+                      ? "bg-emerald-50 border-emerald-500 shadow-sm"
+                      : "bg-gray-50 border-gray-100 hover:border-emerald-200 hover:bg-white")
               )}
             >
               <div className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all",
                 answers[currentQuestionIdx] === idx 
-                  ? "bg-emerald-500 text-white" 
-                  : "bg-white text-gray-400 group-hover:text-emerald-600"
+                  ? (exam.type === 'exercicio' && isAnswerChecked
+                      ? (idx === currentQuestion.correctOption ? "bg-emerald-500 text-white" : "bg-red-500 text-white")
+                      : "bg-emerald-500 text-white")
+                  : (exam.type === 'exercicio' && isAnswerChecked && idx === currentQuestion.correctOption
+                      ? "bg-emerald-500 text-white"
+                      : "bg-white text-gray-400 group-hover:text-emerald-600")
               )}>
                 {String.fromCharCode(65 + idx)}
               </div>
-              <span className={cn(
-                "text-sm font-medium",
-                answers[currentQuestionIdx] === idx ? "text-emerald-900" : "text-gray-600"
-              )}>
-                {opt}
-              </span>
+              <div className="flex-1 flex items-center justify-between">
+                <span className={cn(
+                  "text-sm font-medium",
+                  answers[currentQuestionIdx] === idx 
+                    ? (exam.type === 'exercicio' && isAnswerChecked
+                        ? (idx === currentQuestion.correctOption ? "text-emerald-900" : "text-red-900")
+                        : "text-emerald-900")
+                    : (exam.type === 'exercicio' && isAnswerChecked && idx === currentQuestion.correctOption
+                        ? "text-emerald-900"
+                        : "text-gray-600")
+                )}>
+                  {opt}
+                </span>
+                {exam.type === 'exercicio' && isAnswerChecked && (
+                  idx === currentQuestion.correctOption ? (
+                    <CheckCircle2 className="text-emerald-500" size={18} />
+                  ) : (
+                    answers[currentQuestionIdx] === idx && <XCircle className="text-red-500" size={18} />
+                  )
+                )}
+              </div>
             </button>
           ))}
         </div>
+
+        {exam.type === 'exercicio' && isAnswerChecked && currentQuestion.explanation && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-6 bg-blue-50 border border-blue-100 rounded-2xl space-y-2"
+          >
+            <div className="flex items-center gap-2 text-blue-700 font-bold text-xs uppercase tracking-widest">
+              <HelpCircle size={14} /> Correção Comentada
+            </div>
+            <p className="text-sm text-blue-900 leading-relaxed">
+              {currentQuestion.explanation}
+            </p>
+          </motion.div>
+        )}
       </motion.div>
 
       <div className="flex items-center justify-between">
         <button
           disabled={currentQuestionIdx === 0}
-          onClick={() => setCurrentQuestionIdx(prev => prev - 1)}
+          onClick={handlePrevious}
           className="flex items-center gap-2 px-6 py-3 text-gray-500 font-bold hover:text-gray-900 disabled:opacity-30"
         >
           <ChevronLeft size={20} /> Anterior
         </button>
-        
-        {currentQuestionIdx === exam.questions.length - 1 ? (
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:opacity-50"
-          >
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-            Finalizar Simulado
-          </button>
-        ) : (
-          <button
-            onClick={() => setCurrentQuestionIdx(prev => prev + 1)}
-            className="flex items-center gap-2 px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 shadow-lg shadow-gray-200"
-          >
-            Próxima <ChevronRight size={20} />
-          </button>
-        )}
+
+        <div className="flex gap-3">
+          {exam.type === 'exercicio' && !isAnswerChecked && answers[currentQuestionIdx] !== -1 && (
+            <button
+              onClick={() => setIsAnswerChecked(true)}
+              className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100"
+            >
+              <Check size={20} /> Verificar Resposta
+            </button>
+          )}
+          
+          {(exam.type === 'simulado' || isAnswerChecked) && (
+            currentQuestionIdx === exam.questions.length - 1 ? (
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:opacity-50"
+              >
+                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                Finalizar {exam.type === 'exercicio' ? 'Exercício' : 'Simulado'}
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                className="flex items-center gap-2 px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 shadow-lg shadow-gray-200"
+              >
+                Próxima <ChevronRight size={20} />
+              </button>
+            )
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2513,41 +2610,35 @@ function AdminUsersView({ user }: { user: User | null }) {
     e.preventDefault();
     setCreating(true);
 
+    let secondaryApp;
     try {
       // Initialize a secondary app to create the user without signing out the admin
       const { getApps, initializeApp, deleteApp } = await import('firebase/app');
-      const existingApp = getApps().find(app => app.name === "SecondaryApp");
-      const secondaryApp = existingApp || initializeApp(firebaseConfig, "SecondaryApp");
+      const apps = getApps();
+      secondaryApp = apps.find(app => app.name === "SecondaryApp") || initializeApp(firebaseConfig, "SecondaryApp");
       const secondaryAuth = getSecondaryAuth(secondaryApp);
       
-      try {
-        const result = await createSecondaryUser(secondaryAuth, newEmail, newPassword);
-        const newUser = result.user;
+      const result = await createSecondaryUser(secondaryAuth, newEmail, newPassword);
+      const newUser = result.user;
 
-        // Save user profile in Firestore
-        const userRef = doc(db, 'users', newUser.uid);
-        await setDoc(userRef, {
-          uid: newUser.uid,
-          email: newUser.email,
-          displayName: newName || newEmail.split('@')[0],
-          photoURL: null,
-          emailVerified: false,
-          role: newRole,
-          createdAt: new Date().toISOString()
-        });
+      // Save user profile in Firestore
+      const userRef = doc(db, 'users', newUser.uid);
+      await setDoc(userRef, {
+        uid: newUser.uid,
+        email: newUser.email,
+        displayName: newName || newEmail.split('@')[0],
+        photoURL: '',
+        emailVerified: false,
+        role: newRole,
+        createdAt: new Date().toISOString()
+      });
 
-        toast.success(`Usuário ${newEmail} criado com sucesso!`);
-        setNewEmail('');
-        setNewPassword('');
-        setNewName('');
-        setNewRole('aluno');
-      } finally {
-        // Sign out and delete the secondary app
-        await secondaryAuth.signOut();
-        if (secondaryApp.name === "SecondaryApp") {
-          await deleteApp(secondaryApp);
-        }
-      }
+      await secondaryAuth.signOut();
+      toast.success(`Usuário ${newEmail} criado com sucesso!`);
+      setNewEmail('');
+      setNewPassword('');
+      setNewName('');
+      setNewRole('aluno');
     } catch (err: any) {
       console.error("Error creating user", err);
       if (err.code === 'auth/email-already-in-use') {
@@ -2558,6 +2649,10 @@ function AdminUsersView({ user }: { user: User | null }) {
         toast.error("Erro ao criar usuário. Verifique os dados.");
       }
     } finally {
+      if (secondaryApp) {
+        const { deleteApp } = await import('firebase/app');
+        await deleteApp(secondaryApp).catch(console.error);
+      }
       setCreating(false);
     }
   };
@@ -3115,9 +3210,11 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   const [editingComp, setEditingComp] = useState<string | null>(null);
   const [editingFeedback, setEditingFeedback] = useState<string | null>(null);
+  const [editingQuestionFeedback, setEditingQuestionFeedback] = useState<string | null>(null);
   const [editingPrivateNote, setEditingPrivateNote] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [feedbackValue, setFeedbackValue] = useState('');
+  const [notaValue, setNotaValue] = useState<string | number>('');
   const [privateNoteValue, setPrivateNoteValue] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
@@ -3196,17 +3293,50 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
     return comps;
   }, [result, filter, sortOrder]);
 
-  const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote' | 'professorFeedback', value?: string) => {
+  const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote' | 'professorFeedback' | 'questionFeedback' | 'professorNota' | 'questionNota' | 'fullFeedback' | 'fullQuestionFeedback', value?: string | number, questionId?: string | number, nota?: string | number) => {
     if (!result) return;
     const newCompetencias = [...result.diagnostico_por_competencia];
     const idx = newCompetencias.findIndex(c => c.competencia === competenciaName);
     if (idx !== -1) {
       if (type === 'recommendation') {
-        newCompetencias[idx] = { ...newCompetencias[idx], recomendacoes: value !== undefined ? value : editValue };
+        newCompetencias[idx] = { ...newCompetencias[idx], recomendacoes: (value !== undefined ? value : editValue) as string };
       } else if (type === 'professorFeedback') {
-        newCompetencias[idx] = { ...newCompetencias[idx], professor_feedback: value !== undefined ? value : feedbackValue };
+        newCompetencias[idx] = { ...newCompetencias[idx], professor_feedback: (value !== undefined ? value : feedbackValue) as string };
+      } else if (type === 'professorNota') {
+        newCompetencias[idx] = { ...newCompetencias[idx], professor_nota: value !== undefined ? value : notaValue };
+      } else if (type === 'fullFeedback') {
+        newCompetencias[idx] = { 
+          ...newCompetencias[idx], 
+          professor_feedback: (value !== undefined ? value : feedbackValue) as string,
+          professor_nota: nota !== undefined ? nota : notaValue
+        };
+      } else if (type === 'questionFeedback') {
+        const qIdx = newCompetencias[idx].questoes?.findIndex(q => q.id === questionId);
+        if (qIdx !== undefined && qIdx !== -1 && newCompetencias[idx].questoes) {
+          const updatedQuestoes = [...newCompetencias[idx].questoes!];
+          updatedQuestoes[qIdx] = { ...updatedQuestoes[qIdx], professor_feedback: (value !== undefined ? value : feedbackValue) as string };
+          newCompetencias[idx] = { ...newCompetencias[idx], questoes: updatedQuestoes };
+        }
+      } else if (type === 'questionNota') {
+        const qIdx = newCompetencias[idx].questoes?.findIndex(q => q.id === questionId);
+        if (qIdx !== undefined && qIdx !== -1 && newCompetencias[idx].questoes) {
+          const updatedQuestoes = [...newCompetencias[idx].questoes!];
+          updatedQuestoes[qIdx] = { ...updatedQuestoes[qIdx], professor_nota: value !== undefined ? value : notaValue };
+          newCompetencias[idx] = { ...newCompetencias[idx], questoes: updatedQuestoes };
+        }
+      } else if (type === 'fullQuestionFeedback') {
+        const qIdx = newCompetencias[idx].questoes?.findIndex(q => q.id === questionId);
+        if (qIdx !== undefined && qIdx !== -1 && newCompetencias[idx].questoes) {
+          const updatedQuestoes = [...newCompetencias[idx].questoes!];
+          updatedQuestoes[qIdx] = { 
+            ...updatedQuestoes[qIdx], 
+            professor_feedback: (value !== undefined ? value : feedbackValue) as string,
+            professor_nota: nota !== undefined ? nota : notaValue
+          };
+          newCompetencias[idx] = { ...newCompetencias[idx], questoes: updatedQuestoes };
+        }
       } else {
-        newCompetencias[idx] = { ...newCompetencias[idx], private_notes: value !== undefined ? value : privateNoteValue };
+        newCompetencias[idx] = { ...newCompetencias[idx], private_notes: (value !== undefined ? value : privateNoteValue) as string };
       }
       
       const updatedResult = { ...result, diagnostico_por_competencia: newCompetencias };
@@ -3226,7 +3356,9 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
     }
     setEditingComp(null);
     setEditingFeedback(null);
+    setEditingQuestionFeedback(null);
     setEditingPrivateNote(null);
+    setNotaValue('');
   };
 
   if (!result) return (
@@ -3469,11 +3601,14 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
 
                           {/* Professor Feedback Section */}
                           {(comp.nivel === 'Crítico' || comp.acertos < comp.total_questoes) && (
-                            <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                            <div className={cn(
+                              "mt-6 pt-6 border-t border-gray-100 space-y-4",
+                              comp.nivel === 'Crítico' && "bg-red-50/20 -mx-6 px-6 pb-6 rounded-b-2xl"
+                            )}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <MessageSquare size={14} className="text-emerald-500" />
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback Personalizado do Professor</p>
+                                  <MessageSquare size={14} className={comp.nivel === 'Crítico' ? "text-red-500" : "text-emerald-500"} />
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback do Professor</p>
                                 </div>
                                 {isProfessor && (
                                   editingFeedback !== comp.competencia ? (
@@ -3481,6 +3616,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                                       onClick={() => {
                                         setEditingFeedback(comp.competencia);
                                         setFeedbackValue(comp.professor_feedback || '');
+                                        setNotaValue(comp.professor_nota || '');
                                       }}
                                       className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                                     >
@@ -3507,22 +3643,205 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                               </div>
 
                               {editingFeedback === comp.competencia ? (
-                                <textarea
-                                  value={feedbackValue}
-                                  onChange={(e) => setFeedbackValue(e.target.value)}
-                                  className="w-full p-3 text-sm text-emerald-900 bg-emerald-50 border border-emerald-100 rounded-lg focus:ring-1 focus:ring-emerald-400 outline-none min-h-[80px]"
-                                  placeholder="Insira uma nota ou explicação personalizada para o aluno..."
-                                  autoFocus
-                                />
-                              ) : comp.professor_feedback ? (
-                                <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
-                                  <p className="text-sm text-emerald-800 leading-relaxed font-medium">
-                                    {comp.professor_feedback}
-                                  </p>
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Nota (0-10)</label>
+                                      <input
+                                        type="text"
+                                        value={notaValue}
+                                        onChange={(e) => setNotaValue(e.target.value)}
+                                        className={cn(
+                                          "w-full p-2 text-sm rounded-lg focus:ring-1 outline-none",
+                                          comp.nivel === 'Crítico' 
+                                            ? "text-red-900 bg-red-50 border border-red-100 focus:ring-red-400" 
+                                            : "text-emerald-900 bg-emerald-50 border border-emerald-100 focus:ring-emerald-400"
+                                        )}
+                                        placeholder="Ex: 7.5"
+                                      />
+                                    </div>
+                                    <div className="flex-[3]">
+                                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Explicação Personalizada</label>
+                                      <textarea
+                                        value={feedbackValue}
+                                        onChange={(e) => setFeedbackValue(e.target.value)}
+                                        className={cn(
+                                          "w-full p-3 text-sm rounded-lg focus:ring-1 outline-none min-h-[80px]",
+                                          comp.nivel === 'Crítico' 
+                                            ? "text-red-900 bg-red-50 border border-red-100 focus:ring-red-400" 
+                                            : "text-emerald-900 bg-emerald-50 border border-emerald-100 focus:ring-emerald-400"
+                                        )}
+                                        placeholder="Insira uma explicação personalizada para o aluno..."
+                                        autoFocus
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end gap-2">
+                                    <button 
+                                      onClick={() => handleSaveEdit(comp.competencia, 'fullFeedback')}
+                                      className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                                    >
+                                      Salvar Feedback Completo
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (comp.professor_feedback || comp.professor_nota) ? (
+                                <div className={cn(
+                                  "p-4 rounded-xl border flex items-start gap-4",
+                                  comp.nivel === 'Crítico'
+                                    ? "bg-red-50/50 border-red-100/50"
+                                    : "bg-emerald-50/50 border-emerald-100/50"
+                                )}>
+                                  {comp.professor_nota && (
+                                    <div className={cn(
+                                      "px-3 py-2 rounded-lg border flex flex-col items-center justify-center min-w-[60px]",
+                                      comp.nivel === 'Crítico' ? "bg-red-100 border-red-200" : "bg-emerald-100 border-emerald-200"
+                                    )}>
+                                      <span className="text-[8px] font-bold text-gray-400 uppercase">Nota</span>
+                                      <span className={cn("text-lg font-black", comp.nivel === 'Crítico' ? "text-red-700" : "text-emerald-700")}>
+                                        {comp.professor_nota}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex-1">
+                                    <p className={cn(
+                                      "text-sm leading-relaxed font-medium",
+                                      comp.nivel === 'Crítico' ? "text-red-800" : "text-emerald-800"
+                                    )}>
+                                      {comp.professor_feedback || "Nenhuma explicação fornecida."}
+                                    </p>
+                                  </div>
                                 </div>
                               ) : (
                                 <p className="text-xs text-gray-400 italic">Nenhum feedback personalizado inserido ainda.</p>
                               )}
+                            </div>
+                          )}
+
+                          {/* Individual Questions Section */}
+                          {comp.questoes && comp.questoes.length > 0 && (comp.nivel === 'Crítico' || comp.acertos < comp.total_questoes) && (
+                            <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
+                              <div className="flex items-center gap-2 mb-4">
+                                <HelpCircle size={14} className="text-emerald-500" />
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Detalhamento por Questão</p>
+                              </div>
+                              
+                              <div className="space-y-4">
+                                {comp.questoes.map((q, qIdx) => (
+                                  <div 
+                                    key={qIdx} 
+                                    className={cn(
+                                      "p-4 rounded-xl border transition-all",
+                                      q.acertou ? "bg-emerald-50/30 border-emerald-100/50" : "bg-red-50/30 border-red-100/50"
+                                    )}
+                                  >
+                                    <div className="flex items-start justify-between gap-4 mb-3">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className={cn(
+                                            "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                            q.acertou ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                                          )}>
+                                            Questão {q.id}
+                                          </span>
+                                          {!q.acertou && (
+                                            <span className="text-[10px] font-bold text-red-600 uppercase tracking-tight flex items-center gap-1">
+                                              <XCircle size={10} />
+                                              Incorreta
+                                            </span>
+                                          )}
+                                        </div>
+                                        {q.enunciado && <p className="text-sm text-gray-700 font-medium mb-2">{q.enunciado}</p>}
+                                        <div className="grid grid-cols-2 gap-4 text-xs">
+                                          <div className="p-2 bg-white/50 rounded-lg border border-gray-100">
+                                            <p className="text-gray-400 font-bold uppercase tracking-tighter mb-1">Resposta do Aluno</p>
+                                            <p className={cn("font-bold", q.acertou ? "text-emerald-700" : "text-red-700")}>{q.resposta_aluno}</p>
+                                          </div>
+                                          <div className="p-2 bg-white/50 rounded-lg border border-gray-100">
+                                            <p className="text-gray-400 font-bold uppercase tracking-tighter mb-1">Gabarito</p>
+                                            <p className="text-emerald-700 font-bold">{q.gabarito}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
+                                      {isProfessor && (
+                                        <div className="flex flex-col gap-2">
+                                          {editingQuestionFeedback !== `${comp.competencia}-${q.id}` ? (
+                                            <button 
+                                              onClick={() => {
+                                                setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                                setFeedbackValue(q.professor_feedback || '');
+                                                setNotaValue(q.professor_nota || '');
+                                              }}
+                                              className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                                              title="Adicionar Feedback à Questão"
+                                            >
+                                              <MessageSquare size={16} />
+                                            </button>
+                                          ) : (
+                                            <div className="flex flex-col gap-1">
+                                              <button 
+                                                onClick={() => handleSaveEdit(comp.competencia, 'fullQuestionFeedback', feedbackValue, q.id, notaValue)}
+                                                className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                                                title="Salvar"
+                                              >
+                                                <Check size={14} />
+                                              </button>
+                                              <button 
+                                                onClick={() => setEditingQuestionFeedback(null)}
+                                                className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors"
+                                                title="Cancelar"
+                                              >
+                                                <X size={14} />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Question Feedback UI */}
+                                    {editingQuestionFeedback === `${comp.competencia}-${q.id}` ? (
+                                      <div className="mt-2 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-20">
+                                            <input
+                                              type="text"
+                                              value={notaValue}
+                                              onChange={(e) => setNotaValue(e.target.value)}
+                                              className="w-full p-2 text-xs text-emerald-900 bg-white border border-emerald-200 rounded-lg focus:ring-1 focus:ring-emerald-400 outline-none"
+                                              placeholder="Nota"
+                                            />
+                                          </div>
+                                          <div className="flex-1">
+                                            <textarea
+                                              value={feedbackValue}
+                                              onChange={(e) => setFeedbackValue(e.target.value)}
+                                              className="w-full p-2 text-xs text-emerald-900 bg-white border border-emerald-200 rounded-lg focus:ring-1 focus:ring-emerald-400 outline-none min-h-[40px]"
+                                              placeholder="Explicação personalizada..."
+                                              autoFocus
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (q.professor_feedback || q.professor_nota) ? (
+                                      <div className="mt-2 p-3 bg-emerald-100/30 rounded-lg border border-emerald-100/50 flex items-start gap-3">
+                                        {q.professor_nota && (
+                                          <div className="px-2 py-1 bg-emerald-100 border border-emerald-200 rounded text-[10px] font-bold text-emerald-700">
+                                            Nota: {q.professor_nota}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 flex gap-2">
+                                          <MessageSquare size={12} className="text-emerald-500 shrink-0 mt-0.5" />
+                                          <p className="text-xs text-emerald-800 font-medium italic">
+                                            {q.professor_feedback || "Nenhuma explicação fornecida."}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>

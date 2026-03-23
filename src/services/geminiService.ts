@@ -22,7 +22,17 @@ export interface DiagnosticResult {
     conhecimentos_fracos: string[];
     recomendacoes: string;
     professor_feedback?: string;
+    professor_nota?: number | string;
     private_notes?: string;
+    questoes?: Array<{
+      id: string | number;
+      enunciado?: string;
+      resposta_aluno: any;
+      gabarito: any;
+      acertou: boolean;
+      professor_feedback?: string;
+      professor_nota?: number | string;
+    }>;
   }>;
   plano_de_estudos_7_dias: Array<{
     dia: number;
@@ -80,7 +90,16 @@ RETORNE APENAS O JSON NO FORMATO:
       "acuracia_ponderada": number,
       "distribuicao_bloom": { "Fácil": number, "Médio": number, "Difícil": number },
       "conhecimentos_fracos": string[],
-      "recomendacoes": string
+      "recomendacoes": string,
+      "questoes": [
+        {
+          "id": string | number,
+          "enunciado": string,
+          "resposta_aluno": any,
+          "gabarito": any,
+          "acertou": boolean
+        }
+      ]
     }
   ],
   "plano_de_estudos_7_dias": [
