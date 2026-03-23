@@ -49,7 +49,7 @@ export interface DiagnosticResult {
   mensagem_para_o_aluno: string;
 }
 
-export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview"): Promise<DiagnosticResult> {
+export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview"): Promise<DiagnosticResult[]> {
   const response = await ai.models.generateContent({
     model: modelName,
     contents: [
@@ -58,7 +58,7 @@ export async function generateDiagnostic(data: any[], modelName: string = "gemin
         parts: [
           {
             text: `Aja como um Especialista em Diagnóstico Educacional por Competências (padrão SAEP).
-Analise os seguintes dados brutos de um simulado e gere um diagnóstico completo em formato JSON.
+Analise os seguintes dados brutos de um simulado e gere um diagnóstico completo para CADA aluno presente nos dados.
 
 REGRAS DE CÁLCULO:
 1) acertou: use campo "acertou" ou compare resposta_aluno == gabarito.
@@ -70,7 +70,7 @@ REGRAS DE CÁLCULO:
 DADOS:
 ${JSON.stringify(data)}
 
-RETORNE APENAS O JSON NO FORMATO:
+RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
 {
   "aluno": "Nome do Aluno",
   "summary": {
@@ -123,7 +123,8 @@ RETORNE APENAS O JSON NO FORMATO:
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  const parsed = JSON.parse(response.text || "[]");
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-3-flash-preview"): Promise<string[]> {

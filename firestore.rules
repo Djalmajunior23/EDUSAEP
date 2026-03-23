@@ -95,13 +95,17 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "djalmabatistajunior@gmail.com" && request.auth.token.email_verified == true));
+        (request.auth.token.email == "djalmabatistajunior@gmail.com" && request.auth.token.email_verified == true);
     }
 
     function isProfessor() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor' || isAdmin());
+    }
+
+    function isUserAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || isAdmin());
     }
 
     function hasRequiredFields(fields) {
@@ -206,10 +210,10 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isProfessor();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && request.resource.data.uid == userId && (isOwner(userId) || isAdmin()) && (!('role' in request.resource.data) || request.resource.data.role == 'aluno' || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && request.resource.data.uid == userId && (isOwner(userId) || isAdmin()) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isAdmin());
-      allow delete: if isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['professor', 'admin']);
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && request.resource.data.uid == userId && (isOwner(userId) || isUserAdmin()) && (!('role' in request.resource.data) || request.resource.data.role == 'aluno' || isUserAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && request.resource.data.uid == userId && (isOwner(userId) || isUserAdmin()) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isUserAdmin());
+      allow delete: if isUserAdmin();
     }
 
     match /diagnostics/{diagnosticId} {
