@@ -40,7 +40,11 @@ import {
   Users,
   Square,
   X,
-  Menu
+  Menu,
+  Database,
+  Zap,
+  ArrowRight,
+  Target
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -99,7 +103,8 @@ import {
   getDocs,
   updateDoc,
   setDoc,
-  writeBatch
+  writeBatch,
+  limit
 } from 'firebase/firestore';
 
 function cn(...inputs: ClassValue[]) {
@@ -173,6 +178,11 @@ export interface Question {
   correctOption: number;
   weight: number;
   competency: string;
+  skill?: string;
+  difficulty: 'fácil' | 'médio' | 'difícil';
+  explanation?: string;
+  createdAt?: any;
+  createdBy?: string;
 }
 
 export interface Exam {
@@ -184,11 +194,13 @@ export interface Exam {
   createdBy: string;
   createdAt: any;
   status: 'draft' | 'published';
+  type: 'simulado' | 'exercicio';
 }
 
 export interface ExamSubmission {
   id: string;
-  examId: string;
+  resourceId: string; // examId or exerciseId
+  type: 'exam' | 'exercise';
   studentId: string;
   studentName: string;
   answers: number[];
@@ -196,6 +208,15 @@ export interface ExamSubmission {
   maxScore: number;
   completedAt: any;
   competencyResults: { [key: string]: { correct: number, total: number } };
+}
+
+export interface StudyPlan {
+  id: string;
+  userId: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  createdAt: any;
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -1179,8 +1200,66 @@ import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSe
 import { firebaseConfig } from './firebase';
 
 function StudentDashboardView({ user }: { user: User | null }) {
+  const navigate = useNavigate();
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/student-exams')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+            <BookOpen size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Simulados</h3>
+            <p className="text-xs text-gray-500">Avaliações completas para testar seus conhecimentos.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-emerald-600 text-xs font-bold">
+            Acessar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/exercises')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+            <CheckSquare size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Exercícios</h3>
+            <p className="text-xs text-gray-500">Pratique tópicos específicos com feedback imediato.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
+            Praticar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/study-plan')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+            <Zap size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Plano IA</h3>
+            <p className="text-xs text-gray-500">Seu roteiro personalizado baseado no seu desempenho.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-purple-600 text-xs font-bold">
+            Ver Plano <ArrowRight size={14} />
+          </div>
+        </motion.button>
+      </div>
+
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Meu Desempenho</h2>
         <p className="text-gray-600">
@@ -1196,7 +1275,199 @@ function StudentDashboardView({ user }: { user: User | null }) {
   );
 }
 
-function ExamsManagementView({ user }: { user: User | null }) {
+function QuestionsBankView({ user }: { user: User | null }) {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({
+    text: '',
+    options: ['', '', '', ''],
+    correctOption: 0,
+    weight: 1,
+    competency: '',
+    difficulty: 'médio'
+  });
+
+  useEffect(() => {
+    const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const questionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+      setQuestions(questionsData);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSaveQuestion = async () => {
+    if (!user) return;
+    try {
+      const questionData = {
+        ...currentQuestion,
+        createdBy: user.uid,
+        createdAt: currentQuestion.id ? currentQuestion.createdAt : serverTimestamp(),
+      };
+
+      if (currentQuestion.id) {
+        await updateDoc(doc(db, 'questions', currentQuestion.id), questionData);
+        toast.success("Questão atualizada!");
+      } else {
+        await addDoc(collection(db, 'questions'), questionData);
+        toast.success("Questão adicionada ao banco!");
+      }
+      setIsEditing(false);
+      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio' });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'questions');
+    }
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    if (!window.confirm("Excluir esta questão do banco?")) return;
+    try {
+      await deleteDoc(doc(db, 'questions', id));
+      toast.success("Questão excluída.");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `questions/${id}`);
+    }
+  };
+
+  const filteredQuestions = questions.filter(q => 
+    q.competency.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    q.text.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold text-gray-900">Banco de Questões</h2>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Buscar por competência ou enunciado..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-full md:w-64"
+            />
+          </div>
+          <button 
+            onClick={() => {
+              setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio' });
+              setIsEditing(true);
+            }}
+            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 whitespace-nowrap"
+          >
+            <Plus size={18} /> Nova Questão
+          </button>
+        </div>
+      </div>
+
+      {isEditing && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enunciado</label>
+              <textarea 
+                value={currentQuestion.text} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, text: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Digite o enunciado da questão..."
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Competência</label>
+              <input 
+                type="text" 
+                value={currentQuestion.competency} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, competency: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dificuldade</label>
+              <select 
+                value={currentQuestion.difficulty} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, difficulty: e.target.value as any })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="fácil">Fácil</option>
+                <option value="médio">Médio</option>
+                <option value="difícil">Difícil</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Opções</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {currentQuestion.options?.map((opt, oIdx) => (
+                <div key={oIdx} className="flex items-center gap-3">
+                  <input 
+                    type="radio" 
+                    name="correct-bank" 
+                    checked={currentQuestion.correctOption === oIdx} 
+                    onChange={() => setCurrentQuestion({ ...currentQuestion, correctOption: oIdx })}
+                  />
+                  <input 
+                    type="text" 
+                    value={opt} 
+                    onChange={(e) => {
+                      const newOpts = [...(currentQuestion.options || [])];
+                      newOpts[oIdx] = e.target.value;
+                      setCurrentQuestion({ ...currentQuestion, options: newOpts });
+                    }}
+                    className="flex-1 p-2 text-sm bg-gray-50 border border-gray-200 rounded-lg"
+                    placeholder={`Opção ${String.fromCharCode(65 + oIdx)}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 font-bold">Cancelar</button>
+            <button onClick={handleSaveQuestion} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Salvar Questão</button>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4">
+        {filteredQuestions.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl border border-dashed border-gray-200 text-center space-y-4">
+            <Search className="mx-auto text-gray-200" size={48} />
+            <p className="text-gray-500 italic">Nenhuma questão encontrada para os critérios de busca.</p>
+          </div>
+        ) : (
+          filteredQuestions.map((q) => (
+            <div key={q.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-start justify-between group">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                    q.difficulty === 'fácil' ? "bg-emerald-100 text-emerald-700" :
+                    q.difficulty === 'médio' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                  )}>
+                    {q.difficulty}
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competency}</span>
+                </div>
+                <p className="text-gray-900 font-medium">{q.text}</p>
+              </div>
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => { setCurrentQuestion(q); setIsEditing(true); }} className="p-2 text-gray-400 hover:text-emerald-600"><Pencil size={18} /></button>
+                <button onClick={() => handleDeleteQuestion(q.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={18} /></button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | null, defaultType?: 'simulado' | 'exercicio' }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -1206,12 +1477,17 @@ function ExamsManagementView({ user }: { user: User | null }) {
     description: '',
     subject: '',
     questions: [],
-    status: 'draft'
+    status: 'draft',
+    type: defaultType
   });
 
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, 'exams'), orderBy('createdAt', 'desc'));
+    const q = query(
+      collection(db, 'exams'), 
+      where('type', '==', defaultType),
+      orderBy('createdAt', 'desc')
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const examsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
       setExams(examsData);
@@ -1221,7 +1497,44 @@ function ExamsManagementView({ user }: { user: User | null }) {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, defaultType]);
+
+  const handleGenerateSAEP = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const questionsSnapshot = await getDocs(collection(db, 'questions'));
+      const allQuestions = questionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+      
+      if (allQuestions.length < 40) {
+        toast.error(`Banco de questões insuficiente. Você tem ${allQuestions.length} questões, mas precisa de 40.`);
+        setLoading(false);
+        return;
+      }
+
+      // Shuffle and pick 40
+      const shuffled = allQuestions.sort(() => 0.5 - Math.random());
+      const selectedQuestions = shuffled.slice(0, 40);
+
+      const newExam: Omit<Exam, 'id'> = {
+        title: `Simulado SAEP - ${new Date().toLocaleDateString()}`,
+        description: "Simulado gerado automaticamente com 40 questões aleatórias do banco.",
+        subject: "Geral",
+        questions: selectedQuestions,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        status: 'published',
+        type: 'simulado'
+      };
+
+      await addDoc(collection(db, 'exams'), newExam);
+      toast.success("Simulado SAEP gerado com sucesso!");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'exams');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSaveExam = async () => {
     if (!user) return;
@@ -1239,23 +1552,23 @@ function ExamsManagementView({ user }: { user: User | null }) {
 
       if (currentExam.id) {
         await updateDoc(doc(db, 'exams', currentExam.id), examData);
-        toast.success("Simulado atualizado com sucesso!");
+        toast.success(`${defaultType === 'simulado' ? 'Simulado' : 'Exercício'} atualizado com sucesso!`);
       } else {
         await addDoc(collection(db, 'exams'), examData);
-        toast.success("Simulado criado com sucesso!");
+        toast.success(`${defaultType === 'simulado' ? 'Simulado' : 'Exercício'} criado com sucesso!`);
       }
       setIsEditing(false);
-      setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft' });
+      setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: defaultType });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'exams');
     }
   };
 
   const handleDeleteExam = async (id: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir este simulado?")) return;
+    if (!window.confirm(`Tem certeza que deseja excluir este ${defaultType === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
     try {
       await deleteDoc(doc(db, 'exams', id));
-      toast.success("Simulado excluído.");
+      toast.success(`${defaultType === 'simulado' ? 'Simulado' : 'Exercício'} excluído.`);
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `exams/${id}`);
     }
@@ -1268,7 +1581,8 @@ function ExamsManagementView({ user }: { user: User | null }) {
       options: ['', '', '', ''],
       correctOption: 0,
       weight: 1,
-      competency: ''
+      competency: '',
+      difficulty: 'médio'
     };
     setCurrentExam({
       ...currentExam,
@@ -1300,7 +1614,7 @@ function ExamsManagementView({ user }: { user: User | null }) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">{currentExam.id ? 'Editar Simulado' : 'Novo Simulado'}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{currentExam.id ? `Editar ${defaultType === 'simulado' ? 'Simulado' : 'Exercício'}` : `Novo ${defaultType === 'simulado' ? 'Simulado' : 'Exercício'}`}</h2>
           <div className="flex gap-3">
             <input 
               type="file" 
@@ -1372,7 +1686,7 @@ function ExamsManagementView({ user }: { user: User | null }) {
               {isProcessingFile ? 'Processando...' : 'Importar Arquivo'}
             </label>
             <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 hover:text-gray-900 font-bold">Cancelar</button>
-            <button onClick={handleSaveExam} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Salvar Simulado</button>
+            <button onClick={handleSaveExam} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Salvar {defaultType === 'simulado' ? 'Simulado' : 'Exercício'}</button>
           </div>
         </div>
 
@@ -1405,7 +1719,7 @@ function ExamsManagementView({ user }: { user: User | null }) {
               value={currentExam.description} 
               onChange={(e) => setCurrentExam({ ...currentExam, description: e.target.value })}
               className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px]"
-              placeholder="Descreva o objetivo deste simulado..."
+              placeholder={`Descreva o objetivo deste ${defaultType === 'simulado' ? 'simulado' : 'exercício'}...`}
             />
           </div>
           <div className="flex items-center gap-4">
@@ -1416,7 +1730,7 @@ function ExamsManagementView({ user }: { user: User | null }) {
                 onChange={(e) => setCurrentExam({ ...currentExam, status: e.target.checked ? 'published' : 'draft' })}
                 className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
               />
-              <span className="text-sm font-bold text-gray-700">Publicar Simulado</span>
+              <span className="text-sm font-bold text-gray-700">Publicar {defaultType === 'simulado' ? 'Simulado' : 'Exercício'}</span>
             </label>
           </div>
         </div>
@@ -1505,18 +1819,28 @@ function ExamsManagementView({ user }: { user: User | null }) {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestão de Simulados</h2>
-          <p className="text-sm text-gray-500">Crie e gerencie avaliações para seus alunos</p>
+          <h2 className="text-2xl font-bold text-gray-900">Gestão de {defaultType === 'simulado' ? 'Simulados' : 'Exercícios'}</h2>
+          <p className="text-sm text-gray-500">{defaultType === 'simulado' ? 'Crie e gerencie avaliações para seus alunos' : 'Crie atividades de fixação com feedback imediato'}</p>
         </div>
-        <button 
-          onClick={() => {
-            setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft' });
-            setIsEditing(true);
-          }}
-          className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all"
-        >
-          <Plus size={20} /> Novo Simulado
-        </button>
+        <div className="flex gap-3">
+          {defaultType === 'simulado' && (
+            <button 
+              onClick={handleGenerateSAEP}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all"
+            >
+              <Zap size={20} /> Gerar Simulado SAEP (40q)
+            </button>
+          )}
+          <button 
+            onClick={() => {
+              setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: defaultType });
+              setIsEditing(true);
+            }}
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all"
+          >
+            <Plus size={20} /> Novo {defaultType === 'simulado' ? 'Simulado' : 'Exercício'}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -1529,8 +1853,8 @@ function ExamsManagementView({ user }: { user: User | null }) {
             <BookOpen size={32} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-gray-900">Nenhum simulado criado</h3>
-            <p className="text-gray-500 max-w-xs mx-auto">Comece criando sua primeira avaliação para disponibilizar aos alunos.</p>
+            <h3 className="text-lg font-bold text-gray-900">Nenhum {defaultType === 'simulado' ? 'simulado' : 'exercício'} criado</h3>
+            <p className="text-gray-500 max-w-xs mx-auto">Comece criando sua primeira {defaultType === 'simulado' ? 'avaliação' : 'atividade'} para disponibilizar aos alunos.</p>
           </div>
         </div>
       ) : (
@@ -1589,6 +1913,82 @@ function ExamsManagementView({ user }: { user: User | null }) {
   );
 }
 
+function ExercisesView({ user }: { user: User | null }) {
+  const [exercises, setExercises] = useState<Exam[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeExercise, setActiveExercise] = useState<Exam | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'exams'), 
+      where('type', '==', 'exercicio'),
+      where('status', '==', 'published')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
+      setExercises(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  if (activeExercise) {
+    return <ExamTakingView user={user} exam={activeExercise} onCancel={() => setActiveExercise(null)} />;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Exercícios de Fixação</h2>
+          <p className="text-sm text-gray-500">Pratique seus conhecimentos com feedback imediato</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+        </div>
+      ) : exercises.length === 0 ? (
+        <div className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center space-y-4">
+          <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 mx-auto">
+            <BookOpen size={32} />
+          </div>
+          <p className="text-gray-500 font-medium">Nenhum exercício disponível no momento.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {exercises.map((ex) => (
+            <motion.div 
+              key={ex.id} 
+              whileHover={{ y: -4 }}
+              className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                  {ex.subject}
+                </span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {ex.questions.length} Questões
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors">{ex.title}</h3>
+              <p className="text-sm text-gray-500 line-clamp-2 mb-6">{ex.description}</p>
+              <button 
+                onClick={() => setActiveExercise(ex)}
+                className="w-full py-3 bg-gray-50 text-gray-900 rounded-2xl font-bold hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center gap-2"
+              >
+                Começar Exercício <ArrowRight size={18} />
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StudentExamsView({ user }: { user: User | null }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
@@ -1638,7 +2038,7 @@ function StudentExamsView({ user }: { user: User | null }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {exams.map((exam) => {
-            const submission = submissions.find(s => s.examId === exam.id);
+            const submission = submissions.find(s => s.resourceId === exam.id);
             return (
               <motion.div 
                 key={exam.id}
@@ -1702,6 +2102,161 @@ function StudentExamsView({ user }: { user: User | null }) {
   );
 }
 
+function StudyPlanView({ user }: { user: User | null }) {
+  const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'study_plans'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(1));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        setStudyPlan({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as StudyPlan);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const generatePlan = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // Fetch user submissions to analyze
+      const q = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      const submissions = snapshot.docs.map(doc => doc.data() as ExamSubmission);
+
+      if (submissions.length === 0) {
+        toast.error("Você precisa realizar pelo menos um simulado para gerar um plano de estudos.");
+        setLoading(false);
+        return;
+      }
+
+      // Analyze performance
+      const competencyStats: { [key: string]: { correct: number, total: number } } = {};
+      submissions.forEach(sub => {
+        Object.entries(sub.competencyResults).forEach(([comp, stats]) => {
+          if (!competencyStats[comp]) competencyStats[comp] = { correct: 0, total: 0 };
+          competencyStats[comp].correct += stats.correct;
+          competencyStats[comp].total += stats.total;
+        });
+      });
+
+      const strengths: string[] = [];
+      const weaknesses: string[] = [];
+      Object.entries(competencyStats).forEach(([comp, stats]) => {
+        const accuracy = stats.correct / stats.total;
+        if (accuracy >= 0.7) strengths.push(comp);
+        else if (accuracy < 0.5) weaknesses.push(comp);
+      });
+
+      // Use Gemini to generate recommendations
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `Como um tutor educacional especialista no SAEP, gere um plano de estudos personalizado.
+      O aluno tem as seguintes forças: ${strengths.join(', ')}.
+      O aluno tem as seguintes fraquezas: ${weaknesses.join(', ')}.
+      Gere 5 recomendações práticas de estudo para melhorar o desempenho nas fraquezas.
+      Responda em JSON com o formato: { "recommendations": ["string", "string", ...] }`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      });
+
+      const aiData = JSON.parse(response.text || '{"recommendations": []}');
+
+      const newPlan: Omit<StudyPlan, 'id'> = {
+        userId: user.uid,
+        strengths,
+        weaknesses,
+        recommendations: aiData.recommendations,
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'study_plans'), newPlan);
+      toast.success("Plano de estudos atualizado!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao gerar plano de estudos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={32} /></div>;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Plano de Estudos Inteligente</h2>
+          <p className="text-sm text-gray-500">Análise personalizada baseada no seu desempenho</p>
+        </div>
+        <button 
+          onClick={generatePlan}
+          className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100"
+        >
+          <Zap size={18} /> Atualizar Plano
+        </button>
+      </div>
+
+      {!studyPlan ? (
+        <div className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center space-y-4">
+          <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 mx-auto">
+            <Target size={32} />
+          </div>
+          <p className="text-gray-500 font-medium">Você ainda não tem um plano de estudos gerado.</p>
+          <button onClick={generatePlan} className="text-emerald-600 font-bold hover:underline">Gerar meu primeiro plano agora</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <BookOpen className="text-emerald-600" size={24} /> Recomendações de Estudo
+              </h3>
+              <div className="space-y-4">
+                {studyPlan.recommendations.map((rec, idx) => (
+                  <div key={idx} className="flex gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                      {idx + 1}
+                    </div>
+                    <p className="text-gray-700 leading-relaxed">{rec}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+              <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pontos Fortes</h4>
+              <div className="flex flex-wrap gap-2">
+                {studyPlan.strengths.map(s => (
+                  <span key={s} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold">{s}</span>
+                ))}
+                {studyPlan.strengths.length === 0 && <span className="text-xs text-gray-400 italic">Nenhum identificado ainda</span>}
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+              <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Pontos de Atenção</h4>
+              <div className="flex flex-wrap gap-2">
+                {studyPlan.weaknesses.map(w => (
+                  <span key={w} className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-bold">{w}</span>
+                ))}
+                {studyPlan.weaknesses.length === 0 && <span className="text-xs text-gray-400 italic">Nenhum identificado ainda</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | null, onCancel: () => void }) {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>(new Array(exam.questions.length).fill(-1));
@@ -1744,7 +2299,8 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
       });
 
       const submission: Omit<ExamSubmission, 'id'> = {
-        examId: exam.id,
+        resourceId: exam.id,
+        type: exam.type === 'exercicio' ? 'exercise' : 'exam',
         studentId: user?.uid || '',
         studentName: user?.displayName || 'Aluno',
         answers,
@@ -2558,8 +3114,10 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
   const [filter, setFilter] = useState<'Todos' | 'Forte' | 'Atenção' | 'Crítico'>('Todos');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   const [editingComp, setEditingComp] = useState<string | null>(null);
+  const [editingFeedback, setEditingFeedback] = useState<string | null>(null);
   const [editingPrivateNote, setEditingPrivateNote] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [feedbackValue, setFeedbackValue] = useState('');
   const [privateNoteValue, setPrivateNoteValue] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
@@ -2638,13 +3196,15 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
     return comps;
   }, [result, filter, sortOrder]);
 
-  const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote', value?: string) => {
+  const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote' | 'professorFeedback', value?: string) => {
     if (!result) return;
     const newCompetencias = [...result.diagnostico_por_competencia];
     const idx = newCompetencias.findIndex(c => c.competencia === competenciaName);
     if (idx !== -1) {
       if (type === 'recommendation') {
         newCompetencias[idx] = { ...newCompetencias[idx], recomendacoes: value !== undefined ? value : editValue };
+      } else if (type === 'professorFeedback') {
+        newCompetencias[idx] = { ...newCompetencias[idx], professor_feedback: value !== undefined ? value : feedbackValue };
       } else {
         newCompetencias[idx] = { ...newCompetencias[idx], private_notes: value !== undefined ? value : privateNoteValue };
       }
@@ -2665,6 +3225,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
       }
     }
     setEditingComp(null);
+    setEditingFeedback(null);
     setEditingPrivateNote(null);
   };
 
@@ -2737,25 +3298,56 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
               <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
             </div>
             
-            <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-center">
-              {['Todos', 'Forte', 'Atenção', 'Crítico'].map((f) => (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Filtrar por Nível:</span>
+                <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-center">
+                  {['Todos', 'Forte', 'Atenção', 'Crítico'].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f as any)}
+                      className={cn(
+                        "px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
+                        filter === f 
+                          ? "bg-white text-emerald-600 shadow-sm" 
+                          : "text-gray-500 hover:text-gray-700"
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ordenar:</span>
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                 <button
-                  key={f}
-                  onClick={() => setFilter(f as any)}
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'none' : 'asc')}
                   className={cn(
-                    "px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
-                    filter === f 
-                      ? "bg-white text-emerald-600 shadow-sm" 
-                      : "text-gray-500 hover:text-gray-700"
+                    "p-1.5 rounded-lg transition-all",
+                    sortOrder === 'asc' ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
                   )}
+                  title="Ordenar Crescente"
                 >
-                  {f}
+                  <ChevronRight size={16} className="-rotate-90" />
                 </button>
-              ))}
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'desc' ? 'none' : 'desc')}
+                  className={cn(
+                    "p-1.5 rounded-lg transition-all",
+                    sortOrder === 'desc' ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                  )}
+                  title="Ordenar Decrescente"
+                >
+                  <ChevronRight size={16} className="rotate-90" />
+                </button>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 gap-6">
             {filteredCompetencias.length > 0 ? (
               filteredCompetencias.map((comp, idx) => (
                 <motion.div 
@@ -2873,6 +3465,65 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                             <p className="text-sm text-gray-600 leading-relaxed italic border-l-2 border-blue-100 pl-4">
                               {comp.recomendacoes}
                             </p>
+                          )}
+
+                          {/* Professor Feedback Section */}
+                          {(comp.nivel === 'Crítico' || comp.acertos < comp.total_questoes) && (
+                            <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <MessageSquare size={14} className="text-emerald-500" />
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback Personalizado do Professor</p>
+                                </div>
+                                {isProfessor && (
+                                  editingFeedback !== comp.competencia ? (
+                                    <button 
+                                      onClick={() => {
+                                        setEditingFeedback(comp.competencia);
+                                        setFeedbackValue(comp.professor_feedback || '');
+                                      }}
+                                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                                    >
+                                      <Pencil size={10} />
+                                      {comp.professor_feedback ? 'Editar Feedback' : 'Adicionar Feedback'}
+                                    </button>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <button 
+                                        onClick={() => handleSaveEdit(comp.competencia, 'professorFeedback')}
+                                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700"
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button 
+                                        onClick={() => setEditingFeedback(null)}
+                                        className="text-[10px] font-bold text-gray-400 hover:text-gray-600"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+
+                              {editingFeedback === comp.competencia ? (
+                                <textarea
+                                  value={feedbackValue}
+                                  onChange={(e) => setFeedbackValue(e.target.value)}
+                                  className="w-full p-3 text-sm text-emerald-900 bg-emerald-50 border border-emerald-100 rounded-lg focus:ring-1 focus:ring-emerald-400 outline-none min-h-[80px]"
+                                  placeholder="Insira uma nota ou explicação personalizada para o aluno..."
+                                  autoFocus
+                                />
+                              ) : comp.professor_feedback ? (
+                                <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
+                                  <p className="text-sm text-emerald-800 leading-relaxed font-medium">
+                                    {comp.professor_feedback}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-400 italic">Nenhum feedback personalizado inserido ainda.</p>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -3022,6 +3673,8 @@ function AppContent() {
       return [
         { id: 'student-dashboard', label: 'Meu Painel', icon: LayoutDashboard, path: '/student-dashboard' },
         { id: 'student-exams', label: 'Simulados', icon: BookOpen, path: '/student-exams' },
+        { id: 'exercises', label: 'Exercícios', icon: CheckSquare, path: '/exercises' },
+        { id: 'study-plan', label: 'Plano IA', icon: Zap, path: '/study-plan' },
         { id: 'history', label: 'Histórico', icon: History, path: '/history' },
         { id: 'chat', label: 'Assistente IA', icon: MessageSquare, path: '/chat' },
         { id: 'plan', label: 'Meu Plano', icon: Calendar, disabled: !result, path: '/plan' },
@@ -3032,8 +3685,9 @@ function AppContent() {
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
-      { id: 'tasks', label: 'Tarefas', icon: CheckSquare, path: '/tasks' },
-      { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams-management' },
+      { id: 'questions-bank', label: 'Banco de Questões', icon: Database, path: '/questions-bank' },
+      { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams' },
+      { id: 'exercises-management', label: 'Exercícios', icon: CheckSquare, path: '/exercises-management' },
       { id: 'chat', label: 'Chat IA', icon: MessageSquare, path: '/chat' },
       { id: 'admin-users', label: 'Gestão', icon: Users, path: '/admin-users' },
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, disabled: !result, path: result && currentDiagnosticId ? `/dashboard/${currentDiagnosticId}` : '/dashboard' },
@@ -3850,6 +4504,12 @@ function AppContent() {
                   userProfile?.role === 'aluno' ? "/student-dashboard" : (result ? "/dashboard" : "/input")
                 } replace />
               } />
+              <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} defaultType="simulado" /></ProtectedRoute>} />
+              <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} defaultType="exercicio" /></ProtectedRoute>} />
+              <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} /></ProtectedRoute>} />
+              <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
+              <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
+              <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudyPlanView user={user} /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div

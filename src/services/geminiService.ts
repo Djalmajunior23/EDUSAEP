@@ -21,6 +21,7 @@ export interface DiagnosticResult {
     distribuicao_bloom: Record<string, number>;
     conhecimentos_fracos: string[];
     recomendacoes: string;
+    professor_feedback?: string;
     private_notes?: string;
   }>;
   plano_de_estudos_7_dias: Array<{

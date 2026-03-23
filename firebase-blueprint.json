@@ -67,6 +67,67 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "When the message was sent." }
       },
       "required": ["userId", "text", "role", "createdAt"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "A question in the question bank.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "The question text." },
+        "options": { "type": "array", "items": { "type": "string" }, "description": "The answer options." },
+        "correctOption": { "type": "integer", "description": "The index of the correct option." },
+        "weight": { "type": "number", "description": "The weight of the question." },
+        "competency": { "type": "string", "description": "The competency this question belongs to." },
+        "skill": { "type": "string", "description": "The specific skill this question tests." },
+        "difficulty": { "type": "string", "enum": ["fácil", "médio", "difícil"], "description": "The difficulty level." },
+        "createdBy": { "type": "string", "description": "The ID of the user who created this question." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the question was created." }
+      },
+      "required": ["text", "options", "correctOption", "competency", "difficulty"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "A simulated exam.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the exam." },
+        "description": { "type": "string", "description": "The description of the exam." },
+        "subject": { "type": "string", "description": "The subject of the exam." },
+        "questions": { "type": "array", "items": { "$ref": "Question" }, "description": "The list of questions in this exam." },
+        "createdBy": { "type": "string", "description": "The ID of the user who created this exam." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the exam was created." },
+        "status": { "type": "string", "enum": ["draft", "published"], "description": "The status of the exam." }
+      },
+      "required": ["title", "subject", "questions", "createdBy"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "A student's submission for an exam or exercise.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the student." },
+        "resourceId": { "type": "string", "description": "The ID of the exam or exercise." },
+        "type": { "type": "string", "enum": ["exam", "exercise"], "description": "The type of submission." },
+        "answers": { "type": "array", "items": { "type": "integer" }, "description": "The student's answers." },
+        "score": { "type": "number", "description": "The total score achieved." },
+        "maxScore": { "type": "number", "description": "The maximum possible score." },
+        "completedAt": { "type": "string", "format": "date-time", "description": "When the submission was completed." },
+        "competencyResults": { "type": "object", "description": "Results broken down by competency." }
+      },
+      "required": ["userId", "resourceId", "type", "answers", "score", "completedAt"]
+    },
+    "StudyPlan": {
+      "title": "Study Plan",
+      "description": "A personalized study plan for a student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the student." },
+        "strengths": { "type": "array", "items": { "type": "string" }, "description": "Identified strengths." },
+        "weaknesses": { "type": "array", "items": { "type": "string" }, "description": "Identified weaknesses." },
+        "recommendations": { "type": "array", "items": { "type": "string" }, "description": "Recommended content and exercises." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the plan was generated." }
+      },
+      "required": ["userId", "strengths", "weaknesses", "recommendations", "createdAt"]
     }
   },
   "firestore": {
@@ -85,6 +146,26 @@
     "/chat_messages/{messageId}": {
       "schema": "ChatMessage",
       "description": "Chat message documents."
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Question bank documents."
+    },
+    "/exams/{examId}": {
+      "schema": "Exam",
+      "description": "Simulated exam documents."
+    },
+    "/submissions/{submissionId}": {
+      "schema": "Submission",
+      "description": "Exam and exercise submission documents."
+    },
+    "/study_plans/{planId}": {
+      "schema": "StudyPlan",
+      "description": "Personalized study plan documents."
+    },
+    "/exercises/{exerciseId}": {
+      "schema": "Exam",
+      "description": "Practice exercise documents (uses same schema as Exam)."
     }
   }
 }

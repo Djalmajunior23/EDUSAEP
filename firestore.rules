@@ -40,6 +40,41 @@ service cloud.firestore {
     //   - role: string (required) - The role of the message sender (user or model).
     //   - createdAt: string (required) - When the message was sent.
     //
+    // Collection: questions
+    // Document ID: questionId (auto-generated)
+    // Fields:
+    //   - text: string (required)
+    //   - options: list (required)
+    //   - correctOption: int (required)
+    //   - weight: number (optional)
+    //   - competency: string (required)
+    //   - skill: string (optional)
+    //   - difficulty: string (required)
+    //
+    // Collection: exams
+    // Document ID: examId (auto-generated)
+    // Fields:
+    //   - title: string (required)
+    //   - questions: list (required)
+    //   - createdBy: string (required)
+    //
+    // Collection: submissions
+    // Document ID: submissionId (auto-generated)
+    // Fields:
+    //   - userId: string (required)
+    //   - resourceId: string (required)
+    //   - type: string (required)
+    //   - answers: list (required)
+    //   - score: number (required)
+    //
+    // Collection: study_plans
+    // Document ID: planId (auto-generated)
+    // Fields:
+    //   - userId: string (required)
+    //   - strengths: list (required)
+    //   - weaknesses: list (required)
+    //   - recommendations: list (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -130,6 +165,42 @@ service cloud.firestore {
              isValidDateString(data.createdAt);
     }
 
+    function isValidQuestion(data) {
+      return hasRequiredFields(['text', 'options', 'correctOption', 'competency', 'difficulty']) &&
+             data.text is string && data.text.size() > 0 &&
+             data.options is list && data.options.size() == 4 &&
+             data.correctOption is int && data.correctOption >= 0 && data.correctOption <= 3 &&
+             data.competency is string &&
+             data.difficulty in ['fácil', 'médio', 'difícil'];
+    }
+
+    function isValidExam(data) {
+      return hasRequiredFields(['title', 'subject', 'questions', 'createdBy']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.subject is string &&
+             data.questions is list &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidSubmission(data) {
+      return hasRequiredFields(['userId', 'resourceId', 'type', 'answers', 'score', 'completedAt']) &&
+             data.userId == request.auth.uid &&
+             data.resourceId is string &&
+             data.type in ['exam', 'exercise'] &&
+             data.answers is list &&
+             data.score is number &&
+             isValidDateString(data.completedAt);
+    }
+
+    function isValidStudyPlan(data) {
+      return hasRequiredFields(['userId', 'strengths', 'weaknesses', 'recommendations', 'createdAt']) &&
+             data.userId is string &&
+             data.strengths is list &&
+             data.weaknesses is list &&
+             data.recommendations is list &&
+             isValidDateString(data.createdAt);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -159,6 +230,40 @@ service cloud.firestore {
       allow read: if isDocOwner() || isProfessor();
       allow create: if isAuthenticated() && isValidChatMessage(request.resource.data);
       allow delete: if (isAuthenticated() && isDocOwner()) || isProfessor();
+    }
+
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow create: if isProfessor() && isValidQuestion(request.resource.data);
+      allow update: if isProfessor() && isValidQuestion(request.resource.data);
+      allow delete: if isProfessor();
+    }
+
+    match /exams/{examId} {
+      allow read: if isAuthenticated();
+      allow create: if isProfessor() && isValidExam(request.resource.data);
+      allow update: if isProfessor() && isValidExam(request.resource.data);
+      allow delete: if isProfessor();
+    }
+
+    match /exercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow create: if isProfessor() && isValidExam(request.resource.data);
+      allow update: if isProfessor() && isValidExam(request.resource.data);
+      allow delete: if isProfessor();
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if isDocOwner() || isProfessor();
+      allow create: if isAuthenticated() && isValidSubmission(request.resource.data);
+      allow delete: if isProfessor();
+    }
+
+    match /study_plans/{planId} {
+      allow read: if isDocOwner() || isProfessor();
+      allow create: if isProfessor() && isValidStudyPlan(request.resource.data);
+      allow update: if isProfessor() && isValidStudyPlan(request.resource.data);
+      allow delete: if isProfessor();
     }
   }
 }
