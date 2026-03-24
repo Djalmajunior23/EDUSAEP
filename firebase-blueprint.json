@@ -17,7 +17,8 @@
           "description": "User account settings.",
           "properties": {
             "theme": { "type": "string", "enum": ["light", "dark"], "description": "UI theme preference." },
-            "notifications": { "type": "boolean", "description": "Whether notifications are enabled." }
+            "notifications": { "type": "boolean", "description": "Whether notifications are enabled." },
+            "webhookUrl": { "type": "string", "description": "Webhook URL for N8N integration." }
           }
         },
         "preferences": {
@@ -105,16 +106,15 @@
       "description": "A student's submission for an exam or exercise.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string", "description": "The ID of the student." },
-        "resourceId": { "type": "string", "description": "The ID of the exam or exercise." },
-        "type": { "type": "string", "enum": ["exam", "exercise"], "description": "The type of submission." },
-        "answers": { "type": "array", "items": { "type": "integer" }, "description": "The student's answers." },
+        "studentId": { "type": "string", "description": "The ID of the student." },
+        "examId": { "type": "string", "description": "The ID of the exam or exercise." },
+        "answers": { "type": "object", "description": "The student's answers (questionIndex -> optionIndex)." },
         "score": { "type": "number", "description": "The total score achieved." },
         "maxScore": { "type": "number", "description": "The maximum possible score." },
         "completedAt": { "type": "string", "format": "date-time", "description": "When the submission was completed." },
         "competencyResults": { "type": "object", "description": "Results broken down by competency." }
       },
-      "required": ["userId", "resourceId", "type", "answers", "score", "completedAt"]
+      "required": ["studentId", "examId", "answers", "score", "completedAt"]
     },
     "StudyPlan": {
       "title": "Study Plan",
@@ -124,10 +124,35 @@
         "userId": { "type": "string", "description": "The ID of the student." },
         "strengths": { "type": "array", "items": { "type": "string" }, "description": "Identified strengths." },
         "weaknesses": { "type": "array", "items": { "type": "string" }, "description": "Identified weaknesses." },
-        "recommendations": { "type": "array", "items": { "type": "string" }, "description": "Recommended content and exercises." },
+        "priorityTopics": { "type": "array", "items": { "type": "object" }, "description": "Topics to prioritize." },
+        "recommendedExercises": { "type": "array", "items": { "type": "object" }, "description": "Recommended content and exercises." },
+        "recommendations": { "type": "array", "items": { "type": "string" }, "description": "General recommendations." },
+        "competencyAnalysis": { "type": "object", "description": "Detailed competency performance data." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the plan was generated." }
       },
-      "required": ["userId", "strengths", "weaknesses", "recommendations", "createdAt"]
+      "required": ["userId", "strengths", "weaknesses", "createdAt"]
+    },
+    "StudentExam": {
+      "title": "Student Exam",
+      "description": "Relationship between a student and an exam.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "The ID of the student." },
+        "examId": { "type": "string", "description": "The ID of the exam." },
+        "status": { "type": "string", "enum": ["assigned", "in_progress", "completed"], "description": "The status of the exam for this student." },
+        "assignedAt": { "type": "string", "format": "date-time", "description": "When the exam was assigned." }
+      },
+      "required": ["studentId", "examId", "status"]
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Stores global application configurations.",
+      "type": "object",
+      "properties": {
+        "webhookUrl": { "type": "string", "description": "Global webhook URL for N8N integration." },
+        "updatedBy": { "type": "string", "description": "UID of the user who last updated the settings." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the settings were last updated." }
+      }
     }
   },
   "firestore": {
@@ -155,7 +180,7 @@
       "schema": "Exam",
       "description": "Simulated exam documents."
     },
-    "/submissions/{submissionId}": {
+    "/exam_submissions/{submissionId}": {
       "schema": "Submission",
       "description": "Exam and exercise submission documents."
     },
@@ -163,9 +188,13 @@
       "schema": "StudyPlan",
       "description": "Personalized study plan documents."
     },
-    "/exercises/{exerciseId}": {
-      "schema": "Exam",
-      "description": "Practice exercise documents (uses same schema as Exam)."
+    "/student_exams/{studentExamId}": {
+      "schema": "StudentExam",
+      "description": "Tracks exams assigned to or taken by students."
+    },
+    "/settings/global": {
+      "schema": "GlobalSettings",
+      "description": "Global application settings."
     }
   }
 }

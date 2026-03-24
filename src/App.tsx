@@ -31,11 +31,14 @@ import {
   CheckSquare,
   Plus,
   Pencil,
+  Sun,
+  Moon,
   MessageSquare,
   Send,
   Loader2,
   User as UserIcon,
   Search,
+  Filter,
   ChevronLeft,
   Users,
   Square,
@@ -47,7 +50,8 @@ import {
   Database,
   Zap,
   ArrowRight,
-  Target
+  Target,
+  Info
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -102,6 +106,7 @@ import {
   serverTimestamp, 
   deleteDoc, 
   doc,
+  getDoc,
   getDocFromServer,
   getDocs,
   updateDoc,
@@ -112,6 +117,26 @@ import {
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// Skeleton Component
+function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("animate-pulse bg-gray-200 dark:bg-gray-800 rounded-md", className)} />
+  );
+}
+
+// Dark Mode Toggle Component
+function DarkModeToggle({ darkMode, setDarkMode }: { darkMode: boolean, setDarkMode: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => setDarkMode(!darkMode)}
+      className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+      title={darkMode ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+    >
+      {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+    </button>
+  );
 }
 
 // Protected Route Component
@@ -229,6 +254,12 @@ export interface StudyPlan {
     id: string;
     title: string;
     competency: string;
+  }>;
+  competencyAnalysis?: Array<{
+    competency: string;
+    accuracy: number;
+    correct: number;
+    total: number;
   }>;
   recommendations: string[];
   createdAt: any;
@@ -1030,6 +1061,20 @@ function TasksView({ user }: { user: User | null }) {
     if (!user || !newTaskTitle.trim()) return;
 
     const path = 'tasks';
+    const newTask = {
+      id: 'temp-' + Date.now(),
+      userId: user.uid,
+      title: newTaskTitle.trim(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Optimistic Update
+    setTasks(prev => [newTask, ...prev]);
+    setNewTaskTitle('');
+    localStorage.removeItem('tasks_draft_title');
+
     try {
       await addDoc(collection(db, path), {
         userId: user.uid,
@@ -1038,10 +1083,10 @@ function TasksView({ user }: { user: User | null }) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
-      setNewTaskTitle('');
-      localStorage.removeItem('tasks_draft_title');
       toast.success('Tarefa adicionada!');
     } catch (err) {
+      // Rollback
+      setTasks(prev => prev.filter(t => t.id !== newTask.id));
       toast.error('Erro ao adicionar tarefa.');
       handleFirestoreError(err, OperationType.CREATE, path);
     }
@@ -1049,12 +1094,18 @@ function TasksView({ user }: { user: User | null }) {
 
   const toggleTask = async (task: any) => {
     const path = `tasks/${task.id}`;
+    
+    // Optimistic Update
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t));
+
     try {
       await updateDoc(doc(db, 'tasks', task.id), {
         completed: !task.completed,
         updatedAt: new Date().toISOString()
       });
     } catch (err) {
+      // Rollback
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: task.completed } : t));
       toast.error('Erro ao atualizar tarefa.');
       handleFirestoreError(err, OperationType.UPDATE, path);
     }
@@ -1062,10 +1113,17 @@ function TasksView({ user }: { user: User | null }) {
 
   const deleteTask = async (id: string) => {
     const path = `tasks/${id}`;
+    
+    // Optimistic Update
+    const taskToDelete = tasks.find(t => t.id === id);
+    setTasks(prev => prev.filter(t => t.id !== id));
+
     try {
       await deleteDoc(doc(db, 'tasks', id));
       toast.success('Tarefa excluída!');
     } catch (err) {
+      // Rollback
+      if (taskToDelete) setTasks(prev => [...prev, taskToDelete].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       toast.error('Erro ao excluir tarefa.');
       handleFirestoreError(err, OperationType.DELETE, path);
     }
@@ -1214,8 +1272,52 @@ import { initializeApp } from 'firebase/app';
 import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
 import { firebaseConfig } from './firebase';
 
-function StudentDashboardView({ user }: { user: User | null }) {
+function StudentDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const navigate = useNavigate();
+  const [diagnostics, setDiagnostics] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, 'diagnostics'), orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allDiags = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const filtered = allDiags.filter((d: any) => 
+        d.studentId === user.uid || 
+        (d.studentEmail && d.studentEmail.toLowerCase() === user.email?.toLowerCase()) ||
+        (d.studentMatricula && d.studentMatricula === userProfile?.matricula) ||
+        (d.aluno && d.aluno.toLowerCase() === user.displayName?.toLowerCase())
+      );
+      
+      setDiagnostics(filtered);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-48 rounded-2xl" />
+          ))}
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-32 rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -1276,15 +1378,51 @@ function StudentDashboardView({ user }: { user: User | null }) {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Meu Desempenho</h2>
-        <p className="text-gray-600">
-          Bem-vindo ao seu painel de desempenho. Aqui você poderá ver os resultados dos seus diagnósticos e acompanhar sua evolução.
-        </p>
-        <div className="mt-8 p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 text-center">
-          <BarChart3 size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum diagnóstico disponível</h3>
-          <p className="text-gray-500">Seus professores ainda não publicaram nenhum resultado para você.</p>
-        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Meus Resultados Importados</h2>
+        
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+          </div>
+        ) : diagnostics.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4">
+            {diagnostics.map((diag) => (
+              <motion.div
+                key={diag.id}
+                whileHover={{ scale: 1.01 }}
+                onClick={() => navigate(`/dashboard/${diag.id}`)}
+                className="p-4 border border-gray-100 rounded-xl hover:bg-gray-50 cursor-pointer flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Diagnóstico de {diag.aluno}</h4>
+                    <p className="text-xs text-gray-500">
+                      {new Date(diag.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-emerald-600">
+                      {Math.round(diag.result.summary.acuracia_ponderada * 100)}%
+                    </div>
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wider">Acurácia</div>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-8 p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 text-center">
+            <BarChart3 size={48} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum diagnóstico disponível</h3>
+            <p className="text-gray-500">Seus professores ainda não publicaram nenhum resultado para você.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1295,6 +1433,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [competencySearch, setCompetencySearch] = useState('');
   const [competencyFilter, setCompetencyFilter] = useState('all');
   const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({
     text: '',
@@ -1437,10 +1576,10 @@ function QuestionsBankView({ user }: { user: User | null }) {
   };
 
   const filteredQuestions = questions.filter(q => {
-    const matchesSearch = q.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         q.competency.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = q.text.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCompSearch = q.competency.toLowerCase().includes(competencySearch.toLowerCase());
     const matchesCompetency = competencyFilter === 'all' || q.competency === competencyFilter;
-    return matchesSearch && matchesCompetency;
+    return matchesSearch && matchesCompSearch && matchesCompetency;
   });
 
   return (
@@ -1458,10 +1597,24 @@ function QuestionsBankView({ user }: { user: User | null }) {
               className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-full md:w-64"
             />
           </div>
+
+          <div className="relative flex-1 md:flex-none">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Filtrar por competência..."
+              value={competencySearch}
+              onChange={(e) => setCompetencySearch(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-full md:w-64"
+            />
+          </div>
           
           <select
             value={competencyFilter}
-            onChange={(e) => setCompetencyFilter(e.target.value)}
+            onChange={(e) => {
+              setCompetencyFilter(e.target.value);
+              if (e.target.value !== 'all') setCompetencySearch('');
+            }}
             className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all min-w-[180px]"
           >
             <option value="all">Todas as Competências</option>
@@ -1598,6 +1751,8 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'simulado' | 'exercicio'>(defaultType);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'published'>('all');
   const [currentExam, setCurrentExam] = useState<Partial<Exam>>({
     title: '',
     description: '',
@@ -1608,10 +1763,13 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
   });
 
   useEffect(() => {
+    setTypeFilter(defaultType);
+  }, [defaultType]);
+
+  useEffect(() => {
     if (!user) return;
     const q = query(
       collection(db, 'exams'), 
-      where('type', '==', defaultType),
       orderBy('createdAt', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1623,7 +1781,13 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user, defaultType]);
+  }, [user]);
+
+  const filteredExams = exams.filter(exam => {
+    if (typeFilter !== 'all' && exam.type !== typeFilter) return false;
+    if (statusFilter !== 'all' && exam.status !== statusFilter) return false;
+    return true;
+  });
 
   const handleGenerateSAEP = async () => {
     if (!user) return;
@@ -1678,23 +1842,23 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
 
       if (currentExam.id) {
         await updateDoc(doc(db, 'exams', currentExam.id), examData);
-        toast.success(`${defaultType === 'simulado' ? 'Simulado' : 'Exercício'} atualizado com sucesso!`);
+        toast.success(`${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} atualizado com sucesso!`);
       } else {
         await addDoc(collection(db, 'exams'), examData);
-        toast.success(`${defaultType === 'simulado' ? 'Simulado' : 'Exercício'} criado com sucesso!`);
+        toast.success(`${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} criado com sucesso!`);
       }
       setIsEditing(false);
-      setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: defaultType });
+      setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: typeFilter === 'all' ? 'simulado' : typeFilter });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'exams');
     }
   };
 
-  const handleDeleteExam = async (id: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir este ${defaultType === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
+  const handleDeleteExam = async (id: string, type: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir este ${type === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
     try {
       await deleteDoc(doc(db, 'exams', id));
-      toast.success(`${defaultType === 'simulado' ? 'Simulado' : 'Exercício'} excluído.`);
+      toast.success(`${type === 'simulado' ? 'Simulado' : 'Exercício'} excluído.`);
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `exams/${id}`);
     }
@@ -1740,7 +1904,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">{currentExam.id ? `Editar ${defaultType === 'simulado' ? 'Simulado' : 'Exercício'}` : `Novo ${defaultType === 'simulado' ? 'Simulado' : 'Exercício'}`}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{currentExam.id ? `Editar ${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'}` : `Novo ${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'}`}</h2>
           <div className="flex gap-3">
             <input 
               type="file" 
@@ -1813,7 +1977,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
               {isProcessingFile ? 'Processando...' : 'Importar Arquivo'}
             </label>
             <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 hover:text-gray-900 font-bold">Cancelar</button>
-            <button onClick={handleSaveExam} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Salvar {defaultType === 'simulado' ? 'Simulado' : 'Exercício'}</button>
+            <button onClick={handleSaveExam} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Salvar {currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'}</button>
           </div>
         </div>
 
@@ -1826,7 +1990,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
                 value={currentExam.title} 
                 onChange={(e) => setCurrentExam({ ...currentExam, title: e.target.value })}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="Ex: Simulado de Matemática - 1º Bimestre"
+                placeholder={`Ex: ${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} de Matemática - 1º Bimestre`}
               />
             </div>
             <div className="space-y-1">
@@ -1840,25 +2004,38 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
               />
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tipo</label>
+              <select
+                value={currentExam.type}
+                onChange={(e) => setCurrentExam({ ...currentExam, type: e.target.value as 'simulado' | 'exercicio' })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="simulado">Simulado</option>
+                <option value="exercicio">Exercício</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-4 pt-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={currentExam.status === 'published'} 
+                  onChange={(e) => setCurrentExam({ ...currentExam, status: e.target.checked ? 'published' : 'draft' })}
+                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                />
+                <span className="text-sm font-bold text-gray-700">Publicar {currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'}</span>
+              </label>
+            </div>
+          </div>
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Descrição</label>
             <textarea 
               value={currentExam.description} 
               onChange={(e) => setCurrentExam({ ...currentExam, description: e.target.value })}
               className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px]"
-              placeholder={`Descreva o objetivo deste ${defaultType === 'simulado' ? 'simulado' : 'exercício'}...`}
+              placeholder={`Descreva o objetivo deste ${currentExam.type === 'simulado' ? 'simulado' : 'exercício'}...`}
             />
-          </div>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={currentExam.status === 'published'} 
-                onChange={(e) => setCurrentExam({ ...currentExam, status: e.target.checked ? 'published' : 'draft' })}
-                className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-              />
-              <span className="text-sm font-bold text-gray-700">Publicar {defaultType === 'simulado' ? 'Simulado' : 'Exercício'}</span>
-            </label>
           </div>
         </div>
 
@@ -1953,13 +2130,15 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestão de {defaultType === 'simulado' ? 'Simulados' : 'Exercícios'}</h2>
-          <p className="text-sm text-gray-500">{defaultType === 'simulado' ? 'Crie e gerencie avaliações para seus alunos' : 'Crie atividades de fixação com feedback imediato'}</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Gestão de {typeFilter === 'all' ? 'Avaliações' : typeFilter === 'simulado' ? 'Simulados' : 'Exercícios'}
+          </h2>
+          <p className="text-sm text-gray-500">Crie e gerencie avaliações e atividades para seus alunos</p>
         </div>
-        <div className="flex gap-3">
-          {defaultType === 'simulado' && (
+        <div className="flex flex-wrap gap-3">
+          {typeFilter === 'simulado' && (
             <button 
               onClick={handleGenerateSAEP}
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all"
@@ -1969,13 +2148,41 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
           )}
           <button 
             onClick={() => {
-              setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: defaultType });
+              setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: typeFilter === 'all' ? 'simulado' : typeFilter });
               setIsEditing(true);
             }}
             className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all"
           >
-            <Plus size={20} /> Novo {defaultType === 'simulado' ? 'Simulado' : 'Exercício'}
+            <Plus size={20} /> Novo {typeFilter === 'all' ? 'Simulado' : typeFilter === 'simulado' ? 'Simulado' : 'Exercício'}
           </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex-1 flex items-center gap-2">
+          <Filter size={18} className="text-gray-400" />
+          <span className="text-sm font-bold text-gray-700">Filtros:</span>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as any)}
+            className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-gray-700"
+          >
+            <option value="all">Todos os Tipos</option>
+            <option value="simulado">Simulados</option>
+            <option value="exercicio">Exercícios</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-gray-700"
+          >
+            <option value="all">Todos os Status</option>
+            <option value="published">Publicados</option>
+            <option value="draft">Rascunhos</option>
+          </select>
         </div>
       </div>
 
@@ -1983,54 +2190,64 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
         <div className="flex justify-center py-12">
           <Loader2 className="animate-spin text-emerald-600" size={32} />
         </div>
-      ) : exams.length === 0 ? (
+      ) : filteredExams.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center space-y-4">
           <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 mx-auto">
             <BookOpen size={32} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-gray-900">Nenhum {defaultType === 'simulado' ? 'simulado' : 'exercício'} criado</h3>
-            <p className="text-gray-500 max-w-xs mx-auto">Comece criando sua primeira {defaultType === 'simulado' ? 'avaliação' : 'atividade'} para disponibilizar aos alunos.</p>
+            <h3 className="text-lg font-bold text-gray-900">Nenhum item encontrado</h3>
+            <p className="text-gray-500 max-w-xs mx-auto">Tente ajustar os filtros ou crie uma nova avaliação.</p>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exams.map((exam) => (
+          {filteredExams.map((exam) => (
             <motion.div 
               key={exam.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col"
+              className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col relative"
             >
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                    exam.status === 'published' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                  )}>
-                    {exam.status === 'published' ? 'Publicado' : 'Rascunho'}
-                  </span>
+              <div className="absolute top-4 right-4 flex gap-1">
+                <button 
+                  onClick={() => {
+                    setCurrentExam(exam);
+                    setIsEditing(true);
+                  }}
+                  className="p-2 text-gray-400 hover:text-emerald-600 transition-colors bg-white rounded-full shadow-sm border border-gray-100"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button 
+                  onClick={() => handleDeleteExam(exam.id, exam.type)}
+                  className="p-2 text-gray-400 hover:text-red-500 transition-colors bg-white rounded-full shadow-sm border border-gray-100"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              <div className="flex items-start justify-between pr-16">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                      exam.status === 'published' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                    )}>
+                      {exam.status === 'published' ? 'Publicado' : 'Rascunho'}
+                    </span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                      exam.type === 'simulado' ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                    )}>
+                      {exam.type === 'simulado' ? 'Simulado' : 'Exercício'}
+                    </span>
+                  </div>
                   <h3 className="font-bold text-gray-900 line-clamp-1">{exam.title}</h3>
                   <p className="text-xs text-gray-500">{exam.subject}</p>
                 </div>
-                <div className="flex gap-1">
-                  <button 
-                    onClick={() => {
-                      setCurrentExam(exam);
-                      setIsEditing(true);
-                    }}
-                    className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
-                  >
-                    <Pencil size={18} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteExam(exam.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
               </div>
+
               
               <p className="text-xs text-gray-600 line-clamp-2 flex-1">{exam.description}</p>
               
@@ -2053,6 +2270,8 @@ function ExercisesView({ user }: { user: User | null }) {
   const [exercises, setExercises] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeExercise, setActiveExercise] = useState<Exam | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('Todos');
 
   useEffect(() => {
     if (!user) return;
@@ -2069,13 +2288,27 @@ function ExercisesView({ user }: { user: User | null }) {
     return () => unsubscribe();
   }, [user]);
 
+  const subjects = useMemo(() => {
+    const s = new Set(exercises.map(ex => ex.subject));
+    return ['Todos', ...Array.from(s)];
+  }, [exercises]);
+
+  const filteredExercises = useMemo(() => {
+    return exercises.filter(ex => {
+      const matchesSearch = ex.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           ex.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSubject = selectedSubject === 'Todos' || ex.subject === selectedSubject;
+      return matchesSearch && matchesSubject;
+    });
+  }, [exercises, searchTerm, selectedSubject]);
+
   if (activeExercise) {
     return <ExamTakingView user={user} exam={activeExercise} onCancel={() => setActiveExercise(null)} />;
   }
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100">
             <CheckSquare size={28} />
@@ -2085,22 +2318,57 @@ function ExercisesView({ user }: { user: User | null }) {
             <p className="text-sm text-gray-500">Foco em <span className="text-blue-600 font-bold">prática e aprendizado</span> com feedback imediato e correção comentada</p>
           </div>
         </div>
+        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-2xl">
+          <Info size={16} className="text-blue-600" />
+          <p className="text-[10px] text-blue-700 font-medium">
+            Diferente dos simulados, aqui você recebe correção na hora para acelerar seu aprendizado.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input 
+            type="text"
+            placeholder="Buscar exercícios por título ou descrição..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0">
+          {subjects.map(subject => (
+            <button
+              key={subject}
+              onClick={() => setSelectedSubject(subject)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                selectedSubject === subject 
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-100" 
+                  : "bg-white text-gray-600 border border-gray-100 hover:bg-gray-50"
+              )}
+            >
+              {subject}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <Loader2 className="animate-spin text-blue-600" size={32} />
         </div>
-      ) : exercises.length === 0 ? (
+      ) : filteredExercises.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center space-y-4">
           <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 mx-auto">
             <BookOpen size={32} />
           </div>
-          <p className="text-gray-500 font-medium">Nenhum exercício disponível no momento.</p>
+          <p className="text-gray-500 font-medium">Nenhum exercício encontrado para os filtros selecionados.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exercises.map((ex) => (
+          {filteredExercises.map((ex) => (
             <motion.div 
               key={ex.id} 
               whileHover={{ y: -4 }}
@@ -2181,6 +2449,12 @@ function StudentExamsView({ user }: { user: User | null }) {
             <p className="text-sm text-gray-500">Foco em <span className="text-emerald-600 font-bold">diagnóstico e avaliação formal</span> para monitoramento de desempenho</p>
           </div>
         </div>
+        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-2xl">
+          <Info size={16} className="text-emerald-600" />
+          <p className="text-[10px] text-emerald-700 font-medium">
+            Avaliações formais para medir seu progresso real. O feedback detalhado vem após o envio.
+          </p>
+        </div>
       </div>
 
       {loading ? (
@@ -2260,6 +2534,7 @@ function StudentExamsView({ user }: { user: User | null }) {
 }
 
 function StudyPlanView({ user }: { user: User | null }) {
+  const navigate = useNavigate();
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -2282,17 +2557,19 @@ function StudyPlanView({ user }: { user: User | null }) {
     try {
       // 1. Fetch all performance data
       const submissionsQuery = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid));
-      const diagnosticsQuery = query(collection(db, 'diagnostics'), where('userId', '==', user.uid)); // Assuming student's diagnostics are stored with their userId
+      const diagnosticsQuery = query(collection(db, 'diagnostics'), where('userId', '==', user.uid));
       
-      const [submissionsSnap, diagnosticsSnap, questionsSnap] = await Promise.all([
+      const [submissionsSnap, diagnosticsSnap, questionsSnap, examsSnap] = await Promise.all([
         getDocs(submissionsQuery),
         getDocs(diagnosticsQuery),
-        getDocs(query(collection(db, 'questions'), limit(50))) // Fetch some questions for context
+        getDocs(query(collection(db, 'questions'), limit(100))),
+        getDocs(query(collection(db, 'exams'), limit(20)))
       ]);
 
       const submissions = submissionsSnap.docs.map(doc => doc.data() as ExamSubmission);
       const diagnostics = diagnosticsSnap.docs.map(doc => doc.data());
       const availableQuestions = questionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+      const availableExams = examsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
 
       if (submissions.length === 0 && diagnostics.length === 0) {
         toast.error("Você precisa realizar pelo menos um simulado ou ter um diagnóstico importado para gerar um plano de estudos.");
@@ -2303,7 +2580,6 @@ function StudyPlanView({ user }: { user: User | null }) {
       // 2. Aggregate Competency Stats
       const competencyStats: { [key: string]: { correct: number, total: number } } = {};
       
-      // From submissions
       submissions.forEach(sub => {
         Object.entries(sub.competencyResults || {}).forEach(([comp, stats]) => {
           if (!competencyStats[comp]) competencyStats[comp] = { correct: 0, total: 0 };
@@ -2312,7 +2588,6 @@ function StudyPlanView({ user }: { user: User | null }) {
         });
       });
 
-      // From diagnostics (if available)
       diagnostics.forEach(diag => {
         (diag.result?.diagnostico_por_competencia || []).forEach((comp: any) => {
           if (!competencyStats[comp.competencia]) competencyStats[comp.competencia] = { correct: 0, total: 0 };
@@ -2323,8 +2598,11 @@ function StudyPlanView({ user }: { user: User | null }) {
 
       const strengths: string[] = [];
       const weaknesses: string[] = [];
+      const competencyAnalysis: any[] = [];
+
       Object.entries(competencyStats).forEach(([comp, stats]) => {
         const accuracy = stats.correct / stats.total;
+        competencyAnalysis.push({ competency: comp, accuracy, ...stats });
         if (accuracy >= 0.75) strengths.push(comp);
         else if (accuracy < 0.6) weaknesses.push(comp);
       });
@@ -2333,16 +2611,18 @@ function StudyPlanView({ user }: { user: User | null }) {
       const prompt = `Como um tutor educacional especialista no SAEP, gere um plano de estudos ADAPTATIVO e PERSONALIZADO.
       
       PERFIL DO ALUNO:
-      - Pontos Fortes (Competências): ${strengths.join(', ') || 'Nenhum identificado ainda'}
-      - Pontos Fracos (Competências): ${weaknesses.join(', ') || 'Nenhum identificado ainda'}
+      - Pontos Fortes: ${strengths.join(', ') || 'Nenhum identificado ainda'}
+      - Pontos Fracos: ${weaknesses.join(', ') || 'Nenhum identificado ainda'}
+      - Análise Detalhada: ${JSON.stringify(competencyAnalysis)}
       
-      QUESTÕES DISPONÍVEIS NO BANCO:
-      ${availableQuestions.map(q => `- ID: ${q.id}, Título: ${q.text.substring(0, 50)}..., Competência: ${q.competency}`).join('\n')}
+      CONTEÚDO DISPONÍVEL:
+      - Questões: ${availableQuestions.map(q => `- ID: ${q.id}, Competência: ${q.competency}, Texto: ${q.text.substring(0, 30)}`).join('\n')}
+      - Simulados/Exercícios: ${availableExams.map(e => `- ID: ${e.id}, Título: ${e.title}, Tipo: ${e.type}`).join('\n')}
       
       OBJETIVO:
       1. Identificar 3 Tópicos Prioritários para estudo com base nas fraquezas.
-      2. Recomendar 3 a 5 Exercícios específicos do banco acima que ajudem nessas fraquezas.
-      3. Fornecer 5 Recomendações gerais de estudo.
+      2. Recomendar 3 a 5 Exercícios/Simulados específicos do banco acima que ajudem nessas fraquezas.
+      3. Fornecer 5 Recomendações estratégicas de estudo.
       
       RETORNE APENAS UM JSON NO FORMATO:
       {
@@ -2350,7 +2630,7 @@ function StudyPlanView({ user }: { user: User | null }) {
           { "topic": "Nome do Tópico", "reason": "Por que estudar isso?", "priority": "Alta" | "Média" | "Baixa" }
         ],
         "recommendedExercises": [
-          { "id": "ID_DA_QUESTAO", "title": "Título Curto", "competency": "Competência" }
+          { "id": "ID_DO_RECURSO", "title": "Título do Simulado ou Exercício", "competency": "Competência Principal" }
         ],
         "recommendations": ["Recomendação 1", "Recomendação 2", ...]
       }`;
@@ -2369,6 +2649,7 @@ function StudyPlanView({ user }: { user: User | null }) {
         weaknesses,
         priorityTopics: aiData.priorityTopics || [],
         recommendedExercises: aiData.recommendedExercises || [],
+        competencyAnalysis,
         recommendations: aiData.recommendations || [],
         createdAt: serverTimestamp()
       };
@@ -2417,19 +2698,19 @@ function StudyPlanView({ user }: { user: User | null }) {
       </div>
 
       {!studyPlan ? (
-        <div className="bg-white p-16 rounded-[2.5rem] border-2 border-dashed border-gray-100 text-center space-y-6">
-          <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center text-gray-300 mx-auto">
+        <div className="bg-white dark:bg-gray-900 p-16 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-gray-800 text-center space-y-6">
+          <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800 rounded-3xl flex items-center justify-center text-gray-300 dark:text-gray-600 mx-auto">
             <Target size={40} />
           </div>
           <div className="space-y-2">
-            <h3 className="text-2xl font-bold text-gray-900">Comece sua jornada personalizada</h3>
-            <p className="text-gray-500 max-w-md mx-auto">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Comece sua jornada personalizada</h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
               Ainda não temos dados suficientes para mapear seu perfil. Realize simulados ou exercícios para que possamos gerar seu plano.
             </p>
           </div>
           <button 
             onClick={generatePlan} 
-            className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
+            className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 dark:shadow-none"
           >
             Gerar Meu Plano Agora
           </button>
@@ -2439,31 +2720,34 @@ function StudyPlanView({ user }: { user: User | null }) {
           {/* Left Column: Priority Topics & Exercises */}
           <div className="lg:col-span-8 space-y-8">
             {/* Priority Topics */}
-            <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+            <section className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                   <Target className="text-emerald-600" size={28} /> Tópicos Prioritários
                 </h3>
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Foco Atual</span>
+                <div className="text-right">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Foco Atual</span>
+                  <span className="text-[10px] text-gray-400 italic">Atualizado em {studyPlan.createdAt?.toDate ? studyPlan.createdAt.toDate().toLocaleDateString() : 'recentemente'}</span>
+                </div>
               </div>
               
               <div className="grid gap-6">
                 {studyPlan.priorityTopics?.map((topic, idx) => (
-                  <div key={idx} className="group p-6 bg-gray-50 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all">
+                  <div key={idx} className="group p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${
-                            topic.priority === 'Alta' ? 'bg-red-100 text-red-700' : 
-                            topic.priority === 'Média' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                            topic.priority === 'Alta' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 
+                            topic.priority === 'Média' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                           }`}>
                             Prioridade {topic.priority}
                           </span>
-                          <h4 className="text-lg font-bold text-gray-900">{topic.topic}</h4>
+                          <h4 className="text-lg font-bold text-gray-900 dark:text-white">{topic.topic}</h4>
                         </div>
-                        <p className="text-gray-600 text-sm leading-relaxed">{topic.reason}</p>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{topic.reason}</p>
                       </div>
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                      <div className="w-10 h-10 bg-white dark:bg-gray-700 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-all">
                         <ArrowRight size={20} />
                       </div>
                     </div>
@@ -2473,9 +2757,9 @@ function StudyPlanView({ user }: { user: User | null }) {
             </section>
 
             {/* Recommended Exercises */}
-            <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+            <section className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                   <CheckSquare className="text-emerald-600" size={28} /> Exercícios Recomendados
                 </h3>
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Prática Direcionada</span>
@@ -2483,46 +2767,86 @@ function StudyPlanView({ user }: { user: User | null }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {studyPlan.recommendedExercises?.map((ex, idx) => (
-                  <div key={idx} className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center justify-between group cursor-pointer hover:bg-emerald-50 transition-all">
+                  <div 
+                    key={idx} 
+                    onClick={() => navigate(`/student-exams`)}
+                    className="p-5 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between group cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                  >
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{ex.competency}</p>
-                      <h4 className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{ex.title}</h4>
+                      <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{ex.competency}</p>
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{ex.title}</h4>
                     </div>
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-600 shadow-sm group-hover:translate-x-1 transition-transform">
+                    <div className="w-8 h-8 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center text-emerald-600 shadow-sm group-hover:translate-x-1 transition-transform">
                       <ChevronRight size={18} />
                     </div>
                   </div>
                 ))}
               </div>
             </section>
+
+            {/* Competency Breakdown */}
+            {studyPlan.competencyAnalysis && studyPlan.competencyAnalysis.length > 0 && (
+              <section className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                    <BarChart3 className="text-emerald-600" size={28} /> Análise por Competência
+                  </h3>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Desempenho Detalhado</span>
+                </div>
+
+                <div className="space-y-4">
+                  {studyPlan.competencyAnalysis.map((comp, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-bold text-gray-700 dark:text-gray-300">{comp.competency}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{(comp.accuracy * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${comp.accuracy * 100}%` }}
+                          transition={{ duration: 1, delay: idx * 0.1 }}
+                          className={cn(
+                            "h-full rounded-full",
+                            comp.accuracy >= 0.75 ? "bg-emerald-500" :
+                            comp.accuracy >= 0.6 ? "bg-amber-500" : "bg-red-500"
+                          )}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400 text-right">{comp.correct} acertos de {comp.total} questões</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* Right Column: Profile & Recommendations */}
           <div className="lg:col-span-4 space-y-8">
             {/* Performance Profile */}
-            <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+            <section className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
               <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Seu Perfil SAEP</h4>
               
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
                     <CheckCircle2 size={16} /> Pontos Fortes
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {studyPlan.strengths.map(s => (
-                      <span key={s} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold border border-emerald-100">{s}</span>
+                      <span key={s} className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-full text-[10px] font-bold border border-emerald-100 dark:border-emerald-900/30">{s}</span>
                     ))}
                     {studyPlan.strengths.length === 0 && <span className="text-xs text-gray-400 italic">Nenhum identificado ainda</span>}
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
+                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold text-sm">
                     <AlertCircle size={16} /> Pontos de Atenção
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {studyPlan.weaknesses.map(w => (
-                      <span key={w} className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-[10px] font-bold border border-red-100">{w}</span>
+                      <span key={w} className="px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-full text-[10px] font-bold border border-red-100 dark:border-red-900/30">{w}</span>
                     ))}
                     {studyPlan.weaknesses.length === 0 && <span className="text-xs text-gray-400 italic">Nenhum identificado ainda</span>}
                   </div>
@@ -2531,15 +2855,15 @@ function StudyPlanView({ user }: { user: User | null }) {
             </section>
 
             {/* General Recommendations */}
-            <section className="bg-emerald-50 p-8 rounded-[2rem] border border-emerald-100 space-y-6">
-              <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-widest flex items-center gap-2">
+            <section className="bg-emerald-50 dark:bg-emerald-900/10 p-8 rounded-[2rem] border border-emerald-100 dark:border-emerald-900/30 space-y-6">
+              <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
                 <MessageSquare size={16} /> Dicas do Tutor IA
               </h4>
               <div className="space-y-4">
                 {studyPlan.recommendations.map((rec, idx) => (
                   <div key={idx} className="flex gap-3">
                     <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full mt-2 shrink-0"></div>
-                    <p className="text-sm text-emerald-900/80 leading-relaxed">{rec}</p>
+                    <p className="text-sm text-emerald-900/80 dark:text-emerald-100/70 leading-relaxed">{rec}</p>
                   </div>
                 ))}
               </div>
@@ -2553,11 +2877,19 @@ function StudyPlanView({ user }: { user: User | null }) {
 
 function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | null, onCancel: () => void }) {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [answers, setAnswers] = useState<number[]>(new Array(exam.questions.length).fill(-1));
+  const [answers, setAnswers] = useState<number[]>(() => {
+    const saved = localStorage.getItem(`exam_progress_${exam.id}`);
+    return saved ? JSON.parse(saved) : new Array(exam.questions.length).fill(-1);
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [finalSubmission, setFinalSubmission] = useState<ExamSubmission | null>(null);
   const [isAnswerChecked, setIsAnswerChecked] = useState(false);
+
+  // Auto-save progress
+  useEffect(() => {
+    localStorage.setItem(`exam_progress_${exam.id}`, JSON.stringify(answers));
+  }, [answers, exam.id]);
 
   const currentQuestion = exam.questions[currentQuestionIdx];
 
@@ -2623,6 +2955,10 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
       const docRef = await addDoc(collection(db, 'exam_submissions'), submission);
       setFinalSubmission({ id: docRef.id, ...submission } as ExamSubmission);
       setShowResult(true);
+      
+      // Clear auto-save on success
+      localStorage.removeItem(`exam_progress_${exam.id}`);
+      toast.success("Avaliação enviada com sucesso!");
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'exam_submissions');
     } finally {
@@ -3367,8 +3703,10 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
   const [theme, setTheme] = useState(profile?.settings?.theme || 'light');
   const [notifications, setNotifications] = useState(profile?.settings?.notifications ?? true);
   const [webhookUrl, setWebhookUrl] = useState(profile?.settings?.webhookUrl || '');
+  const [globalWebhookUrl, setGlobalWebhookUrl] = useState('');
   const [defaultGrade, setDefaultGrade] = useState(profile?.preferences?.defaultGrade || '');
   const [language, setLanguage] = useState(profile?.preferences?.language || 'Português');
+  const [isTesting, setIsTesting] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -3380,6 +3718,51 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
     }
   }, [profile]);
 
+  useEffect(() => {
+    const fetchGlobalSettings = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'global');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setGlobalWebhookUrl(docSnap.data().webhookUrl || '');
+        }
+      } catch (err) {
+        console.error("Error fetching global settings:", err);
+      }
+    };
+    fetchGlobalSettings();
+  }, []);
+
+  const testWebhook = async (url: string, type: 'user' | 'global') => {
+    if (!url) {
+      toast.error('Informe uma URL para testar.');
+      return;
+    }
+    setIsTesting(type);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'webhook.test',
+          message: 'Este é um teste de integração do Plano de Estudos Automático.',
+          timestamp: new Date().toISOString(),
+          user: user?.email
+        })
+      });
+      if (response.ok) {
+        toast.success('Webhook testado com sucesso!');
+      } else {
+        toast.error(`Erro no teste: ${response.status} ${response.statusText}`);
+      }
+    } catch (err) {
+      toast.error('Erro ao conectar com o webhook. Verifique a URL e o CORS.');
+      console.error("Webhook Test Error:", err);
+    } finally {
+      setIsTesting(null);
+    }
+  };
+
   const saveProfile = async () => {
     if (!user) return;
     setIsSaving(true);
@@ -3390,6 +3773,15 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
         preferences: { defaultGrade, language },
         updatedAt: new Date().toISOString()
       });
+
+      if (profile?.role === 'admin') {
+        await setDoc(doc(db, 'settings', 'global'), {
+          webhookUrl: globalWebhookUrl,
+          updatedBy: user.uid,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
       toast.success('Perfil atualizado com sucesso!');
     } catch (err) {
       toast.error('Erro ao atualizar perfil.');
@@ -3491,18 +3883,59 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Webhook URL (n8n / Automação)</label>
               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-tighter">Opcional</span>
             </div>
-            <div className="relative">
-              <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
-              <input 
-                type="url"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                placeholder="https://seu-n8n.com/webhook/..."
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-              />
-            </div>
+              <div className="relative flex gap-2">
+                <div className="relative flex-1">
+                  <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+                  <input 
+                    type="url"
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    placeholder="https://seu-n8n.com/webhook/..."
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+                <button
+                  onClick={() => testWebhook(webhookUrl, 'user')}
+                  disabled={isTesting === 'user' || !webhookUrl}
+                  className="px-4 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 font-bold text-xs hover:bg-emerald-100 transition-all disabled:opacity-50"
+                >
+                  {isTesting === 'user' ? <Loader2 className="animate-spin" size={16} /> : 'Testar'}
+                </button>
+              </div>
             <p className="text-[10px] text-gray-400 italic">Sempre que um diagnóstico for gerado, os dados serão enviados para esta URL.</p>
           </div>
+
+          {profile?.role === 'admin' && (
+            <div className="space-y-2 p-4 bg-purple-50 rounded-xl border border-purple-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-purple-700 uppercase tracking-wider flex items-center gap-2">
+                  <Settings size={14} />
+                  Webhook Global (n8n / Automação)
+                </label>
+                <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded uppercase tracking-tighter">Admin Only</span>
+              </div>
+                <div className="relative flex gap-2">
+                  <div className="relative flex-1">
+                    <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-500" size={18} />
+                    <input 
+                      type="url"
+                      value={globalWebhookUrl}
+                      onChange={(e) => setGlobalWebhookUrl(e.target.value)}
+                      placeholder="https://seu-n8n.com/webhook/global/..."
+                      className="w-full pl-12 pr-4 py-3 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                    />
+                  </div>
+                  <button
+                    onClick={() => testWebhook(globalWebhookUrl, 'global')}
+                    disabled={isTesting === 'global' || !globalWebhookUrl}
+                    className="px-4 bg-purple-100 text-purple-700 rounded-xl border border-purple-200 font-bold text-xs hover:bg-purple-200 transition-all disabled:opacity-50"
+                  >
+                    {isTesting === 'global' ? <Loader2 className="animate-spin" size={16} /> : 'Testar'}
+                  </button>
+                </div>
+              <p className="text-[10px] text-purple-600 italic">Esta URL será usada como padrão para todos os usuários que não tiverem um webhook pessoal configurado.</p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
             <div className="space-y-0.5">
@@ -3537,14 +3970,16 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
   );
 }
 
-function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null, userProfile: UserProfile | null }) {
+function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null, userProfile: UserProfile | null, history: any[] }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'Todos' | 'Forte' | 'Atenção' | 'Crítico'>('Todos');
+  const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   const [editingComp, setEditingComp] = useState<string | null>(null);
   const [editingFeedback, setEditingFeedback] = useState<string | null>(null);
   const [editingQuestionFeedback, setEditingQuestionFeedback] = useState<string | null>(null);
   const [editingPrivateNote, setEditingPrivateNote] = useState<string | null>(null);
+  const [activeQuestionTabs, setActiveQuestionTabs] = useState<Record<string, 'question' | 'feedback'>>({});
   const [editValue, setEditValue] = useState('');
   const [feedbackValue, setFeedbackValue] = useState('');
   const [notaValue, setNotaValue] = useState<string | number>('');
@@ -3553,6 +3988,17 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [loadingSuggestions, setLoadingSuggestions] = useState<Record<string, boolean>>({});
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const studentHistory = useMemo(() => {
+    if (!result || !history) return [];
+    return history
+      .filter(h => h.result?.aluno === result.aluno)
+      .sort((a, b) => {
+        const dateA = a.createdAt?.seconds || 0;
+        const dateB = b.createdAt?.seconds || 0;
+        return dateA - dateB;
+      });
+  }, [result, history]);
 
   const fetchSuggestions = async (comp: any) => {
     if (suggestions[comp.competencia]) return;
@@ -3569,6 +4015,10 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
   };
 
   const isProfessor = userProfile?.role === 'professor' || userProfile?.role === 'admin';
+
+  const setQuestionTab = (questionKey: string, tab: 'question' | 'feedback') => {
+    setActiveQuestionTabs(prev => ({ ...prev, [questionKey]: tab }));
+  };
 
   const exportToPDF = async () => {
     if (!reportRef.current || !result) return;
@@ -3608,8 +4058,14 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
   const filteredCompetencias = useMemo(() => {
     if (!result) return [];
     let comps = result.diagnostico_por_competencia;
+    
     if (filter !== 'Todos') {
       comps = comps.filter(c => c.nivel === filter);
+    }
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      comps = comps.filter(c => c.competencia.toLowerCase().includes(term));
     }
     
     if (sortOrder !== 'none') {
@@ -3692,6 +4148,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
     setEditingQuestionFeedback(null);
     setEditingPrivateNote(null);
     setNotaValue('');
+    setFeedbackValue('');
   };
 
   if (!result) return (
@@ -3757,30 +4214,74 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
         </div>
 
         <div className="space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 size={20} className="text-emerald-600" />
-              <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
-            </div>
-            
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Filtrar por Nível:</span>
-                <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-center">
-                  {['Todos', 'Forte', 'Atenção', 'Crítico'].map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFilter(f as any)}
-                      className={cn(
-                        "px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
-                        filter === f 
-                          ? "bg-white text-emerald-600 shadow-sm" 
-                          : "text-gray-500 hover:text-gray-700"
-                      )}
+                <BarChart3 size={20} className="text-emerald-600" />
+                <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Buscar competência..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-gray-100 border-none rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Nível:</span>
+                    <select
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value as any)}
+                      className="px-3 py-1.5 bg-gray-100 border-none rounded-xl text-[10px] font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer"
                     >
-                      {f}
-                    </button>
-                  ))}
+                      <option value="Todos">Todos os Níveis</option>
+                      <option value="Forte">Forte</option>
+                      <option value="Atenção">Atenção</option>
+                      <option value="Crítico">Crítico</option>
+                    </select>
+                  </div>
+
+                  <div className="hidden sm:flex bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
+                  {['Todos', 'Forte', 'Atenção', 'Crítico'].map((f) => {
+                    const count = f === 'Todos' 
+                      ? result.diagnostico_por_competencia.length 
+                      : result.diagnostico_por_competencia.filter(c => c.nivel === f).length;
+                    
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => setFilter(f as any)}
+                        className={cn(
+                          "px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
+                          filter === f 
+                            ? "bg-white text-emerald-600 shadow-sm" 
+                            : "text-gray-500 hover:text-gray-700"
+                        )}
+                      >
+                        {f !== 'Todos' && (
+                          <div className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            f === 'Forte' ? "bg-emerald-500" :
+                            f === 'Atenção' ? "bg-amber-500" :
+                            "bg-red-500"
+                          )} />
+                        )}
+                        {f}
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded-md text-[9px] transition-colors",
+                          filter === f ? "bg-emerald-50 text-emerald-600" : "bg-gray-200 text-gray-500"
+                        )}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -3932,6 +4433,60 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                             </p>
                           )}
 
+                          {/* Competency Evolution Chart */}
+                          {studentHistory.length > 1 && (
+                            <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                              <div className="flex items-center gap-2">
+                                <History size={14} className="text-emerald-600" />
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Evolução de Desempenho</p>
+                              </div>
+                              <div className="h-40 w-full bg-gray-50/50 rounded-xl p-4 border border-gray-100">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={studentHistory.map(h => {
+                                    const c = h.result?.diagnostico_por_competencia?.find((dc: any) => dc.competencia === comp.competencia);
+                                    return {
+                                      date: h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'N/A',
+                                      acuracia: c ? Math.round(c.acuracia_ponderada * 100) : 0
+                                    };
+                                  })}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis 
+                                      dataKey="date" 
+                                      tick={{ fontSize: 10, fill: '#9ca3af' }} 
+                                      axisLine={false}
+                                      tickLine={false}
+                                    />
+                                    <YAxis 
+                                      domain={[0, 100]} 
+                                      tick={{ fontSize: 10, fill: '#9ca3af' }} 
+                                      axisLine={false}
+                                      tickLine={false}
+                                      width={25}
+                                    />
+                                    <Tooltip 
+                                      contentStyle={{ 
+                                        borderRadius: '12px', 
+                                        border: 'none', 
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                        fontSize: '12px'
+                                      }}
+                                      formatter={(value: number) => [`${value}%`, 'Acurácia']}
+                                    />
+                                    <Line 
+                                      type="monotone" 
+                                      dataKey="acuracia" 
+                                      stroke="#10b981" 
+                                      strokeWidth={3} 
+                                      dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                                      activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }}
+                                      animationDuration={1500}
+                                    />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Professor Feedback Section */}
                           {(comp.nivel === 'Crítico' || comp.acertos < comp.total_questoes) && (
                             <div className={cn(
@@ -4064,154 +4619,298 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                                   <div 
                                     key={qIdx} 
                                     className={cn(
-                                      "p-4 rounded-xl border transition-all",
+                                      "p-4 rounded-xl border transition-all overflow-hidden",
                                       q.acertou ? "bg-emerald-50/30 border-emerald-100/50" : "bg-red-50/30 border-red-100/50"
                                     )}
                                   >
-                                    <div className="flex items-start justify-between gap-4 mb-3">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <span className={cn(
-                                            "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                                            q.acertou ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                                          )}>
-                                            Questão {q.id}
-                                          </span>
-                                          {!q.acertou && (
-                                            <span className="text-[10px] font-bold text-red-600 uppercase tracking-tight flex items-center gap-1">
-                                              <XCircle size={10} />
-                                              Incorreta
-                                            </span>
-                                          )}
-                                        </div>
-                                        {q.enunciado && <p className="text-sm text-gray-700 font-medium mb-2">{q.enunciado}</p>}
-                                        <div className="grid grid-cols-2 gap-4 text-xs">
-                                          <div className="p-2 bg-white/50 rounded-lg border border-gray-100">
-                                            <p className="text-gray-400 font-bold uppercase tracking-tighter mb-1">Resposta do Aluno</p>
-                                            <p className={cn("font-bold", q.acertou ? "text-emerald-700" : "text-red-700")}>{q.resposta_aluno}</p>
-                                          </div>
-                                          <div className="p-2 bg-white/50 rounded-lg border border-gray-100">
-                                            <p className="text-gray-400 font-bold uppercase tracking-tighter mb-1">Gabarito</p>
-                                            <p className="text-emerald-700 font-bold">{q.gabarito}</p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      
-                                      {isProfessor && (
-                                        <div className="flex flex-col gap-2">
-                                          {editingQuestionFeedback !== `${comp.competencia}-${q.id}` ? (
-                                            <button 
-                                              onClick={() => {
-                                                setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
-                                                setFeedbackValue(q.professor_feedback || '');
-                                                setNotaValue(q.professor_nota || '');
-                                              }}
-                                              className={cn(
-                                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all",
-                                                q.acertou 
-                                                  ? "text-emerald-600 hover:bg-emerald-100" 
-                                                  : "text-red-600 hover:bg-red-100 bg-red-50 border border-red-100"
-                                              )}
-                                              title="Adicionar Feedback à Questão"
-                                            >
-                                              <MessageSquare size={14} />
-                                              {q.professor_feedback ? 'Editar Feedback' : 'Adicionar Feedback'}
-                                            </button>
-                                          ) : (
-                                            <div className="flex flex-col gap-1">
-                                              <button 
-                                                onClick={() => handleSaveEdit(comp.competencia, 'fullQuestionFeedback', feedbackValue, q.id, notaValue)}
-                                                className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                                                title="Salvar"
-                                              >
-                                                <Check size={14} />
-                                              </button>
-                                              <button 
-                                                onClick={() => setEditingQuestionFeedback(null)}
-                                                className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors"
-                                                title="Cancelar"
-                                              >
-                                                <X size={14} />
-                                              </button>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
+                                    {/* Question Tabs */}
+                                    <div className="flex items-center gap-1 mb-4 p-1 bg-white/40 rounded-lg w-fit border border-gray-100/50">
+                                      <button
+                                        onClick={() => setQuestionTab(`${comp.competencia}-${q.id}`, 'question')}
+                                        className={cn(
+                                          "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-1.5",
+                                          (activeQuestionTabs[`${comp.competencia}-${q.id}`] || 'question') === 'question'
+                                            ? "bg-white text-emerald-700 shadow-sm"
+                                            : "text-gray-500 hover:text-emerald-600"
+                                        )}
+                                      >
+                                        <HelpCircle size={12} />
+                                        Questão
+                                      </button>
+                                      <button
+                                        onClick={() => setQuestionTab(`${comp.competencia}-${q.id}`, 'feedback')}
+                                        className={cn(
+                                          "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-1.5",
+                                          activeQuestionTabs[`${comp.competencia}-${q.id}`] === 'feedback'
+                                            ? "bg-white text-emerald-700 shadow-sm"
+                                            : "text-gray-500 hover:text-emerald-600"
+                                        )}
+                                      >
+                                        <MessageSquare size={12} />
+                                        Feedback & Nota
+                                        { (q.professor_feedback || q.professor_nota) ? (
+                                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                                        ) : !q.acertou && isProfessor && (
+                                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                                        )}
+                                      </button>
                                     </div>
 
-                                    {/* Question Feedback UI */}
-                                    <div className="mt-4 pt-4 border-t border-gray-100/50">
-                                      {isProfessor && (!q.acertou || comp.nivel === 'Crítico') && editingQuestionFeedback !== `${comp.competencia}-${q.id}` && !q.professor_feedback && !q.professor_nota && (
-                                        <div className="flex items-center justify-between bg-gray-50/50 p-3 rounded-xl border border-dashed border-gray-200">
-                                          <div className="flex items-center gap-2 text-gray-500">
-                                            <MessageSquare size={14} />
-                                            <span className="text-xs font-medium">Feedback do Professor pendente</span>
-                                          </div>
-                                          <button 
-                                            onClick={() => {
-                                              setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
-                                              setFeedbackValue(q.professor_feedback || '');
-                                              setNotaValue(q.professor_nota || '');
-                                            }}
-                                            className="text-[10px] font-bold text-emerald-600 hover:underline"
-                                          >
-                                            Inserir Agora
-                                          </button>
-                                        </div>
-                                      )}
-
-                                      {editingQuestionFeedback === `${comp.competencia}-${q.id}` ? (
-                                        <div className="space-y-3">
-                                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback do Professor</p>
-                                          <div className="flex items-center gap-2">
-                                            <div className="w-24">
-                                              <input
-                                                type="text"
-                                                value={notaValue}
-                                                onChange={(e) => setNotaValue(e.target.value)}
-                                                className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none"
-                                                placeholder="Nota"
-                                              />
-                                            </div>
-                                            <div className="flex-1">
-                                              <textarea
-                                                value={feedbackValue}
-                                                onChange={(e) => setFeedbackValue(e.target.value)}
-                                                className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[40px]"
-                                                placeholder="Explicação personalizada para o aluno..."
-                                                autoFocus
-                                              />
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ) : (q.professor_feedback || q.professor_nota) ? (
-                                        <div className={cn(
-                                          "p-4 rounded-xl border space-y-3",
-                                          q.acertou ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100"
-                                        )}>
-                                          <div className="flex items-center justify-between">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback do Professor</p>
-                                            {q.professor_nota && (
-                                              <span className={cn(
-                                                "px-2 py-0.5 rounded text-[10px] font-bold",
-                                                q.acertou ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                                              )}>
-                                                Nota: {q.professor_nota}
-                                              </span>
+                                    {(activeQuestionTabs[`${comp.competencia}-${q.id}`] || 'question') === 'question' ? (
+                                      <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className={cn(
+                                              "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                              q.acertou ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                                            )}>
+                                              Questão {q.id}
+                                            </span>
+                                            {!q.acertou && (
+                                              <div className="flex items-center gap-3">
+                                                <span className="text-[10px] font-bold text-red-600 uppercase tracking-tight flex items-center gap-1">
+                                                  <XCircle size={10} />
+                                                  Incorreta
+                                                </span>
+                                                {isProfessor && !q.professor_feedback && (
+                                                  <button 
+                                                    onClick={() => {
+                                                      setQuestionTab(`${comp.competencia}-${q.id}`, 'feedback');
+                                                      setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                                      setFeedbackValue('');
+                                                      setNotaValue('');
+                                                    }}
+                                                    className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full hover:bg-red-200 transition-colors flex items-center gap-1"
+                                                  >
+                                                    <Plus size={10} />
+                                                    Adicionar Feedback
+                                                  </button>
+                                                )}
+                                              </div>
                                             )}
                                           </div>
-                                          <div className="flex gap-3">
-                                            <MessageSquare size={14} className={q.acertou ? "text-emerald-500" : "text-red-500"} />
-                                            <p className={cn(
-                                              "text-xs font-medium italic leading-relaxed",
-                                              q.acertou ? "text-emerald-800" : "text-red-800"
-                                            )}>
-                                              {q.professor_feedback || "Nenhuma explicação fornecida."}
-                                            </p>
+                                          {q.enunciado && <p className="text-sm text-gray-700 font-medium mb-2">{q.enunciado}</p>}
+                                          <div className="grid grid-cols-2 gap-4 text-xs mb-4">
+                                            <div className="p-2 bg-white/50 rounded-lg border border-gray-100">
+                                              <p className="text-gray-400 font-bold uppercase tracking-tighter mb-1">Resposta do Aluno</p>
+                                              <p className={cn("font-bold", q.acertou ? "text-emerald-700" : "text-red-700")}>{q.resposta_aluno}</p>
+                                            </div>
+                                            <div className="p-2 bg-white/50 rounded-lg border border-gray-100">
+                                              <p className="text-gray-400 font-bold uppercase tracking-tighter mb-1">Gabarito</p>
+                                              <p className="text-emerald-700 font-bold">{q.gabarito}</p>
+                                            </div>
                                           </div>
+
+                                          {/* Integrated Feedback Section for Incorrect Questions */}
+                                          {!q.acertou && (
+                                            <div className="mt-4 p-4 bg-white/60 rounded-xl border border-red-100/50 space-y-4">
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                  <MessageSquare size={14} className="text-red-500" />
+                                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback do Professor</p>
+                                                </div>
+                                                {isProfessor && editingQuestionFeedback !== `${comp.competencia}-${q.id}` && (
+                                                  <button 
+                                                    onClick={() => {
+                                                      setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                                      setFeedbackValue(q.professor_feedback || '');
+                                                      setNotaValue(q.professor_nota || '');
+                                                    }}
+                                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                                                  >
+                                                    <Pencil size={10} />
+                                                    {q.professor_feedback ? 'Editar' : 'Adicionar'}
+                                                  </button>
+                                                )}
+                                              </div>
+
+                                              {editingQuestionFeedback === `${comp.competencia}-${q.id}` ? (
+                                                <div className="space-y-3">
+                                                  <div className="flex items-center gap-3">
+                                                    <div className="w-24">
+                                                      <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Nota (0-10)</label>
+                                                      <input
+                                                        type="text"
+                                                        value={notaValue}
+                                                        onChange={(e) => setNotaValue(e.target.value)}
+                                                        className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
+                                                        placeholder="0.0"
+                                                      />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                      <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Explicação Pedagógica</label>
+                                                      <textarea
+                                                        value={feedbackValue}
+                                                        onChange={(e) => setFeedbackValue(e.target.value)}
+                                                        className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[60px]"
+                                                        placeholder="Por que o aluno errou? Como ele pode melhorar?"
+                                                        autoFocus
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex justify-end gap-2">
+                                                    <button 
+                                                      onClick={() => setEditingQuestionFeedback(null)}
+                                                      className="px-3 py-1.5 text-[10px] font-bold text-gray-500 hover:text-gray-700"
+                                                    >
+                                                      Cancelar
+                                                    </button>
+                                                    <button 
+                                                      onClick={() => handleSaveEdit(comp.competencia, 'fullQuestionFeedback', feedbackValue, q.id, notaValue)}
+                                                      className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                                                    >
+                                                      Salvar Feedback
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (q.professor_feedback || q.professor_nota) ? (
+                                                <div className="flex items-start gap-3">
+                                                  {q.professor_nota && (
+                                                    <div className="px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex flex-col items-center justify-center min-w-[40px]">
+                                                      <span className="text-[8px] font-bold text-gray-400 uppercase">Nota</span>
+                                                      <span className="text-sm font-black text-red-700">{q.professor_nota}</span>
+                                                    </div>
+                                                  )}
+                                                  <p className="text-xs text-red-800 italic leading-relaxed flex-1">
+                                                    "{q.professor_feedback || "Nenhuma explicação fornecida."}"
+                                                  </p>
+                                                </div>
+                                              ) : isProfessor ? (
+                                                <button 
+                                                  onClick={() => {
+                                                    setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                                    setFeedbackValue('');
+                                                    setNotaValue('');
+                                                  }}
+                                                  className="w-full py-4 border border-dashed border-gray-200 rounded-xl text-[10px] font-bold text-gray-400 hover:border-emerald-300 hover:text-emerald-600 transition-all flex flex-col items-center gap-1"
+                                                >
+                                                  <Plus size={16} />
+                                                  Clique para adicionar feedback e nota para esta questão incorreta
+                                                </button>
+                                              ) : (
+                                                <p className="text-[10px] text-gray-400 italic">Nenhum feedback do professor para esta questão ainda.</p>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
-                                      ) : null}
-                                    </div>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <MessageSquare size={14} className="text-emerald-500" />
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback e Avaliação</p>
+                                          </div>
+                                          
+                                          {isProfessor && (
+                                            <div className="flex items-center gap-2">
+                                              {editingQuestionFeedback !== `${comp.competencia}-${q.id}` ? (
+                                                <button 
+                                                  onClick={() => {
+                                                    setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                                    setFeedbackValue(q.professor_feedback || '');
+                                                    setNotaValue(q.professor_nota || '');
+                                                  }}
+                                                  className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-all border border-emerald-100"
+                                                >
+                                                  <Pencil size={10} />
+                                                  Editar
+                                                </button>
+                                              ) : (
+                                                <div className="flex items-center gap-1">
+                                                  <button 
+                                                    onClick={() => handleSaveEdit(comp.competencia, 'fullQuestionFeedback', feedbackValue, q.id, notaValue)}
+                                                    className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
+                                                    title="Salvar"
+                                                  >
+                                                    <Check size={12} />
+                                                  </button>
+                                                  <button 
+                                                    onClick={() => setEditingQuestionFeedback(null)}
+                                                    className="p-1 bg-gray-200 text-gray-600 rounded hover:bg-gray-300 transition-colors"
+                                                    title="Cancelar"
+                                                  >
+                                                    <X size={12} />
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {editingQuestionFeedback === `${comp.competencia}-${q.id}` ? (
+                                          <div className="space-y-3 bg-white/50 p-3 rounded-xl border border-emerald-100/50">
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-24">
+                                                <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Nota (0-10)</label>
+                                                <input
+                                                  type="text"
+                                                  value={notaValue}
+                                                  onChange={(e) => setNotaValue(e.target.value)}
+                                                  className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
+                                                  placeholder="0.0"
+                                                />
+                                              </div>
+                                              <div className="flex-1">
+                                                <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Explicação Pedagógica</label>
+                                                <textarea
+                                                  value={feedbackValue}
+                                                  onChange={(e) => setFeedbackValue(e.target.value)}
+                                                  className="w-full p-2 text-xs rounded-lg border border-gray-200 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[60px]"
+                                                  placeholder="Por que o aluno errou? Como ele pode melhorar?"
+                                                  autoFocus
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ) : (q.professor_feedback || q.professor_nota) ? (
+                                          <div className={cn(
+                                            "p-4 rounded-xl border space-y-3",
+                                            q.acertou ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100"
+                                          )}>
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-2">
+                                                <div className={cn(
+                                                  "w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm",
+                                                  q.acertou ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                                                )}>
+                                                  {q.professor_nota || '-'}
+                                                </div>
+                                                <div>
+                                                  <p className="text-[9px] font-bold text-gray-400 uppercase leading-none">Nota Atribuída</p>
+                                                  <p className="text-[10px] font-medium text-gray-500">Avaliação do Instrutor</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                            <div className="flex gap-3 pt-2 border-t border-gray-100/50">
+                                              <p className={cn(
+                                                "text-xs font-medium italic leading-relaxed",
+                                                q.acertou ? "text-emerald-800" : "text-red-800"
+                                              )}>
+                                                {q.professor_feedback || "Nenhuma explicação fornecida."}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col items-center justify-center py-6 text-center space-y-2 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                                            <MessageSquare size={20} className="text-gray-300" />
+                                            <p className="text-xs text-gray-400 font-medium">Nenhum feedback ou nota inserida para esta questão.</p>
+                                            {isProfessor && (
+                                              <button 
+                                                onClick={() => {
+                                                  setEditingQuestionFeedback(`${comp.competencia}-${q.id}`);
+                                                  setFeedbackValue(q.professor_feedback || '');
+                                                  setNotaValue(q.professor_nota || '');
+                                                }}
+                                                className="text-[10px] font-bold text-emerald-600 hover:underline"
+                                              >
+                                                Adicionar Feedback Agora
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -4285,8 +4984,28 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile }: { resu
                 </motion.div>
               ))
             ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                <p className="text-gray-500 italic">Nenhuma competência encontrada com o nível "{filter}".</p>
+              <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center space-y-4">
+                <div className="p-4 bg-gray-100 rounded-full">
+                  <Search size={32} className="text-gray-400" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-gray-900 font-bold">Nenhuma competência encontrada</p>
+                  <p className="text-gray-500 text-sm max-w-xs mx-auto">
+                    {searchTerm 
+                      ? `Não encontramos resultados para "${searchTerm}" no nível ${filter}.`
+                      : `Não há competências classificadas como "${filter}" neste diagnóstico.`
+                    }
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setFilter('Todos');
+                    setSearchTerm('');
+                  }}
+                  className="px-6 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+                >
+                  Limpar Filtros
+                </button>
               </div>
             )}
           </div>
@@ -4327,9 +5046,27 @@ function AppContent() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true' || 
+             window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('darkMode', darkMode.toString());
+  }, [darkMode]);
+
   useEffect(() => {
     if (!user) return;
     
@@ -4363,25 +5100,33 @@ function AppContent() {
     if (!userProfile) return [];
     if (userProfile.role === 'aluno') {
       return [
+        { type: 'header', label: 'Principal' },
         { id: 'student-dashboard', label: 'Meu Painel', icon: LayoutDashboard, path: '/student-dashboard' },
-        { id: 'student-exams', label: 'Simulados', icon: BookOpen, path: '/student-exams' },
-        { id: 'exercises', label: 'Exercícios', icon: CheckSquare, path: '/exercises' },
+        { type: 'header', label: 'Módulos de Aprendizado' },
+        { id: 'student-exams', label: 'Simulados', icon: BookOpen, path: '/student-exams', description: 'Diagnóstico e Avaliação' },
+        { id: 'exercises', label: 'Exercícios', icon: CheckSquare, path: '/exercises', description: 'Prática e Aprendizado' },
+        { type: 'header', label: 'Suporte IA' },
         { id: 'study-plan', label: 'Plano IA', icon: Zap, path: '/study-plan' },
-        { id: 'history', label: 'Histórico', icon: History, path: '/history' },
         { id: 'chat', label: 'Assistente IA', icon: MessageSquare, path: '/chat' },
+        { type: 'header', label: 'Outros' },
+        { id: 'history', label: 'Histórico', icon: History, path: '/history' },
         { id: 'plan', label: 'Meu Plano', icon: Calendar, disabled: !result, path: '/plan' },
         { id: 'profile', label: 'Perfil', icon: UserIcon, path: '/profile' },
       ];
     }
     return [
+      { type: 'header', label: 'Gestão de Dados' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
+      { type: 'header', label: 'Gestão Pedagógica' },
       { id: 'questions-bank', label: 'Banco de Questões', icon: Database, path: '/questions-bank' },
-      { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams' },
-      { id: 'exercises-management', label: 'Exercícios', icon: CheckSquare, path: '/exercises-management' },
+      { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Avaliação Formal' },
+      { id: 'exercises-management', label: 'Exercícios', icon: CheckSquare, path: '/exercises-management', description: 'Prática Dirigida' },
+      { type: 'header', label: 'Comunicação e Admin' },
       { id: 'chat', label: 'Chat IA', icon: MessageSquare, path: '/chat' },
       { id: 'admin-users', label: 'Gestão', icon: Users, path: '/admin-users' },
+      { type: 'header', label: 'Visão do Aluno' },
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, disabled: !result, path: result && currentDiagnosticId ? `/dashboard/${currentDiagnosticId}` : '/dashboard' },
       { id: 'aluno', label: 'Detalhes', icon: UserCheck, disabled: !result, path: result && currentDiagnosticId ? `/aluno/${currentDiagnosticId}` : '/aluno' },
       { id: 'plan', label: 'Plano', icon: Calendar, disabled: !result, path: '/plan' },
@@ -4546,6 +5291,19 @@ function AppContent() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Global Settings Listener
+  useEffect(() => {
+    const docRef = doc(db, 'settings', 'global');
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setGlobalSettings(snapshot.data());
+      }
+    }, (err) => {
+      console.error("Error listening to global settings:", err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Test Connection
   useEffect(() => {
@@ -4820,13 +5578,18 @@ function AppContent() {
     setError(null);
     try {
       // Group data by student
-      const studentsData: Record<string, any[]> = {};
+      const studentsData: Record<string, { rows: any[], email: string, matricula: string }> = {};
       data.forEach(row => {
         const studentName = row.aluno || row.Aluno || row.nome || row.Nome || 'Estudante Sem Nome';
+        const studentEmail = row.email || row.Email || row.correio || row.Correio || '';
+        const studentMatricula = row.matricula || row.Matricula || row.id || row.ID || '';
+        
         if (!studentsData[studentName]) {
-          studentsData[studentName] = [];
+          studentsData[studentName] = { rows: [], email: studentEmail, matricula: studentMatricula };
         }
-        studentsData[studentName].push(row);
+        studentsData[studentName].rows.push(row);
+        if (!studentsData[studentName].email && studentEmail) studentsData[studentName].email = studentEmail;
+        if (!studentsData[studentName].matricula && studentMatricula) studentsData[studentName].matricula = studentMatricula;
       });
 
       const studentNames = Object.keys(studentsData);
@@ -4839,25 +5602,28 @@ function AppContent() {
       // Process each student individually to avoid context limits and ensure all are processed
       for (const name of studentNames) {
         try {
-          const studentRows = studentsData[name];
-          const results = await generateDiagnostic(studentRows, selectedModel);
+          const studentInfo = studentsData[name];
+          const results = await generateDiagnostic(studentInfo.rows, selectedModel);
           
           if (results && results.length > 0) {
-            const res = results[0]; // generateDiagnostic now returns an array, but for one student it should be index 0
+            const res = results[0]; 
             allResults.push(res);
 
             // Save to Firestore
             const docRef = await addDoc(collection(db, path), {
-              userId: user.uid,
+              userId: user.uid, // Professor ID
               aluno: res.aluno,
+              studentEmail: studentInfo.email,
+              studentMatricula: studentInfo.matricula,
               result: res,
               createdAt: new Date().toISOString()
             });
             savedIds.push(docRef.id);
 
             // Trigger Webhook if configured
-            if (userProfile?.settings?.webhookUrl) {
-              fetch(userProfile.settings.webhookUrl, {
+            const effectiveWebhookUrl = userProfile?.settings?.webhookUrl || globalSettings?.webhookUrl;
+            if (effectiveWebhookUrl) {
+              fetch(effectiveWebhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -5002,50 +5768,57 @@ function AppContent() {
             </div>
           </div>
         )}
-        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="lg:hidden p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 dark:shadow-none">
               <BarChart3 size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">EduDiagnóstico SAEP</h1>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Especialista em Avaliação</p>
+              <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">EduDiagnóstico SAEP Pro</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Especialista em Avaliação</p>
             </div>
           </div>
 
         {user && userProfile && (
-          <nav className="hidden lg:flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-            {navItems.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => !tab.disabled && navigate(tab.path)}
-                disabled={tab.disabled}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-md text-xs font-bold transition-all",
-                  activeTab === tab.id 
-                    ? "bg-white text-emerald-700 shadow-sm" 
-                    : tab.disabled ? "text-gray-400 cursor-not-allowed" : "text-gray-600 hover:text-emerald-600 hover:bg-white/50"
-                )}
-              >
-                <tab.icon size={14} />
-                {tab.label}
-              </button>
+          <nav className="hidden lg:flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+            {navItems.map((tab, idx) => (
+              tab.type === 'header' ? (
+                <div key={`header-${idx}`} className="px-2 py-1 text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2 first:ml-0">
+                  {tab.label}
+                </div>
+              ) : (
+                <button
+                  key={tab.id}
+                  onClick={() => !tab.disabled && navigate(tab.path)}
+                  disabled={tab.disabled}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-md text-xs font-bold transition-all whitespace-nowrap",
+                    activeTab === tab.id 
+                      ? "bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-400 shadow-sm" 
+                      : tab.disabled ? "text-gray-400 dark:text-gray-600 cursor-not-allowed" : "text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white/50 dark:hover:bg-gray-700/50"
+                  )}
+                >
+                  <tab.icon size={14} />
+                  {tab.label}
+                </button>
+              )
             ))}
           </nav>
         )}
 
         <div className="flex items-center gap-4">
+          <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
           {user ? (
-            <div className="flex items-center gap-3 pl-4 border-l border-gray-100">
+            <div className="flex items-center gap-3 pl-4 border-l border-gray-100 dark:border-gray-800">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{user.displayName}</p>
-                <p className="text-[10px] text-gray-500 truncate max-w-[120px]">{user.email}</p>
+                <p className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[120px]">{user.displayName}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[120px]">{user.email}</p>
               </div>
               {user.photoURL ? (
                 <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-gray-200" referrerPolicy="no-referrer" />
@@ -5085,33 +5858,45 @@ function AppContent() {
           className="lg:hidden bg-white border-b border-gray-200 overflow-hidden"
         >
           <div className="p-4 space-y-1">
-            {navItems.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  if (!tab.disabled) {
-                    navigate(tab.path);
-                    setIsMobileMenuOpen(false);
-                  }
-                }}
-                disabled={tab.disabled}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
-                  activeTab === tab.id 
-                    ? "bg-emerald-50 text-emerald-700" 
-                    : tab.disabled ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-50"
-                )}
-              >
-                <tab.icon size={18} />
-                {tab.label}
-              </button>
+            {navItems.map((tab, idx) => (
+              tab.type === 'header' ? (
+                <div key={`header-mob-${idx}`} className="px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pt-4 first:pt-0">
+                  {tab.label}
+                </div>
+              ) : (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    if (!tab.disabled) {
+                      navigate(tab.path);
+                      setIsMobileMenuOpen(false);
+                    }
+                  }}
+                  disabled={tab.disabled}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
+                    activeTab === tab.id 
+                      ? "bg-emerald-50 text-emerald-700" 
+                      : tab.disabled ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-50"
+                  )}
+                >
+                  <tab.icon size={18} />
+                  <div>
+                    <p>{tab.label}</p>
+                    {tab.description && <p className="text-[10px] font-medium opacity-60">{tab.description}</p>}
+                  </div>
+                </button>
+              )
             ))}
           </div>
         </motion.div>
       )}
     </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto p-6 relative">
+      <main className={cn(
+        "max-w-7xl mx-auto p-6 relative", 
+        !user && "flex flex-col items-center justify-center min-h-[calc(100vh-120px)] w-full"
+      )}>
         {loading && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-sm w-full text-center space-y-6">
@@ -5141,7 +5926,7 @@ function AppContent() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-md mx-auto py-12 space-y-8"
+            className="max-w-md w-full py-12 space-y-8"
           >
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto">
@@ -5458,7 +6243,7 @@ function AppContent() {
 
             <Route path="/student-dashboard" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}>
-                <StudentDashboardView user={user} />
+                <StudentDashboardView user={user} userProfile={userProfile} />
               </ProtectedRoute>
             } />
 
@@ -5493,6 +6278,7 @@ function AppContent() {
                   onUpdateResult={setResult} 
                   diagnosticId={currentDiagnosticId} 
                   userProfile={userProfile}
+                  history={history}
                 />
               </ProtectedRoute>
             } />
