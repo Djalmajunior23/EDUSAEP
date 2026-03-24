@@ -51,7 +51,9 @@ import {
   Zap,
   ArrowRight,
   Target,
-  Info
+  Info,
+  Trophy,
+  TrendingUp
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -189,6 +191,10 @@ export interface UserProfile {
   photoURL: string | null;
   emailVerified: boolean;
   role: 'professor' | 'aluno' | 'admin';
+  xp?: number;
+  level?: number;
+  badges?: string[];
+  gamificationEnabled?: boolean;
   createdAt: string;
   settings?: {
     theme: 'light' | 'dark';
@@ -1321,6 +1327,44 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {/* Gamification Banner */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-6">
+          <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center border-4 border-white/30 shrink-0">
+            <span className="text-3xl font-black">{userProfile?.level || 1}</span>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">Nível {userProfile?.level || 1}</h2>
+            <p className="text-emerald-100 font-medium">{userProfile?.xp || 0} XP Acumulados</p>
+            <div className="mt-3 w-48 h-2 bg-black/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full" 
+                style={{ width: `${((userProfile?.xp || 0) % 100)}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-emerald-100 mt-1 uppercase tracking-wider">
+              {100 - ((userProfile?.xp || 0) % 100)} XP para o próximo nível
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          {/* Badges placeholder */}
+          <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center border border-white/20" title="Primeiro Acesso">
+            🌟
+          </div>
+          {(userProfile?.level || 1) >= 5 && (
+            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center border border-white/20" title="Nível 5 Alcançado">
+              🔥
+            </div>
+          )}
+          {(userProfile?.level || 1) >= 10 && (
+            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center border border-white/20" title="Nível 10 Alcançado">
+              👑
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <motion.button
           whileHover={{ scale: 1.02 }}
@@ -2268,6 +2312,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
 
 function ExercisesView({ user }: { user: User | null }) {
   const [exercises, setExercises] = useState<Exam[]>([]);
+  const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeExercise, setActiveExercise] = useState<Exam | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2280,12 +2325,22 @@ function ExercisesView({ user }: { user: User | null }) {
       where('type', '==', 'exercicio'),
       where('status', '==', 'published')
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeExams = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
       setExercises(data);
+    });
+
+    const submissionsQuery = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid), where('type', '==', 'exercise'));
+    const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
+      const submissionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSubmission));
+      setSubmissions(submissionsData);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeExams();
+      unsubscribeSubmissions();
+    };
   }, [user]);
 
   const subjects = useMemo(() => {
@@ -2368,30 +2423,47 @@ function ExercisesView({ user }: { user: User | null }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredExercises.map((ex) => (
-            <motion.div 
-              key={ex.id} 
-              whileHover={{ y: -4 }}
-              className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                  {ex.subject}
-                </span>
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-full text-[8px] font-bold uppercase tracking-tighter">
-                  <Zap size={8} /> Prática
-                </div>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{ex.title}</h3>
-              <p className="text-sm text-gray-500 line-clamp-2 mb-6">{ex.description}</p>
-              <button 
-                onClick={() => setActiveExercise(ex)}
-                className="w-full py-3 bg-blue-50 text-blue-700 rounded-2xl font-bold hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
+          {filteredExercises.map((ex) => {
+            const submission = submissions.find(s => s.resourceId === ex.id);
+            const isCompleted = !!submission;
+            const scorePercentage = isCompleted ? Math.round((submission.score / (submission.maxScore || 100)) * 100) : 0;
+
+            return (
+              <motion.div 
+                key={ex.id} 
+                whileHover={{ y: -4 }}
+                className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group flex flex-col"
               >
-                Praticar Agora <ArrowRight size={18} />
-              </button>
-            </motion.div>
-          ))}
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                    {ex.subject}
+                  </span>
+                  {isCompleted ? (
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-tighter">
+                      <CheckCircle2 size={12} /> Concluído ({scorePercentage}%)
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-full text-[8px] font-bold uppercase tracking-tighter">
+                      <Zap size={8} /> Prática
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{ex.title}</h3>
+                <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-1">{ex.description}</p>
+                <button 
+                  onClick={() => setActiveExercise(ex)}
+                  className={cn(
+                    "w-full py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2",
+                    isCompleted 
+                      ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white" 
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white"
+                  )}
+                >
+                  {isCompleted ? 'Praticar Novamente' : 'Praticar Agora'} <ArrowRight size={18} />
+                </button>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -2638,7 +2710,43 @@ function StudyPlanView({ user }: { user: User | null }) {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
-        config: { responseMimeType: "application/json" }
+        config: { 
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              priorityTopics: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    reason: { type: Type.STRING },
+                    priority: { type: Type.STRING }
+                  },
+                  required: ["topic", "reason", "priority"]
+                }
+              },
+              recommendedExercises: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    title: { type: Type.STRING },
+                    competency: { type: Type.STRING }
+                  },
+                  required: ["id", "title", "competency"]
+                }
+              },
+              recommendations: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            },
+            required: ["priorityTopics", "recommendedExercises", "recommendations"]
+          }
+        }
       });
 
       const aiData = JSON.parse(response.text || '{}');
@@ -2953,6 +3061,35 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
       };
 
       const docRef = await addDoc(collection(db, 'exam_submissions'), submission);
+      
+      // Gamification Logic
+      if (user?.uid) {
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDocFromServer(userRef);
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            const currentXp = userData.xp || 0;
+            const earnedXp = score * 10; // 10 XP per point
+            const newXp = currentXp + earnedXp;
+            const newLevel = Math.floor(newXp / 100) + 1;
+            
+            await updateDoc(userRef, {
+              xp: newXp,
+              level: newLevel
+            });
+            
+            if (newLevel > (userData.level || 1)) {
+              toast.success(`🎉 Parabéns! Você alcançou o nível ${newLevel}!`);
+            } else if (earnedXp > 0) {
+              toast.success(`✨ Você ganhou ${earnedXp} XP!`);
+            }
+          }
+        } catch (e) {
+          console.error("Error updating gamification:", e);
+        }
+      }
+
       setFinalSubmission({ id: docRef.id, ...submission } as ExamSubmission);
       setShowResult(true);
       
@@ -3212,6 +3349,516 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
   );
 }
 
+function GamificationView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
+  const [gameState, setGameState] = useState<'menu' | 'playing' | 'results'>('menu');
+  const [score, setScore] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+
+  // Exemplo de questões focadas no padrão SAEP
+  const questions = [
+    {
+      id: 1,
+      descriptor: 'D01',
+      text: 'Identificar o tema de um texto.',
+      question: 'Leia o texto e responda: Qual é o tema central abordado?',
+      options: [
+        'A importância da leitura na infância.',
+        'Os perigos da internet para os jovens.',
+        'A preservação do meio ambiente.',
+        'O desenvolvimento de novas tecnologias.'
+      ],
+      correctAnswer: 2,
+      explanation: 'O texto foca nas consequências do desmatamento e na necessidade de proteger as florestas, o que se alinha com a preservação do meio ambiente.'
+    },
+    {
+      id: 2,
+      descriptor: 'D04',
+      text: 'Inferir uma informação implícita em um texto.',
+      question: 'Na frase "João fechou a cara e saiu batendo a porta", o que podemos inferir sobre o estado de João?',
+      options: [
+        'Ele estava com pressa.',
+        'Ele estava muito feliz.',
+        'Ele estava irritado ou zangado.',
+        'Ele estava com sono.'
+      ],
+      correctAnswer: 2,
+      explanation: 'A expressão "fechou a cara" e a ação de "bater a porta" são indicativos clássicos de irritação ou raiva.'
+    },
+    {
+      id: 3,
+      descriptor: 'D14',
+      text: 'Distinguir um fato da opinião relativa a esse fato.',
+      question: 'Qual das frases abaixo representa uma opinião?',
+      options: [
+        'A Terra gira em torno do Sol.',
+        'A água ferve a 100 graus Celsius ao nível do mar.',
+        'O filme que estreou ontem é o melhor do ano.',
+        'O Brasil está localizado na América do Sul.'
+      ],
+      correctAnswer: 2,
+      explanation: 'Dizer que um filme é "o melhor" é um julgamento de valor, portanto, uma opinião. As outras opções são fatos comprováveis.'
+    },
+    {
+      id: 4,
+      descriptor: 'D15',
+      text: 'Estabelecer relações lógico-discursivas presentes no texto.',
+      question: 'Na frase "Choveu muito, portanto, as ruas ficaram alagadas", a palavra "portanto" estabelece uma relação de:',
+      options: [
+        'Causa.',
+        'Consequência.',
+        'Oposição.',
+        'Adição.'
+      ],
+      correctAnswer: 1,
+      explanation: 'A palavra "portanto" introduz a consequência do fato anterior (ter chovido muito).'
+    },
+    {
+      id: 5,
+      descriptor: 'D19',
+      text: 'Resolver problema com números naturais.',
+      question: 'Maria comprou 3 cadernos por R$ 15,00 cada e 2 canetas por R$ 5,00 cada. Quanto ela gastou no total?',
+      options: [
+        'R$ 45,00',
+        'R$ 55,00',
+        'R$ 60,00',
+        'R$ 50,00'
+      ],
+      correctAnswer: 1,
+      explanation: '3 cadernos x R$ 15 = R$ 45. 2 canetas x R$ 5 = R$ 10. Total: 45 + 10 = R$ 55,00.'
+    }
+  ];
+
+  const handleAnswer = (index: number) => {
+    if (selectedAnswer !== null) return;
+    setSelectedAnswer(index);
+    setShowExplanation(true);
+    if (index === questions[currentQuestion].correctAnswer) {
+      setScore(score + 10);
+    }
+  };
+
+  const handleNext = async () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+    } else {
+      setGameState('results');
+      // Award XP
+      if (userProfile && user) {
+        try {
+          const newXp = (userProfile.xp || 0) + score;
+          const newLevel = Math.floor(newXp / 100) + 1;
+          await updateDoc(doc(db, 'users', user.uid), {
+            xp: newXp,
+            level: newLevel
+          });
+          toast.success(`Você ganhou ${score} XP!`);
+        } catch (err) {
+          console.error("Error updating XP:", err);
+        }
+      }
+    }
+  };
+
+  const resetGame = () => {
+    setGameState('menu');
+    setScore(0);
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+  };
+
+  if (!userProfile?.gamificationEnabled) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <Trophy className="w-12 h-12 text-gray-300" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-700">Gamificação Desativada</h2>
+        <p className="text-gray-500 max-w-md">
+          O módulo de gamificação e revisão SAEP não está habilitado para o seu perfil no momento. 
+          Fale com seu professor para liberar o acesso.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-4xl mx-auto space-y-8"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <Trophy className="w-8 h-8 text-yellow-500" />
+            Arena SAEP
+          </h2>
+          <p className="text-gray-500 mt-2">Revise os descritores do SAEP de forma interativa e ganhe XP!</p>
+        </div>
+        <div className="bg-white px-6 py-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Seu Nível</div>
+            <div className="text-2xl font-black text-emerald-600">Lvl {userProfile.level || 1}</div>
+          </div>
+          <div className="w-px h-10 bg-gray-200"></div>
+          <div>
+            <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">XP Total</div>
+            <div className="text-2xl font-black text-blue-600">{userProfile.xp || 0}</div>
+          </div>
+        </div>
+      </div>
+
+      {gameState === 'menu' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setGameState('playing')}>
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <BookOpen className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Quiz de Descritores</h3>
+            <p className="text-gray-500 mb-6">Teste seus conhecimentos nos principais descritores cobrados no SAEP.</p>
+            <button className="w-full py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors">
+              Iniciar Desafio
+            </button>
+          </div>
+          
+          <div className="bg-gray-50 p-8 rounded-3xl border border-gray-200 border-dashed flex flex-col items-center justify-center text-center opacity-70">
+            <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center mb-4">
+              <Target className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-600 mb-2">Batalha de Turmas</h3>
+            <p className="text-gray-500 text-sm">Em breve! Dispute com seus colegas em tempo real.</p>
+          </div>
+        </div>
+      )}
+
+      {gameState === 'playing' && (
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gray-900 p-6 text-white flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="px-3 py-1 bg-white/20 rounded-lg text-sm font-bold tracking-wider">
+                {questions[currentQuestion].descriptor}
+              </span>
+              <span className="font-medium opacity-90">{questions[currentQuestion].text}</span>
+            </div>
+            <div className="font-bold text-xl">
+              {currentQuestion + 1} / {questions.length}
+            </div>
+          </div>
+          
+          <div className="p-8">
+            <h3 className="text-2xl font-medium text-gray-900 mb-8 leading-relaxed">
+              {questions[currentQuestion].question}
+            </h3>
+            
+            <div className="space-y-4">
+              {questions[currentQuestion].options.map((option, idx) => {
+                const isSelected = selectedAnswer === idx;
+                const isCorrect = idx === questions[currentQuestion].correctAnswer;
+                const showStatus = selectedAnswer !== null;
+                
+                let buttonClass = "w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 flex items-center justify-between group ";
+                
+                if (!showStatus) {
+                  buttonClass += "border-gray-200 hover:border-blue-500 hover:bg-blue-50";
+                } else if (isCorrect) {
+                  buttonClass += "border-emerald-500 bg-emerald-50";
+                } else if (isSelected && !isCorrect) {
+                  buttonClass += "border-red-500 bg-red-50";
+                } else {
+                  buttonClass += "border-gray-100 opacity-50";
+                }
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleAnswer(idx)}
+                    disabled={showStatus}
+                    className={buttonClass}
+                  >
+                    <span className={cn(
+                      "text-lg font-medium",
+                      showStatus && isCorrect ? "text-emerald-700" :
+                      showStatus && isSelected && !isCorrect ? "text-red-700" :
+                      "text-gray-700"
+                    )}>
+                      {option}
+                    </span>
+                    {showStatus && isCorrect && <CheckCircle2 className="w-6 h-6 text-emerald-500" />}
+                    {showStatus && isSelected && !isCorrect && <XCircle className="w-6 h-6 text-red-500" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {showExplanation && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-8 p-6 bg-blue-50 rounded-2xl border border-blue-100"
+              >
+                <div className="flex items-start gap-3">
+                  <Info className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                  <div>
+                    <h4 className="font-bold text-blue-900 mb-2">Explicação</h4>
+                    <p className="text-blue-800 leading-relaxed">{questions[currentQuestion].explanation}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {showExplanation && (
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={handleNext}
+                  className="px-8 py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors flex items-center gap-2"
+                >
+                  {currentQuestion < questions.length - 1 ? 'Próxima Questão' : 'Ver Resultados'}
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {gameState === 'results' && (
+        <div className="bg-white p-12 rounded-3xl border border-gray-200 shadow-sm text-center max-w-2xl mx-auto">
+          <div className="w-32 h-32 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-8">
+            <Trophy className="w-16 h-16 text-yellow-500" />
+          </div>
+          <h2 className="text-4xl font-black text-gray-900 mb-4">Desafio Concluído!</h2>
+          <p className="text-xl text-gray-500 mb-8">Você revisou {questions.length} descritores do SAEP.</p>
+          
+          <div className="bg-gray-50 rounded-2xl p-8 mb-8 inline-block min-w-[300px]">
+            <div className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">XP Ganho</div>
+            <div className="text-6xl font-black text-emerald-500">+{score}</div>
+          </div>
+
+          <div>
+            <button
+              onClick={resetGame}
+              className="px-8 py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors"
+            >
+              Voltar para a Arena
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function BIAnalysisView({ user }: { user: User | null }) {
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [dataStats, setDataStats] = useState<{ students: number, submissions: number, diagnostics: number } | null>(null);
+
+  useEffect(() => {
+    // Fetch basic stats to show before generating
+    const fetchStats = async () => {
+      try {
+        const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+        const submissionsSnap = await getDocs(collection(db, 'exam_submissions'));
+        const diagnosticsSnap = await getDocs(collection(db, 'diagnostics'));
+        
+        setDataStats({
+          students: usersSnap.size,
+          submissions: submissionsSnap.size,
+          diagnostics: diagnosticsSnap.size
+        });
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  const generateAnalysis = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch data
+      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+      const submissionsSnap = await getDocs(collection(db, 'exam_submissions'));
+      const diagnosticsSnap = await getDocs(collection(db, 'diagnostics'));
+      const examsSnap = await getDocs(collection(db, 'exams'));
+
+      const students = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+      const submissions = submissionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSubmission));
+      const diagnostics = diagnosticsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const exams = examsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
+
+      // 2. Format data for the prompt
+      const studentsData = students.map(s => {
+        const studentSubs = submissions.filter(sub => sub.studentId === s.uid);
+        const studentDiags = diagnostics.filter(d => d.userId === s.uid || d.aluno === s.displayName);
+        
+        const examsTaken = studentSubs.map(sub => {
+          const exam = exams.find(e => e.id === sub.examId);
+          return {
+            title: exam?.title || 'Desconhecido',
+            subject: exam?.subject || 'Desconhecido',
+            score: sub.score,
+            maxScore: sub.maxScore || 100,
+            date: sub.completedAt?.toDate ? sub.completedAt.toDate().toISOString() : sub.completedAt
+          };
+        });
+
+        return {
+          id: s.uid,
+          name: s.displayName || s.email,
+          xp: s.xp || 0,
+          level: s.level || 1,
+          examsTaken,
+          diagnosticsCount: studentDiags.length
+        };
+      });
+
+      const prompt = `Você é um assistente especializado em análise de desempenho de alunos, com foco em Business Intelligence (BI) educacional.
+Seu papel é analisar dados de alunos (notas, frequência, turma, disciplina, período, etc.) e gerar insights claros, objetivos e acionáveis para apoiar decisões pedagógicas.
+
+A partir dos dados que eu fornecer, você deve:
+- Calcular e descrever os principais indicadores de desempenho (médias, taxas, evolução, etc.)
+- Destacar padrões relevantes, como melhora, queda, constância ou variações bruscas de desempenho
+- Identificar alunos ou grupos em possível situação de risco (baixa média, alta taxa de faltas, queda acentuada, etc.)
+- Comparar desempenho entre turmas, disciplinas ou períodos, quando houver dados para isso
+- Sugerir ações pedagógicas ou intervenções práticas (reforço, acompanhamento, comunicação com responsáveis, etc.) com base nos dados
+- Não inventar dados: quando algo não estiver disponível, deixe isso claro e, se fizer suposições, indique que são hipóteses.
+
+DADOS DOS ALUNOS E DESEMPENHO:
+${JSON.stringify(studentsData, null, 2)}
+
+Formato obrigatório da resposta (use Markdown):
+
+## Resumo geral da turma
+Visão geral do desempenho da turma como um todo, em poucas frases.
+
+## Métricas principais
+(lista com valores. Ex: média geral de notas, média por disciplina, etc.)
+
+## Alunos em destaque (positivo e em risco)
+- Alunos com melhor desempenho ou evolução positiva.
+- Alunos em possível situação de risco (notas baixas, queda brusca, etc.).
+
+## Tendências e padrões
+Padrões observados nos dados: melhoria geral, queda em determinada disciplina, etc.
+
+## Recomendações práticas
+Sugestões objetivas de ações pedagógicas ou de gestão.
+
+Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explícito na análise, evitando tirar conclusões fortes sem base suficiente.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: prompt,
+      });
+
+      setAnalysis(response.text || "Não foi possível gerar a análise.");
+      toast.success("Análise de BI gerada com sucesso!");
+    } catch (err) {
+      console.error("Error generating BI analysis:", err);
+      toast.error("Erro ao gerar análise de BI.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8 max-w-5xl mx-auto"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <TrendingUp className="text-emerald-600" size={32} />
+            Análise de BI Educacional
+          </h2>
+          <p className="text-gray-500 mt-2">
+            Gere insights pedagógicos acionáveis baseados no desempenho real dos alunos usando Inteligência Artificial.
+          </p>
+        </div>
+        <button
+          onClick={generateAnalysis}
+          disabled={loading || !dataStats || dataStats.students === 0}
+          className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 shadow-lg shadow-emerald-100"
+        >
+          {loading ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+          {loading ? 'Analisando Dados...' : 'Gerar Análise Completa'}
+        </button>
+      </div>
+
+      {!analysis && dataStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+              <Users className="text-blue-600" size={24} />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{dataStats.students}</div>
+              <div className="text-sm text-gray-500">Alunos Registrados</div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+              <CheckSquare className="text-emerald-600" size={24} />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{dataStats.submissions}</div>
+              <div className="text-sm text-gray-500">Simulados Realizados</div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+              <Target className="text-purple-600" size={24} />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{dataStats.diagnostics}</div>
+              <div className="text-sm text-gray-500">Diagnósticos Importados</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analysis && (
+        <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-emerald-900 p-8 text-white">
+            <h3 className="text-2xl font-bold flex items-center gap-3">
+              <BarChart3 size={28} className="text-emerald-400" />
+              Relatório de Inteligência Pedagógica
+            </h3>
+            <p className="text-emerald-100/80 mt-2">
+              Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
+            </p>
+          </div>
+          <div className="p-8 md:p-12">
+            <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:text-gray-900 prose-p:text-gray-600 prose-li:text-gray-600">
+              <Markdown>{analysis}</Markdown>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!analysis && !loading && (
+        <div className="bg-gray-50 p-12 rounded-[2rem] border-2 border-dashed border-gray-200 text-center space-y-4">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+            <TrendingUp className="text-gray-400" size={40} />
+          </div>
+          <h3 className="text-xl font-bold text-gray-700">Pronto para analisar os dados</h3>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Clique no botão acima para que a Inteligência Artificial processe todas as notas, simulados e diagnósticos e gere um relatório de BI completo.
+          </p>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 function AdminUsersView({ user }: { user: User | null }) {
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3311,6 +3958,17 @@ function AdminUsersView({ user }: { user: User | null }) {
       toast.success("Usuário removido com sucesso do banco de dados.");
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `users/${uid}`);
+    }
+  };
+
+  const handleToggleGamification = async (uid: string, currentStatus: boolean | undefined) => {
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        gamificationEnabled: !currentStatus
+      });
+      toast.success(`Gamificação ${!currentStatus ? 'ativada' : 'desativada'} para o usuário.`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${uid}`);
     }
   };
 
@@ -3443,6 +4101,7 @@ function AdminUsersView({ user }: { user: User | null }) {
                     <th className="pb-3 font-bold text-gray-400 uppercase tracking-wider text-xs">Nome / E-mail</th>
                     <th className="pb-3 font-bold text-gray-400 uppercase tracking-wider text-xs">Perfil</th>
                     <th className="pb-3 font-bold text-gray-400 uppercase tracking-wider text-xs">Data de Cadastro</th>
+                    <th className="pb-3 font-bold text-gray-400 uppercase tracking-wider text-xs">Gamificação</th>
                     <th className="pb-3 font-bold text-gray-400 uppercase tracking-wider text-xs text-right">Ações</th>
                   </tr>
                 </thead>
@@ -3465,6 +4124,24 @@ function AdminUsersView({ user }: { user: User | null }) {
                       </td>
                       <td className="py-3 text-gray-500">
                         {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                      <td className="py-3">
+                        {u.role === 'aluno' && (
+                          <button
+                            onClick={() => handleToggleGamification(u.uid, u.gamificationEnabled)}
+                            className={cn(
+                              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none",
+                              u.gamificationEnabled ? "bg-emerald-500" : "bg-gray-200"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                                u.gamificationEnabled ? "translate-x-5" : "translate-x-1"
+                              )}
+                            />
+                          </button>
+                        )}
                       </td>
                       <td className="py-3 text-right">
                         {u.uid !== user?.uid && (
@@ -5099,7 +5776,7 @@ function AppContent() {
   const navItems = useMemo(() => {
     if (!userProfile) return [];
     if (userProfile.role === 'aluno') {
-      return [
+      const items: any[] = [
         { type: 'header', label: 'Principal' },
         { id: 'student-dashboard', label: 'Meu Painel', icon: LayoutDashboard, path: '/student-dashboard' },
         { type: 'header', label: 'Módulos de Aprendizado' },
@@ -5113,9 +5790,16 @@ function AppContent() {
         { id: 'plan', label: 'Meu Plano', icon: Calendar, disabled: !result, path: '/plan' },
         { id: 'profile', label: 'Perfil', icon: UserIcon, path: '/profile' },
       ];
+      
+      if (userProfile.gamificationEnabled) {
+        items.splice(5, 0, { id: 'gamification', label: 'Gamificação', icon: Trophy, path: '/gamification', description: 'Jogos e Revisão SAEP' });
+      }
+      
+      return items;
     }
     return [
       { type: 'header', label: 'Gestão de Dados' },
+      { id: 'bi-analysis', label: 'Análise BI', icon: TrendingUp, path: '/bi-analysis', description: 'Insights da Turma' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
@@ -5741,55 +6425,24 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-emerald-100">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        {user && !user.emailVerified && (
-          <div className="bg-amber-50 border-b border-amber-100 px-6 py-2 flex items-center justify-between text-amber-800 text-xs font-medium">
-            <div className="flex items-center gap-2">
-              <AlertCircle size={14} />
-              <span>Seu e-mail não está verificado. Verifique seu e-mail para acessar todas as funcionalidades.</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={resendVerification}
-                className="hover:underline"
-              >
-                Reenviar link
-              </button>
-              <button 
-                onClick={checkVerificationStatus}
-                disabled={isVerifying}
-                className="bg-amber-100 px-2 py-1 rounded hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1"
-              >
-                {isVerifying && <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />}
-                {isVerifying ? 'Verificando...' : 'Já verifiquei'}
-              </button>
-            </div>
-          </div>
-        )}
-        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 dark:shadow-none">
+    <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-900 text-[#1A1A1A] dark:text-gray-100 font-sans selection:bg-emerald-100 flex">
+      {/* Sidebar for Desktop */}
+      {user && userProfile && (
+        <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 hidden lg:flex flex-col h-screen sticky top-0 shrink-0">
+          <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 dark:shadow-none shrink-0">
               <BarChart3 size={24} />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">EduDiagnóstico SAEP Pro</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Especialista em Avaliação</p>
+            <div className="overflow-hidden">
+              <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">EduDiagnóstico</h1>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider truncate">SAEP Pro</p>
             </div>
           </div>
-
-        {user && userProfile && (
-          <nav className="hidden lg:flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+          
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
             {navItems.map((tab, idx) => (
               tab.type === 'header' ? (
-                <div key={`header-${idx}`} className="px-2 py-1 text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2 first:ml-0">
+                <div key={`header-${idx}`} className="px-3 py-2 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] mt-4 first:mt-0">
                   {tab.label}
                 </div>
               ) : (
@@ -5798,105 +6451,194 @@ function AppContent() {
                   onClick={() => !tab.disabled && navigate(tab.path)}
                   disabled={tab.disabled}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-md text-xs font-bold transition-all whitespace-nowrap",
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                     activeTab === tab.id 
-                      ? "bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-400 shadow-sm" 
-                      : tab.disabled ? "text-gray-400 dark:text-gray-600 cursor-not-allowed" : "text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white/50 dark:hover:bg-gray-700/50"
+                      ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" 
+                      : tab.disabled ? "text-gray-400 dark:text-gray-600 cursor-not-allowed" : "text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   )}
                 >
-                  <tab.icon size={14} />
-                  {tab.label}
+                  <tab.icon size={18} className={cn(activeTab === tab.id ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500")} />
+                  <div className="text-left">
+                    <p>{tab.label}</p>
+                  </div>
                 </button>
               )
             ))}
           </nav>
-        )}
 
-        <div className="flex items-center gap-4">
-          <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-          {user ? (
-            <div className="flex items-center gap-3 pl-4 border-l border-gray-100 dark:border-gray-800">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[120px]">{user.displayName}</p>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[120px]">{user.email}</p>
-              </div>
+          <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-4">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-gray-200" referrerPolicy="no-referrer" />
+                <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600" referrerPolicy="no-referrer" />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">
                   {user.displayName?.charAt(0) || user.email?.charAt(0)}
                 </div>
               )}
+              <div className="overflow-hidden flex-1">
+                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user.displayName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                {userProfile.role === 'aluno' && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded text-[10px] font-bold">Lvl {userProfile.level || 1}</span>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{userProfile.xp || 0} XP</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
               <button 
                 onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                 title="Sair"
               >
                 <LogOut size={18} />
               </button>
             </div>
-          ) : (
-            <button 
-              onClick={handleLogin}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
-            >
-              <LogIn size={18} />
-              Entrar
-            </button>
-          )}
-        </div>
-      </div>
-    </header>
-
-    {/* Mobile Menu */}
-    <AnimatePresence>
-      {isMobileMenuOpen && user && userProfile && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="lg:hidden bg-white border-b border-gray-200 overflow-hidden"
-        >
-          <div className="p-4 space-y-1">
-            {navItems.map((tab, idx) => (
-              tab.type === 'header' ? (
-                <div key={`header-mob-${idx}`} className="px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pt-4 first:pt-0">
-                  {tab.label}
-                </div>
-              ) : (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    if (!tab.disabled) {
-                      navigate(tab.path);
-                      setIsMobileMenuOpen(false);
-                    }
-                  }}
-                  disabled={tab.disabled}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
-                    activeTab === tab.id 
-                      ? "bg-emerald-50 text-emerald-700" 
-                      : tab.disabled ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-50"
-                  )}
-                >
-                  <tab.icon size={18} />
-                  <div>
-                    <p>{tab.label}</p>
-                    {tab.description && <p className="text-[10px] font-medium opacity-60">{tab.description}</p>}
-                  </div>
-                </button>
-              )
-            ))}
           </div>
-        </motion.div>
+        </aside>
       )}
-    </AnimatePresence>
 
-      <main className={cn(
-        "max-w-7xl mx-auto p-6 relative", 
-        !user && "flex flex-col items-center justify-center min-h-[calc(100vh-120px)] w-full"
-      )}>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile Header & Email Verification Banner */}
+        <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 lg:hidden">
+          {user && !user.emailVerified && (
+            <div className="bg-amber-50 border-b border-amber-100 px-6 py-2 flex items-center justify-between text-amber-800 text-xs font-medium">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={14} />
+                <span>Seu e-mail não está verificado. Verifique seu e-mail para acessar todas as funcionalidades.</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={resendVerification}
+                  className="hover:underline"
+                >
+                  Reenviar link
+                </button>
+                <button 
+                  onClick={checkVerificationStatus}
+                  disabled={isVerifying}
+                  className="bg-amber-100 px-2 py-1 rounded hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isVerifying && <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />}
+                  {isVerifying ? 'Verificando...' : 'Já verifiquei'}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-200 dark:shadow-none">
+                <BarChart3 size={18} />
+              </div>
+              <div>
+                <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">EduDiagnóstico</h1>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+              {!user && (
+                <button 
+                  onClick={handleLogin}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
+                >
+                  <LogIn size={16} />
+                  Entrar
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {isMobileMenuOpen && user && userProfile && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="lg:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 overflow-hidden"
+            >
+              <div className="p-4 space-y-1">
+                {navItems.map((tab, idx) => (
+                  tab.type === 'header' ? (
+                    <div key={`header-mob-${idx}`} className="px-4 py-2 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] pt-4 first:pt-0">
+                      {tab.label}
+                    </div>
+                  ) : (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        if (!tab.disabled) {
+                          navigate(tab.path);
+                          setIsMobileMenuOpen(false);
+                        }
+                      }}
+                      disabled={tab.disabled}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
+                        activeTab === tab.id 
+                          ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" 
+                          : tab.disabled ? "text-gray-300 dark:text-gray-600 cursor-not-allowed" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      )}
+                    >
+                      <tab.icon size={18} />
+                      <div className="text-left">
+                        <p>{tab.label}</p>
+                        {tab.description && <p className="text-[10px] font-medium opacity-60">{tab.description}</p>}
+                      </div>
+                    </button>
+                  )
+                ))}
+                
+                <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-3 mb-4 px-4">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">
+                        {user.displayName?.charAt(0) || user.email?.charAt(0)}
+                      </div>
+                    )}
+                    <div className="overflow-hidden flex-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user.displayName}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                      {userProfile.role === 'aluno' && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded text-[10px] font-bold">Lvl {userProfile.level || 1}</span>
+                          <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{userProfile.xp || 0} XP</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      handleLogout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut size={18} />
+                    <span>Sair da conta</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <main className={cn(
+          "max-w-7xl mx-auto p-6 relative flex-1 w-full", 
+          !user && "flex flex-col items-center justify-center min-h-[calc(100vh-120px)]"
+        )}>
         {loading && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
             <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-sm w-full text-center space-y-6">
@@ -6060,6 +6802,7 @@ function AppContent() {
               <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
               <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
               <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudyPlanView user={user} /></ProtectedRoute>} />
+              <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationView user={user} userProfile={userProfile} /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div
@@ -6262,6 +7005,12 @@ function AppContent() {
             <Route path="/admin-users" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <AdminUsersView user={user} />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/bi-analysis" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <BIAnalysisView user={user} />
               </ProtectedRoute>
             } />
 
@@ -6720,6 +7469,7 @@ function AppContent() {
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,10 @@
         "photoURL": { "type": "string", "description": "The photo URL of the user." },
         "emailVerified": { "type": "boolean", "description": "Whether the user's email is verified." },
         "role": { "type": "string", "enum": ["aluno", "professor", "admin"], "description": "The user's role in the system." },
+        "xp": { "type": "number", "description": "The user's experience points." },
+        "level": { "type": "number", "description": "The user's current level." },
+        "badges": { "type": "array", "items": { "type": "string" }, "description": "List of badge IDs earned by the user." },
+        "gamificationEnabled": { "type": "boolean", "description": "Whether gamification is enabled for the user." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
         "settings": {
           "type": "object",

@@ -160,7 +160,11 @@ service cloud.firestore {
              (!('settings' in data) || data.settings is map) &&
              (!('preferences' in data) || data.preferences is map) &&
              (!('role' in data) || data.role in ['aluno', 'professor', 'admin']) &&
-             (!('lastLoginAt' in data) || isValidDateString(data.lastLoginAt));
+             (!('lastLoginAt' in data) || isValidDateString(data.lastLoginAt)) &&
+             (!('xp' in data) || data.xp is number) &&
+             (!('level' in data) || data.level is number) &&
+             (!('badges' in data) || data.badges is list) &&
+             (!('gamificationEnabled' in data) || data.gamificationEnabled is bool);
     }
 
     function isValidDiagnostic(data) {
