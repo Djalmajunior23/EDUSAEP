@@ -5,323 +5,137 @@ service cloud.firestore {
     // ===============================================================
     // Assumed Data Model
     // ===============================================================
-    //
     // Collection: users
-    // Document ID: userId (UID from Firebase Auth)
-    // Fields:
-    //   - uid: string (required) - The unique ID of the user.
-    //   - email: string (required) - The email of the user.
-    //   - displayName: string (optional) - The display name of the user.
-    //   - photoURL: string (optional) - The photo URL of the user.
-    //   - createdAt: string (optional) - When the profile was created.
-    //
-    // Collection: diagnostics
-    // Document ID: diagnosticId (auto-generated)
-    // Fields:
-    //   - userId: string (required) - The ID of the user who generated this diagnostic.
-    //   - aluno: string (required) - The name of the student or group.
-    //   - result: map (required) - The full diagnostic result from Gemini.
-    //   - createdAt: string (required) - When the diagnostic was generated.
-    //
-    // Collection: tasks
-    // Document ID: taskId (auto-generated)
-    // Fields:
-    //   - userId: string (required) - The ID of the user who owns this task.
-    //   - title: string (required) - The title of the task.
-    //   - completed: boolean (required) - Whether the task is completed.
-    //   - createdAt: string (required) - When the task was created.
-    //   - updatedAt: string (optional) - When the task was last updated.
-    //
-    // Collection: chat_messages
-    // Document ID: messageId (auto-generated)
-    // Fields:
-    //   - userId: string (required) - The ID of the user who sent or received this message.
-    //   - text: string (required) - The content of the message.
-    //   - role: string (required) - The role of the message sender (user or model).
-    //   - createdAt: string (required) - When the message was sent.
-    //
-    // Collection: questions
-    // Document ID: questionId (auto-generated)
-    // Fields:
-    //   - text: string (required)
-    //   - options: list (required)
-    //   - correctOption: int (required)
-    //   - weight: number (optional)
-    //   - competency: string (required)
-    //   - skill: string (optional)
-    //   - difficulty: string (required)
-    //
-    // Collection: exams
-    // Document ID: examId (auto-generated)
-    // Fields:
-    //   - title: string (required)
-    //   - questions: list (required)
-    //   - createdBy: string (required)
-    //
-    // Collection: exam_submissions
-    // Document ID: submissionId (auto-generated)
-    // Fields:
-    //   - studentId: string (required)
-    //   - examId: string (required)
-    //   - answers: map (required)
-    //   - score: number (required)
-    //   - maxScore: number (optional)
-    //   - completedAt: timestamp (required)
-    //   - competencyResults: map (optional)
-    //
-    // Collection: student_exams
-    // Document ID: id (auto-generated)
-    // Fields:
-    //   - studentId: string (required)
-    //   - examId: string (required)
-    //   - status: string (required)
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: study_plans
-    // Document ID: planId (auto-generated)
-    // Fields:
-    //   - userId: string (required)
-    //   - strengths: list (required)
-    //   - weaknesses: list (required)
-    //   - priorityTopics: list (optional)
-    //   - recommendedExercises: list (optional)
-    //   - recommendations: list (optional)
-    //   - competencyAnalysis: map (optional)
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: settings
-    // Document ID: settingId (e.g., 'global')
-    // Fields:
-    //   - [various settings]
-    //
+    // Collection: disciplines
+    // Collection: competencias
+    // Collection: habilidades
+    // Collection: importacoes
+    // Collection: insights_ia
+    // Collection: recomendacoes_pedagogicas
+    // Collection: alertas_pedagogicos
+    // ... (and others)
     // ===============================================================
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         request.auth.token.email == "djalmabatistajunior@gmail.com");
     }
 
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isDocOwner() {
-      return isAuthenticated() && (request.auth.uid == resource.data.userId || request.auth.uid == resource.data.studentId);
-    }
-
-    function isAdmin() {
-      return isAuthenticated() &&
-        (request.auth.token.email == "djalmabatistajunior@gmail.com" && request.auth.token.email_verified == true);
-    }
-
-    function isProfessor() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor' || isAdmin());
-    }
-
-    function isUserAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || isAdmin());
-    }
-
     function hasRequiredFields(fields) {
       return request.resource.data.keys().hasAll(fields);
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    function isValidEmail(email) {
-      return email is string &&
-        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidDateString(dateStr) {
-      return dateStr is string &&
-        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
     }
 
     // ===============================================================
     // Domain Validators
     // ===============================================================
-
-    function isValidUser(data) {
-      return hasRequiredFields(['uid', 'email']) &&
-             (data.uid == request.auth.uid || isAdmin()) &&
-             isValidEmail(data.email) &&
-             (!('displayName' in data) || data.displayName is string || data.displayName == null) &&
-             (!('photoURL' in data) || data.photoURL is string || data.photoURL == null) &&
-             (!('emailVerified' in data) || data.emailVerified is bool) &&
-             (!('createdAt' in data) || isValidDateString(data.createdAt)) &&
-             (!('settings' in data) || data.settings is map) &&
-             (!('preferences' in data) || data.preferences is map) &&
-             (!('role' in data) || data.role in ['aluno', 'professor', 'admin']) &&
-             (!('lastLoginAt' in data) || isValidDateString(data.lastLoginAt)) &&
-             (!('xp' in data) || data.xp is number) &&
-             (!('level' in data) || data.level is number) &&
-             (!('badges' in data) || data.badges is list) &&
-             (!('gamificationEnabled' in data) || data.gamificationEnabled is bool);
-    }
-
-    function isValidDiagnostic(data) {
-      return hasRequiredFields(['userId', 'aluno', 'result', 'createdAt']) &&
-             (data.userId == request.auth.uid || isProfessor()) &&
-             data.aluno is string && data.aluno.size() > 0 && data.aluno.size() < 200 &&
-             data.result is map &&
-             isValidDateString(data.createdAt);
-    }
-
-    function isValidTask(data) {
-      return hasRequiredFields(['userId', 'title', 'completed', 'createdAt']) &&
-             (data.userId == request.auth.uid || isProfessor()) &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 500 &&
-             data.completed is bool &&
-             isValidDateString(data.createdAt) &&
-             (!('updatedAt' in data) || isValidDateString(data.updatedAt));
-    }
-
-    function isValidChatMessage(data) {
-      return hasRequiredFields(['userId', 'text', 'role', 'createdAt']) &&
-             (data.userId == request.auth.uid || isProfessor()) &&
-             data.text is string && data.text.size() > 0 && data.text.size() < 5000 &&
-             data.role in ['user', 'model'] &&
-             isValidDateString(data.createdAt);
-    }
-
-    function isValidQuestion(data) {
-      return hasRequiredFields(['text', 'options', 'correctOption', 'competency', 'difficulty']) &&
-             data.text is string && data.text.size() > 0 &&
-             data.options is list && data.options.size() == 4 &&
-             data.correctOption is int && data.correctOption >= 0 && data.correctOption <= 3 &&
-             data.competency is string &&
-             data.difficulty in ['fácil', 'médio', 'difícil'] &&
-             (!('explanation' in data) || data.explanation is string) &&
-             (!('skill' in data) || data.skill is string) &&
-             (!('weight' in data) || data.weight is number);
-    }
-
-    function isValidExam(data) {
-      return hasRequiredFields(['title', 'subject', 'questions', 'createdBy', 'status', 'type']) &&
-             data.title is string && data.title.size() > 0 &&
-             data.subject is string &&
-             data.questions is list &&
-             data.createdBy == request.auth.uid &&
-             data.status in ['draft', 'published'] &&
-             data.type in ['simulado', 'exercicio'] &&
-             (!('description' in data) || data.description is string) &&
-             (!('createdAt' in data) || data.createdAt is timestamp || isValidDateString(data.createdAt));
-    }
-
-    function isValidSubmission(data) {
-      return hasRequiredFields(['studentId', 'examId', 'answers', 'score', 'completedAt']) &&
-             data.studentId == request.auth.uid &&
-             data.examId is string &&
-             data.answers is map &&
-             data.score is number &&
-             (data.completedAt is timestamp || isValidDateString(data.completedAt)) &&
-             (!('maxScore' in data) || data.maxScore is number) &&
-             (!('competencyResults' in data) || data.competencyResults is map);
-    }
-
-    function isValidStudentExam(data) {
-      return hasRequiredFields(['studentId', 'examId', 'status', 'createdAt']) &&
-             data.studentId == request.auth.uid &&
-             data.examId is string &&
-             data.status in ['pending', 'in_progress', 'completed'] &&
-             (data.createdAt is timestamp || isValidDateString(data.createdAt));
-    }
-
-    function isValidStudyPlan(data) {
-      return hasRequiredFields(['userId', 'strengths', 'weaknesses', 'createdAt']) &&
-             data.userId == request.auth.uid &&
-             data.strengths is list &&
-             data.weaknesses is list &&
-             (!('priorityTopics' in data) || data.priorityTopics is list) &&
-             (!('recommendedExercises' in data) || data.recommendedExercises is list) &&
-             (!('recommendations' in data) || data.recommendations is list) &&
-             (!('competencyAnalysis' in data) || data.competencyAnalysis is map) &&
-             (data.createdAt is timestamp || isValidDateString(data.createdAt));
+    function isValidDiscipline(data) {
+      return hasRequiredFields(['name', 'code_uc', 'status']) &&
+             isValidString('name', 1, 100) &&
+             isValidString('code_uc', 1, 20) &&
+             data.status in ['active', 'inactive'];
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['professor', 'admin']);
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && request.resource.data.uid == userId && (isOwner(userId) || isUserAdmin()) && (!('role' in request.resource.data) || request.resource.data.role == 'aluno' || isUserAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && request.resource.data.uid == userId && (isOwner(userId) || isUserAdmin()) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isUserAdmin());
-      allow delete: if isUserAdmin();
+    match /disciplines/{disciplineId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidDiscipline(request.resource.data);
+      allow update: if isAdmin() && isValidDiscipline(request.resource.data);
+      allow delete: if isAdmin();
     }
 
-    match /diagnostics/{diagnosticId} {
-      allow read: if isDocOwner() || isProfessor();
-      allow create: if isAuthenticated() && isValidDiagnostic(request.resource.data);
-      allow update: if isAuthenticated() && isValidDiagnostic(request.resource.data) && (isDocOwner() || isProfessor());
-      allow delete: if (isAuthenticated() && isDocOwner()) || isProfessor();
+    match /competencias/{competenciaId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /habilidades/{habilidadeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /importacoes/{importacaoId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+    }
+
+    match /insights_ia/{insightId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+    }
+
+    match /recomendacoes_pedagogicas/{recomendacaoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+    }
+
+    match /alertas_pedagogicos/{alertaId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+    }
+
+    match /settings/global {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     match /tasks/{taskId} {
-      allow read: if isDocOwner() || isProfessor();
-      allow create: if isAuthenticated() && isValidTask(request.resource.data);
-      allow update: if isAuthenticated() && isValidTask(request.resource.data) && (isDocOwner() || isProfessor());
-      allow delete: if (isAuthenticated() && isDocOwner()) || isProfessor();
+      allow read, write: if isOwner(resource.data.userId);
     }
 
     match /chat_messages/{messageId} {
-      allow read: if isDocOwner() || isProfessor();
-      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data);
-      allow delete: if (isAuthenticated() && isDocOwner()) || isProfessor();
+      allow read, write: if isAuthenticated();
     }
 
     match /questions/{questionId} {
       allow read: if isAuthenticated();
-      allow create: if isProfessor() && isValidQuestion(request.resource.data);
-      allow update: if isProfessor() && isValidQuestion(request.resource.data);
-      allow delete: if isProfessor();
+      allow write: if isAdmin();
     }
 
     match /exams/{examId} {
       allow read: if isAuthenticated();
-      allow create: if isProfessor() && isValidExam(request.resource.data);
-      allow update: if isProfessor() && isValidExam(request.resource.data);
-      allow delete: if isProfessor();
-    }
-
-    match /exercises/{exerciseId} {
-      allow read: if isAuthenticated();
-      allow create: if isProfessor() && isValidExam(request.resource.data);
-      allow update: if isProfessor() && isValidExam(request.resource.data);
-      allow delete: if isProfessor();
+      allow write: if isAdmin();
     }
 
     match /exam_submissions/{submissionId} {
-      allow read: if isDocOwner() || isProfessor();
-      allow create: if isAuthenticated() && isValidSubmission(request.resource.data);
-      allow delete: if isProfessor();
-    }
-
-    match /student_exams/{id} {
-      allow read: if isDocOwner() || isProfessor();
-      allow create: if isAuthenticated() && isValidStudentExam(request.resource.data);
-      allow update: if isAuthenticated() && isValidStudentExam(request.resource.data) && (isDocOwner() || isProfessor());
-      allow delete: if isProfessor();
-    }
-
-    match /settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isUserAdmin();
+      allow read, write: if isAuthenticated();
     }
 
     match /study_plans/{planId} {
-      allow read: if isDocOwner() || isProfessor();
-      allow create: if isAuthenticated() && isValidStudyPlan(request.resource.data);
-      allow update: if (isDocOwner() || isProfessor()) && isValidStudyPlan(request.resource.data);
-      allow delete: if isProfessor();
+      allow read, write: if isAuthenticated();
+    }
+
+    match /student_exams/{studentExamId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /diagnostics/{diagnosticId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role; // Cannot change role
     }
   }
 }

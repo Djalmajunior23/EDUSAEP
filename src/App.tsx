@@ -1,3 +1,5 @@
+import { BIDashboardView } from './components/dashboard/BIDashboardView';
+import { DataImportView } from './components/admin/DataImportView';
 import React, { useState, useMemo, useEffect, Component, useRef } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -2611,6 +2613,7 @@ function StudyPlanView({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const toggleTask = (taskId: string) => {
     setCompletedTasks(prev => 
@@ -2798,7 +2801,7 @@ function StudyPlanView({ user }: { user: User | null }) {
             </p>
           </div>
           <button 
-            onClick={generatePlan}
+            onClick={() => setShowConfirmation(true)}
             disabled={generating}
             className="group relative flex items-center gap-3 px-8 py-4 bg-white text-emerald-900 rounded-2xl font-bold hover:bg-emerald-50 transition-all shadow-xl disabled:opacity-50"
           >
@@ -2806,6 +2809,35 @@ function StudyPlanView({ user }: { user: User | null }) {
             {generating ? "Analisando Desempenho..." : "Atualizar Meu Plano"}
           </button>
         </div>
+        
+        {/* Confirmation Modal */}
+        {showConfirmation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl max-w-sm w-full space-y-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Gerar novo plano?</h3>
+              <p className="text-gray-500 dark:text-gray-400">
+                Isso irá analisar seu desempenho atual e criar um novo plano de estudos. O plano anterior será substituído.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowConfirmation(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowConfirmation(false);
+                    generatePlan();
+                  }}
+                  className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Decorative elements */}
         <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-emerald-800 rounded-full blur-3xl opacity-30"></div>
@@ -3694,24 +3726,24 @@ function BIAnalysisView({ user }: { user: User | null }) {
       const diagnosticsSnap = await getDocs(collection(db, 'diagnostics'));
       const examsSnap = await getDocs(collection(db, 'exams'));
 
-      const students = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-      const submissions = submissionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSubmission));
-      const diagnostics = diagnosticsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const exams = examsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
+      const students = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any as UserProfile));
+      const submissions = submissionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any as ExamSubmission));
+      const diagnostics = diagnosticsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const exams = examsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any as Exam));
 
       // 2. Format data for the prompt
       const studentsData = students.map(s => {
-        const studentSubs = submissions.filter(sub => sub.studentId === s.uid);
-        const studentDiags = diagnostics.filter(d => d.userId === s.uid || d.aluno === s.displayName);
+        const studentSubs = submissions.filter(sub => (sub as any).studentId === s.uid);
+        const studentDiags = diagnostics.filter(d => (d as any).userId === s.uid || (d as any).aluno === s.displayName);
         
         const examsTaken = studentSubs.map(sub => {
-          const exam = exams.find(e => e.id === sub.examId);
+          const exam = exams.find(e => e.id === (sub as any).examId);
           return {
             title: exam?.title || 'Desconhecido',
             subject: exam?.subject || 'Desconhecido',
-            score: sub.score,
-            maxScore: sub.maxScore || 100,
-            date: sub.completedAt?.toDate ? sub.completedAt.toDate().toISOString() : sub.completedAt
+            score: (sub as any).score,
+            maxScore: (sub as any).maxScore || 100,
+            date: (sub as any).completedAt?.toDate ? (sub as any).completedAt.toDate().toISOString() : (sub as any).completedAt
           };
         });
 
@@ -5174,6 +5206,54 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                             </p>
                           )}
 
+                          {/* Private Notes Field */}
+                          <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Notas Privadas do Professor</h5>
+                              {isProfessor && (
+                                editingPrivateNote === comp.competencia ? (
+                                  <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={() => handleSaveEdit(comp.competencia, 'privateNote', privateNoteValue)}
+                                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700"
+                                    >
+                                      Salvar
+                                    </button>
+                                    <button 
+                                      onClick={() => setEditingPrivateNote(null)}
+                                      className="text-[10px] font-bold text-gray-400 hover:text-gray-600"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button 
+                                    onClick={() => {
+                                      setEditingPrivateNote(comp.competencia);
+                                      setPrivateNoteValue(comp.private_notes || '');
+                                    }}
+                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                                  >
+                                    <Pencil size={10} />
+                                    Editar
+                                  </button>
+                                )
+                              )}
+                            </div>
+                            {editingPrivateNote === comp.competencia ? (
+                              <textarea
+                                value={privateNoteValue}
+                                onChange={(e) => setPrivateNoteValue(e.target.value)}
+                                className="w-full p-3 text-sm text-gray-600 bg-white border border-emerald-200 rounded-lg focus:ring-1 focus:ring-emerald-400 outline-none min-h-[60px]"
+                                autoFocus
+                              />
+                            ) : (
+                              <p className="text-sm text-gray-600 leading-relaxed italic">
+                                {comp.private_notes || 'Nenhuma nota privada.'}
+                              </p>
+                            )}
+                          </div>
+
                           {/* Competency Evolution Chart */}
                           {studentHistory.length > 1 && (
                             <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
@@ -5865,6 +5945,7 @@ function AppContent() {
     return [
       { type: 'header', label: 'Gestão de Dados' },
       { id: 'bi-analysis', label: 'Análise BI', icon: TrendingUp, path: '/bi-analysis', description: 'Insights da Turma' },
+      { id: 'data-import', label: 'Importação n8n', icon: Database, path: '/data-import', description: 'Integração SIAC' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
@@ -7082,7 +7163,13 @@ function AppContent() {
 
             <Route path="/bi-analysis" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
-                <BIAnalysisView user={user} />
+                <BIDashboardView />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/data-import" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <DataImportView />
               </ProtectedRoute>
             } />
 

@@ -149,3 +149,51 @@ export async function generateSuggestions(conhecimentos: string[], recomendacoes
 
   return JSON.parse(response.text || "[]");
 }
+
+export interface PedagogicalAnalysis {
+  resumo_geral: string;
+  principais_dificuldades: string[];
+  pontos_fortes: string[];
+  alunos_em_risco: string[];
+  sugestoes_para_professor: string[];
+  plano_de_acao: string[];
+}
+
+export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-pro-preview"): Promise<PedagogicalAnalysis> {
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um motor de análise pedagógica avançado.
+Analise os seguintes dados estruturados do sistema de avaliação e gere um relatório pedagógico estruturado.
+
+DADOS:
+${JSON.stringify(data)}
+
+RETORNE O RELATÓRIO NO FORMATO JSON SEGUINDO O ESQUEMA DEFINIDO.`
+          }
+        ]
+      }
+    ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          resumo_geral: { type: Type.STRING, description: "Resumo geral da análise pedagógica." },
+          principais_dificuldades: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista das principais dificuldades identificadas." },
+          pontos_fortes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista dos pontos fortes identificados." },
+          alunos_em_risco: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista dos nomes dos alunos em risco pedagógico." },
+          sugestoes_para_professor: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Sugestões de intervenção para o professor." },
+          plano_de_acao: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Plano de ação detalhado." }
+        },
+        required: ["resumo_geral", "principais_dificuldades", "pontos_fortes", "alunos_em_risco", "sugestoes_para_professor", "plano_de_acao"]
+      }
+    }
+  });
+
+  return JSON.parse(response.text || "{}");
+}
