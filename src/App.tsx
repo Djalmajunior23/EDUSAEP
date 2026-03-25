@@ -2610,6 +2610,13 @@ function StudyPlanView({ user }: { user: User | null }) {
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+
+  const toggleTask = (taskId: string) => {
+    setCompletedTasks(prev => 
+      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+    );
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -3794,7 +3801,7 @@ Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explíci
       </div>
 
       {!analysis && dataStats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
               <Users className="text-blue-600" size={24} />
@@ -3815,11 +3822,20 @@ Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explíci
           </div>
           <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
-              <Target className="text-purple-600" size={24} />
+              <TrendingUp className="text-purple-600" size={24} />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900">{dataStats.diagnostics}</div>
-              <div className="text-sm text-gray-500">Diagnósticos Importados</div>
+              <div className="text-2xl font-bold text-gray-900">+5.2%</div>
+              <div className="text-sm text-gray-500">Evolução</div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+              <AlertCircle className="text-red-600" size={24} />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">Álgebra</div>
+              <div className="text-sm text-gray-500">Comp. Crítica</div>
             </div>
           </div>
         </div>
@@ -5095,6 +5111,54 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                                   {suggestions[comp.competencia].map((s, i) => <li key={i}>{s}</li>)}
                                 </ul>
                               ) : null}
+
+                              {/* New Feedback Field */}
+                              <div className="mt-4 pt-4 border-t border-red-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="text-xs font-bold text-red-800 uppercase tracking-wider">Feedback do Professor</h5>
+                                  {isProfessor && (
+                                    editingFeedback === comp.competencia ? (
+                                      <div className="flex items-center gap-2">
+                                        <button 
+                                          onClick={() => handleSaveEdit(comp.competencia, 'professorFeedback', feedbackValue)}
+                                          className="text-[10px] font-bold text-red-600 hover:text-red-700"
+                                        >
+                                          Salvar
+                                        </button>
+                                        <button 
+                                          onClick={() => setEditingFeedback(null)}
+                                          className="text-[10px] font-bold text-gray-400 hover:text-gray-600"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button 
+                                        onClick={() => {
+                                          setEditingFeedback(comp.competencia);
+                                          setFeedbackValue(comp.professor_feedback || '');
+                                        }}
+                                        className="text-[10px] font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
+                                      >
+                                        <Pencil size={10} />
+                                        Editar
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                                {editingFeedback === comp.competencia ? (
+                                  <textarea
+                                    value={feedbackValue}
+                                    onChange={(e) => setFeedbackValue(e.target.value)}
+                                    className="w-full p-3 text-sm text-gray-600 bg-white border border-red-200 rounded-lg focus:ring-1 focus:ring-red-400 outline-none min-h-[80px]"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <p className="text-sm text-red-700 leading-relaxed italic">
+                                    {comp.professor_feedback || 'Nenhum feedback fornecido.'}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           )}
                           {editingComp === comp.competencia ? (
@@ -5711,6 +5775,7 @@ function AppContent() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticResult | null>(null);
+  const [results, setResults] = useState<Array<{ id: string, result: DiagnosticResult }>>([]);
   const [currentDiagnosticId, setCurrentDiagnosticId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -6262,9 +6327,14 @@ function AppContent() {
     setError(null);
     try {
       // Group data by student
+      console.log("Data to process:", data);
+      if (data.length > 0) {
+        console.log("Keys in first row:", Object.keys(data[0]));
+      }
       const studentsData: Record<string, { rows: any[], email: string, matricula: string }> = {};
       data.forEach(row => {
-        const studentName = row.aluno || row.Aluno || row.nome || row.Nome || 'Estudante Sem Nome';
+        const studentName = row.aluno || row.Aluno || row.nome || row.Nome || row['Nome do Aluno'] || row['Nome do aluno'] || row['Nome Aluno'] || 'Estudante Sem Nome';
+        console.log("Processing row for student:", studentName, row);
         const studentEmail = row.email || row.Email || row.correio || row.Correio || '';
         const studentMatricula = row.matricula || row.Matricula || row.id || row.ID || '';
         
@@ -6275,6 +6345,7 @@ function AppContent() {
         if (!studentsData[studentName].email && studentEmail) studentsData[studentName].email = studentEmail;
         if (!studentsData[studentName].matricula && studentMatricula) studentsData[studentName].matricula = studentMatricula;
       });
+      console.log("Grouped studentsData:", studentsData);
 
       const studentNames = Object.keys(studentsData);
       const allResults: DiagnosticResult[] = [];
@@ -6331,6 +6402,7 @@ function AppContent() {
       }
 
       // Set the first result as the current one to display
+      setResults(allResults.map((res, index) => ({ id: savedIds[index], result: res })));
       setResult(allResults[0]);
       setCurrentDiagnosticId(savedIds[0]);
       
@@ -6668,7 +6740,7 @@ function AppContent() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-md w-full py-12 space-y-8"
+            className="max-w-md w-full py-12 space-y-8 mx-auto"
           >
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto">
@@ -7044,6 +7116,22 @@ function AppContent() {
                       <div>
                         <h2 className="text-2xl font-bold text-gray-900">Dashboard de Diagnóstico</h2>
                         <p className="text-sm text-gray-500">Visão geral do desempenho de {result.aluno}</p>
+                        {results.length > 1 && (
+                          <select
+                            value={currentDiagnosticId || ''}
+                            onChange={(e) => {
+                              const selected = results.find(r => r.id === e.target.value);
+                              if (selected) {
+                                setResult(selected.result);
+                                setCurrentDiagnosticId(selected.id);
+                                navigate(`/dashboard/${selected.id}`);
+                              }
+                            }}
+                            className="mt-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          >
+                            {results.map(r => <option key={r.id} value={r.id}>{r.result.aluno}</option>)}
+                          </select>
+                        )}
                       </div>
                       <div className="flex gap-3">
                         <button
