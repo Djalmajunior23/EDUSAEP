@@ -109,6 +109,20 @@ service cloud.firestore {
       allow create: if isAdmin();
     }
 
+    match /intervencoes_pedagogicas/{intervencaoId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /bloom_analyses/{analysisId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /socratic_sessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+
     match /settings/global {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
@@ -145,6 +159,58 @@ service cloud.firestore {
     }
 
     match /diagnostics/{diagnosticId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /learning_profiles/{profileId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /adaptive_sessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /cognitive_error_analyses/{analysisId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /recovery_plans/{planId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /lesson_plans/{planId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /performance_predictions/{predictionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /engagement_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /learning_dna/{dnaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /content_recommendations/{recId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /smart_goals/{goalId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /educational_missions/{missionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /career_matches/{matchId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /smart_alerts/{alertId} {
       allow read, write: if isAuthenticated();
     }
 

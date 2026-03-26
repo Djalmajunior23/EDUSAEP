@@ -23,6 +23,8 @@ import {
   AlertCircle, 
   CheckCircle2, 
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Download,
   Copy,
   LayoutDashboard,
@@ -35,6 +37,7 @@ import {
   CheckSquare,
   Plus,
   Pencil,
+  Lock,
   Sun,
   Moon,
   MessageSquare,
@@ -61,7 +64,8 @@ import {
   Sparkles,
   Mail,
   RotateCcw,
-  Star
+  Star,
+  Brain
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -84,7 +88,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { generateDiagnostic, generateSuggestions, DiagnosticResult } from './services/geminiService';
+import { triggerN8NAlert } from './services/n8nService';
+import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies } from './services/geminiService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -127,6 +132,213 @@ import {
   writeBatch,
   limit
 } from 'firebase/firestore';
+
+import { SocraticTutor } from './components/student/SocraticTutor';
+import { StudentInsights } from './components/student/StudentInsights';
+import { AdaptiveExam } from './components/student/AdaptiveExam';
+import { Gamification } from './components/student/Gamification';
+import { ProfessorInsights } from './components/professor/ProfessorInsights';
+import { CognitiveErrorAnalysisView } from './components/professor/CognitiveErrorAnalysisView';
+
+
+async function updateXP(userId: string, amount: number) {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      const currentXP = data.xp || 0;
+      const currentLevel = data.level || 1;
+      const newXP = currentXP + amount;
+      
+      // Level logic: level up every 1000 XP
+      const newLevel = Math.floor(newXP / 1000) + 1;
+      
+      await updateDoc(userRef, {
+        xp: newXP,
+        level: newLevel
+      });
+      
+      if (newLevel > currentLevel) {
+        toast.success(`Parabéns! Você subiu para o nível ${newLevel}! 🚀`, {
+          icon: '🎉',
+          duration: 5000
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Error updating XP:", err);
+  }
+}
+
+function ItemGeneratorView({ user }: { user: User | null }) {
+  const [competency, setCompetency] = useState('');
+  const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
+
+  const handleGenerate = async () => {
+    if (!competency.trim()) {
+      toast.error("Informe a competência para gerar a questão.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { generateSAEPQuestion } = await import('./services/geminiService');
+      const question = await generateSAEPQuestion(competency, difficulty);
+      setGeneratedQuestion(question);
+      toast.success("Questão gerada com sucesso!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao gerar questão.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const saveToBank = async () => {
+    if (!generatedQuestion || !user) return;
+    try {
+      await addDoc(collection(db, 'questions'), {
+        ...generatedQuestion,
+        createdBy: user.uid,
+        createdAt: serverTimestamp()
+      });
+      toast.success("Questão salva no banco de questões!");
+      setGeneratedQuestion(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar questão.");
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-600">
+            <Sparkles size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">Gerador de Itens SAEP (IA)</h2>
+            <p className="text-gray-500 text-sm">Crie questões inéditas seguindo a Matriz de Referência.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência / Habilidade</label>
+            <input 
+              type="text"
+              value={competency}
+              onChange={(e) => setCompetency(e.target.value)}
+              placeholder="Ex: Instalações Elétricas Prediais"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dificuldade</label>
+            <select 
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value as any)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            >
+              <option value="fácil">Fácil</option>
+              <option value="médio">Médio</option>
+              <option value="difícil">Difícil</option>
+            </select>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleGenerate}
+          disabled={isGenerating}
+          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        >
+          {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+          {isGenerating ? "Gerando Questão..." : "Gerar Questão Inédita"}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {generatedQuestion && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100 space-y-6"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                  {generatedQuestion.difficulty}
+                </span>
+                <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                  Bloom: {generatedQuestion.bloom_level}
+                </span>
+              </div>
+              <button 
+                onClick={() => setGeneratedQuestion(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-gray-900 leading-relaxed">
+                {generatedQuestion.text}
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                {generatedQuestion.options.map((opt: string, idx: number) => (
+                  <div 
+                    key={idx}
+                    className={cn(
+                      "p-4 rounded-xl border transition-all text-sm",
+                      idx === generatedQuestion.correctOption 
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700 font-medium" 
+                        : "bg-gray-50 border-gray-100 text-gray-600"
+                    )}
+                  >
+                    <span className="font-bold mr-2">{String.fromCharCode(65 + idx)})</span>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-2">
+              <div className="flex items-center gap-2 text-blue-700">
+                <Info size={16} />
+                <p className="text-xs font-bold uppercase tracking-wider">Justificativa Pedagógica</p>
+              </div>
+              <p className="text-sm text-blue-800 leading-relaxed italic">
+                {generatedQuestion.explanation}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={saveToBank}
+                className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+              >
+                <Database size={20} />
+                Salvar no Banco de Questões
+              </button>
+              <button 
+                onClick={handleGenerate}
+                className="px-8 py-4 bg-white text-emerald-600 border-2 border-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all"
+              >
+                Gerar Outra
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -1305,6 +1517,158 @@ import { initializeApp } from 'firebase/app';
 import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
 import { firebaseConfig } from './firebase';
 
+function ProfessorDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
+  const navigate = useNavigate();
+  
+  return (
+    <div className="space-y-8 py-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Painel do Professor</h1>
+          <p className="text-gray-500">Bem-vindo, {userProfile?.displayName || 'Professor'}. Gerencie suas turmas e simulados.</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => navigate('/input')}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center gap-2"
+          >
+            <Plus size={18} /> Novo Diagnóstico
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/exams')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+            <BookOpen size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Gestão de Simulados</h3>
+            <p className="text-xs text-gray-500">Crie e gerencie avaliações padrão SAEP.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-emerald-600 text-xs font-bold">
+            Gerenciar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/questions-bank')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+            <Database size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Banco de Questões</h3>
+            <p className="text-xs text-gray-500">Acesse e organize questões por competência.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
+            Acessar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/professor-insights')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Insights da Turma</h3>
+            <p className="text-xs text-gray-500">Análise de desempenho e planos de aula IA.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-purple-600 text-xs font-bold">
+            Analisar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/cognitive-analysis')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
+            <Brain size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Erros Cognitivos</h3>
+            <p className="text-xs text-gray-500">Análise profunda das dificuldades dos alunos.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
+            Analisar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/history')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+            <History size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Histórico</h3>
+            <p className="text-xs text-gray-500">Veja diagnósticos anteriores e resultados.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-amber-600 text-xs font-bold">
+            Ver Tudo <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/reports')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
+            <BarChart3 size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Relatórios</h3>
+            <p className="text-xs text-gray-500">Exporte dados e gere relatórios de BI.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
+            Gerar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/tasks')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+            <CheckSquare size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Minhas Tarefas</h3>
+            <p className="text-xs text-gray-500">Organize suas atividades pedagógicas.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-indigo-600 text-xs font-bold">
+            Ver Tarefas <ArrowRight size={14} />
+          </div>
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
 function StudentDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
@@ -1414,36 +1778,54 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/exercises')}
+          onClick={() => navigate('/student-insights')}
           className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
         >
           <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
-            <CheckSquare size={24} />
+            <TrendingUp size={24} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900">Exercícios</h3>
-            <p className="text-xs text-gray-500">Pratique tópicos específicos com feedback imediato.</p>
+            <h3 className="font-bold text-gray-900">Meu Desempenho</h3>
+            <p className="text-xs text-gray-500">Veja sua evolução e radar de competências.</p>
           </div>
           <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
-            Praticar <ArrowRight size={14} />
+            Analisar <ArrowRight size={14} />
           </div>
         </motion.button>
 
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/study-plan')}
+          onClick={() => navigate('/socratic-tutor')}
           className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
         >
           <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
-            <Zap size={24} />
+            <MessageSquare size={24} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900">Plano IA</h3>
-            <p className="text-xs text-gray-500">Seu roteiro personalizado baseado no seu desempenho.</p>
+            <h3 className="font-bold text-gray-900">Tutor Socrático</h3>
+            <p className="text-xs text-gray-500">Tire dúvidas guiadas com nossa IA.</p>
           </div>
           <div className="mt-auto flex items-center gap-2 text-purple-600 text-xs font-bold">
-            Ver Plano <ArrowRight size={14} />
+            Conversar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/adaptive-exam/Geral')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+            <Brain size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Teste Adaptativo</h3>
+            <p className="text-xs text-gray-500">Questões que se ajustam ao seu nível.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-amber-600 text-xs font-bold">
+            Iniciar <ArrowRight size={14} />
           </div>
         </motion.button>
       </div>
@@ -1499,6 +1881,64 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
   );
 }
 
+function AdaptiveExamView({ user }: { user: User | null }) {
+  const { competency } = useParams();
+  const navigate = useNavigate();
+  return (
+    <div className="py-8">
+      <AdaptiveExam 
+        examId="adaptive-default" 
+        competency={competency || 'Geral'} 
+        onComplete={(score) => {
+          toast.success(`Simulado concluído! Score: ${score}%`);
+          navigate('/student-dashboard');
+        }} 
+      />
+    </div>
+  );
+}
+
+function StudentInsightsView({ user }: { user: User | null }) {
+  return (
+    <div className="py-8">
+      <StudentInsights studentId={user?.uid || ''} />
+    </div>
+  );
+}
+
+function ProfessorInsightsView() {
+  return (
+    <div className="py-8">
+      <ProfessorInsights />
+    </div>
+  );
+}
+
+function CognitiveAnalysisView() {
+  return (
+    <div className="py-8">
+      <CognitiveErrorAnalysisView />
+    </div>
+  );
+}
+
+
+function SocraticTutorView() {
+  return (
+    <div className="py-8">
+      <SocraticTutor />
+    </div>
+  );
+}
+
+function GamificationDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
+  return (
+    <div className="py-8">
+      <Gamification />
+    </div>
+  );
+}
+
 function QuestionsBankView({ user }: { user: User | null }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
@@ -1513,14 +1953,27 @@ function QuestionsBankView({ user }: { user: User | null }) {
     correctOption: 0,
     weight: 1,
     competency: '',
-    difficulty: 'médio'
+    difficulty: 'médio',
+    explanation: ''
   });
 
   // States for missing competencies during import
   const [missingCompetencies, setMissingCompetencies] = useState<string[]>([]);
-  const [competencyMapping, setCompetencyMapping] = useState<Record<string, { action: 'create' | 'map', target?: string }>>({});
+  const [competencyMapping, setCompetencyMapping] = useState<Record<string, { action: 'create' | 'map' | 'ignore', target?: string }>>({});
   const [pendingImportData, setPendingImportData] = useState<any[] | null>(null);
   const [showMappingModal, setShowMappingModal] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    const newExpanded = new Set(expandedQuestions);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedQuestions(newExpanded);
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
@@ -1563,7 +2016,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
         toast.success("Questão adicionada ao banco!");
       }
       setIsEditing(false);
-      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio' });
+      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio', explanation: '' });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'questions');
     }
@@ -1579,124 +2032,186 @@ function QuestionsBankView({ user }: { user: User | null }) {
     }
   };
 
-  const parseQuestionsWithGemini = async (text: string) => {
+  const handleUpdateQuestionDifficulty = async (id: string, difficulty: 'fácil' | 'médio' | 'difícil') => {
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Extraia as questões do seguinte texto e retorne um JSON no formato de array de objetos.
-        Cada objeto deve ter:
-        - text: o enunciado da questão
-        - options: array de 4 strings com as alternativas
-        - correctOption: índice da alternativa correta (0 a 3)
-        - weight: peso da questão (padrão 1)
-        - competency: competência da questão
-        - difficulty: 'fácil', 'médio' ou 'difícil'
-
-        Texto:
-        ${text}`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                text: { type: Type.STRING },
-                options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                correctOption: { type: Type.INTEGER },
-                weight: { type: Type.NUMBER },
-                competency: { type: Type.STRING },
-                difficulty: { type: Type.STRING, enum: ['fácil', 'médio', 'difícil'] }
-              },
-              required: ["text", "options", "correctOption"]
-            }
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text || '[]');
-      return result;
+      await updateDoc(doc(db, 'questions', id), { difficulty });
+      toast.success("Dificuldade atualizada!");
     } catch (err) {
-      console.error("Gemini parsing error:", err);
-      throw new Error("Erro ao processar o texto com IA.");
+      handleFirestoreError(err, OperationType.UPDATE, `questions/${id}`);
     }
   };
 
-  const commitImport = async (data: any[], mapping: Record<string, { action: 'create' | 'map', target?: string }>) => {
+  const parseQuestionsWithGemini = async (text: string) => {
+    try {
+      // Split text into chunks of ~15,000 characters to avoid output token limits
+      const chunkSize = 15000;
+      const chunks: string[] = [];
+      for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.substring(i, i + chunkSize));
+      }
+
+      const allQuestions: any[] = [];
+      let currentChunk = 1;
+      
+      for (const chunk of chunks) {
+        if (chunks.length > 1) {
+          toast.info(`Processando parte ${currentChunk} de ${chunks.length}...`, { id: 'import-progress' });
+        }
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
+          O texto pode vir de um documento (PDF ou DOCX) e pode conter ruídos ou formatação irregular.
+          Este é um fragmento de um documento que pode conter centenas de questões.
+          
+          Para cada questão identificada, extraia:
+          1. O enunciado completo.
+          2. Exatamente 4 alternativas (opções).
+          3. O índice da alternativa correta (0 para A, 1 para B, etc.).
+          4. A competência ou assunto da questão (se não houver, use 'Geral').
+          5. O nível de dificuldade ('fácil', 'médio' ou 'difícil').
+          6. Uma explicação detalhada da resposta correta (se disponível no texto).
+
+          Retorne APENAS um array JSON de objetos com a seguinte estrutura:
+          [
+            {
+              "text": "Enunciado da questão...",
+              "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
+              "correctOption": 0,
+              "weight": 1,
+              "competency": "Assunto",
+              "difficulty": "médio",
+              "explanation": "Explicação da resposta..."
+            }
+          ]
+
+          Texto para análise:
+          ${chunk}`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  text: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  correctOption: { type: Type.INTEGER },
+                  weight: { type: Type.NUMBER },
+                  competency: { type: Type.STRING },
+                  difficulty: { type: Type.STRING, enum: ['fácil', 'médio', 'difícil'] },
+                  explanation: { type: Type.STRING }
+                },
+                required: ["text", "options", "correctOption"]
+              }
+            }
+          }
+        });
+
+        const result = JSON.parse(response.text || '[]');
+        allQuestions.push(...result);
+        currentChunk++;
+      }
+      
+      toast.dismiss('import-progress');
+      return allQuestions;
+    } catch (err) {
+      console.error("Gemini parsing error:", err);
+      toast.dismiss('import-progress');
+      throw new Error("Erro ao processar o texto com IA. Verifique se o arquivo não é muito grande ou complexo.");
+    }
+  };
+
+  const commitImport = async (data: any[], mapping: Record<string, { action: 'create' | 'map' | 'ignore', target?: string }>) => {
     if (!user) return;
     try {
-      const batch = writeBatch(db);
+      setIsImporting(true);
       let count = 0;
-
-      // First, create any new disciplines if requested
+      const BATCH_SIZE = 400; // Safe limit for Firestore batches (max 500)
+      
+      // 1. Handle Discipline Creation in a separate batch if needed
+      const disciplineBatch = writeBatch(db);
+      let disciplineCount = 0;
       for (const [missing, config] of Object.entries(mapping)) {
         if (config.action === 'create') {
           const newDocRef = doc(collection(db, 'disciplines'));
-          batch.set(newDocRef, {
+          disciplineBatch.set(newDocRef, {
             name: missing,
             code: `IMP-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
             area: 'Geral',
             status: 'active',
             createdAt: serverTimestamp()
           });
+          disciplineCount++;
         }
       }
-      
-      for (const row of data) {
-        // Basic validation and mapping
-        const text = row.text || row.enunciado || row.pergunta;
-        if (!text) continue;
+      if (disciplineCount > 0) await disciplineBatch.commit();
 
-        const options = row.options || [
-          row.optionA || row.opcaoA || row.a || '',
-          row.optionB || row.opcaoB || row.b || '',
-          row.optionC || row.opcaoC || row.c || '',
-          row.optionD || row.opcaoD || row.d || ''
-        ];
-
-        let correctOption = 0;
-        if (typeof row.correctOption === 'number') {
-          correctOption = row.correctOption;
-        } else {
-          const correct = String(row.correctOption || row.gabarito || row.resposta || '0').toUpperCase();
-          if (correct === 'A' || correct === '0') correctOption = 0;
-          else if (correct === 'B' || correct === '1') correctOption = 1;
-          else if (correct === 'C' || correct === '2') correctOption = 2;
-          else if (correct === 'D' || correct === '3') correctOption = 3;
-          else if (!isNaN(parseInt(correct))) correctOption = parseInt(correct);
-        }
-
-        let competency = row.competency || row.competencia || 'Geral';
+      // 2. Process questions in chunks of BATCH_SIZE
+      for (let i = 0; i < data.length; i += BATCH_SIZE) {
+        const chunk = data.slice(i, i + BATCH_SIZE);
+        const batch = writeBatch(db);
         
-        // Apply mapping
-        if (mapping[competency]) {
-          if (mapping[competency].action === 'map' && mapping[competency].target) {
-            competency = mapping[competency].target;
+        for (const row of chunk) {
+          const text = row.text || row.enunciado || row.pergunta;
+          if (!text) continue;
+
+          const options = row.options || [
+            row.optionA || row.opcaoA || row.a || '',
+            row.optionB || row.opcaoB || row.b || '',
+            row.optionC || row.opcaoC || row.c || '',
+            row.optionD || row.opcaoD || row.d || ''
+          ];
+
+          let correctOption = 0;
+          if (typeof row.correctOption === 'number') {
+            correctOption = row.correctOption;
+          } else {
+            const correct = String(row.correctOption || row.gabarito || row.resposta || '0').toUpperCase();
+            if (correct === 'A' || correct === '0') correctOption = 0;
+            else if (correct === 'B' || correct === '1') correctOption = 1;
+            else if (correct === 'C' || correct === '2') correctOption = 2;
+            else if (correct === 'D' || correct === '3') correctOption = 3;
+            else if (!isNaN(parseInt(correct))) correctOption = parseInt(correct);
           }
+
+          let competency = (row.competency || row.competencia || 'Geral').trim();
+          if (mapping[competency]) {
+            if (mapping[competency].action === 'ignore') continue;
+            if (mapping[competency].action === 'map' && mapping[competency].target) {
+              competency = mapping[competency].target;
+            }
+          }
+
+          const questionData = {
+            text,
+            options,
+            correctOption,
+            weight: parseFloat(row.weight || row.peso || '1'),
+            competency,
+            difficulty: (row.difficulty || row.dificuldade || 'médio').toLowerCase(),
+            explanation: row.explanation || row.explicacao || '',
+            createdBy: user.uid,
+            createdAt: serverTimestamp()
+          };
+
+          const newDocRef = doc(collection(db, 'questions'));
+          batch.set(newDocRef, questionData);
+          count++;
         }
-
-        const questionData = {
-          text,
-          options,
-          correctOption,
-          weight: parseFloat(row.weight || row.peso || '1'),
-          competency,
-          difficulty: (row.difficulty || row.dificuldade || 'médio').toLowerCase(),
-          createdBy: user.uid,
-          createdAt: serverTimestamp()
-        };
-
-        const newDocRef = doc(collection(db, 'questions'));
-        batch.set(newDocRef, questionData);
-        count++;
+        
+        await batch.commit();
+        if (data.length > BATCH_SIZE) {
+          toast.info(`Importando... ${Math.min(i + BATCH_SIZE, data.length)} de ${data.length} questões salvas.`);
+        }
       }
 
       if (count > 0) {
-        await batch.commit();
         toast.success(`${count} questões importadas com sucesso!`);
       } else {
         toast.warning("Nenhuma questão válida encontrada no arquivo.");
       }
+      
       setShowMappingModal(false);
       setPendingImportData(null);
       setMissingCompetencies([]);
@@ -1704,6 +2219,8 @@ function QuestionsBankView({ user }: { user: User | null }) {
     } catch (err) {
       console.error("Error committing import:", err);
       toast.error("Erro ao finalizar importação.");
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -1713,23 +2230,46 @@ function QuestionsBankView({ user }: { user: User | null }) {
 
     const fileName = file.name.toLowerCase();
     const processQuestions = async (data: any[]) => {
+      setIsImporting(true);
       try {
-        // 1. Identify unique competencies in the imported data
+        if (!data || data.length === 0) {
+          toast.warning("Nenhuma questão encontrada no arquivo.");
+          return;
+        }
+        // 1. Identify questions with missing/generic competencies and suggest them
+        const questionsToSuggest = data.filter(q => !q.competency || q.competency === 'Geral' || q.competency === '');
+        if (questionsToSuggest.length > 0) {
+          toast.info(`IA sugerindo competências para ${questionsToSuggest.length} questões...`);
+          const suggestions = await suggestCompetencies(questionsToSuggest);
+          questionsToSuggest.forEach((q, idx) => {
+            q.competency = suggestions[idx] || 'Geral';
+          });
+        }
+
+        // 2. Identify unique competencies in the imported data
         const importedComps = new Set<string>();
         data.forEach(row => {
-          const comp = row.competency || row.competencia || 'Geral';
+          const comp = (row.competency || row.competencia || 'Geral').trim();
+          row.competency = comp; // Ensure it's set
           importedComps.add(comp);
         });
 
         // 2. Check which ones are missing in the DB
-        const existingCompNames = new Set(disciplines.map(d => d.name));
+        const existingCompNames = new Set(disciplines.map(d => d.name.trim()));
         const missing = Array.from(importedComps).filter(c => !existingCompNames.has(c));
 
         if (missing.length > 0) {
+          const affectedCount = data.filter(row => {
+            const comp = (row.competency || row.competencia || 'Geral').trim();
+            return missing.includes(comp);
+          }).length;
+
+          toast.warning(`${missing.length} competências não encontradas (${affectedCount} questões afetadas). Por favor, mapeie ou crie-as para continuar.`);
+          
           setMissingCompetencies(missing);
           setPendingImportData(data);
           // Initialize mapping: default to 'create'
-          const initialMapping: Record<string, { action: 'create' | 'map', target?: string }> = {};
+          const initialMapping: Record<string, { action: 'create' | 'map' | 'ignore', target?: string }> = {};
           missing.forEach(m => {
             initialMapping[m] = { action: 'create' };
           });
@@ -1742,7 +2282,9 @@ function QuestionsBankView({ user }: { user: User | null }) {
         await commitImport(data, {});
       } catch (err) {
         console.error("Error processing questions:", err);
-        toast.error("Erro ao processar questões.");
+        toast.error("Erro ao processar questões: " + (err instanceof Error ? err.message : String(err)));
+      } finally {
+        setIsImporting(false);
       }
     };
 
@@ -1789,7 +2331,11 @@ function QuestionsBankView({ user }: { user: User | null }) {
         }
       };
       reader.readAsArrayBuffer(file);
-    } else if (fileName.endsWith('.docx')) {
+    } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+      if (fileName.endsWith('.doc')) {
+        toast.error("Arquivos .doc (legado) não são suportados. Por favor, salve como .docx e tente novamente.");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = async (evt) => {
         try {
@@ -1816,6 +2362,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
 
   return (
     <div className="space-y-6">
+      <ItemGeneratorView user={user} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Banco de Questões</h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -1856,10 +2403,19 @@ function QuestionsBankView({ user }: { user: User | null }) {
           </select>
 
           <div className="flex items-center gap-2">
-            <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm">
-              <Upload size={16} />
-              Importar
-              <input type="file" className="hidden" accept=".csv,.xlsx,.xls,.docx,.pdf" onChange={handleQuestionsImport} />
+            <label className={cn(
+              "cursor-pointer flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm",
+              isImporting && "opacity-50 cursor-not-allowed pointer-events-none"
+            )}>
+              {isImporting ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+              {isImporting ? 'Processando...' : 'Importar'}
+              <input 
+                type="file" 
+                className="hidden" 
+                accept=".csv,.xlsx,.xls,.docx,.doc,.pdf" 
+                onChange={handleQuestionsImport} 
+                disabled={isImporting}
+              />
             </label>
 
             <button 
@@ -1908,6 +2464,16 @@ function QuestionsBankView({ user }: { user: User | null }) {
                 <option value="difícil">Difícil</option>
               </select>
             </div>
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Explicação da Resposta (Opcional)</label>
+              <textarea 
+                value={currentQuestion.explanation || ''} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, explanation: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Explique por que esta é a resposta correta..."
+                rows={3}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -1951,27 +2517,88 @@ function QuestionsBankView({ user }: { user: User | null }) {
             <p className="text-gray-500 italic">Nenhuma questão encontrada para os critérios de busca.</p>
           </div>
         ) : (
-          filteredQuestions.map((q) => (
-            <div key={q.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-start justify-between group">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                    q.difficulty === 'fácil' ? "bg-emerald-100 text-emerald-700" :
-                    q.difficulty === 'médio' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
-                  )}>
-                    {q.difficulty}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competency}</span>
+          filteredQuestions.map((q) => {
+            const isExpanded = expandedQuestions.has(q.id);
+            return (
+              <div key={q.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
+                <div className="p-6 flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={q.difficulty}
+                        onChange={(e) => handleUpdateQuestionDifficulty(q.id, e.target.value as any)}
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border-none focus:ring-0 cursor-pointer outline-none appearance-none text-center",
+                          q.difficulty === 'fácil' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" :
+                          q.difficulty === 'médio' ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-red-100 text-red-700 hover:bg-red-200"
+                        )}
+                      >
+                        <option value="fácil">Fácil</option>
+                        <option value="médio">Médio</option>
+                        <option value="difícil">Difícil</option>
+                      </select>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competency}</span>
+                    </div>
+                    <p className="text-gray-900 font-medium">{q.text}</p>
+                    
+                    <button 
+                      onClick={() => toggleExpand(q.id)}
+                      className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase tracking-wider hover:text-emerald-700 transition-colors mt-2"
+                    >
+                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      {isExpanded ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+                    </button>
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => { setCurrentQuestion(q); setIsEditing(true); }} className="p-2 text-gray-400 hover:text-emerald-600"><Pencil size={18} /></button>
+                    <button onClick={() => handleDeleteQuestion(q.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={18} /></button>
+                  </div>
                 </div>
-                <p className="text-gray-900 font-medium">{q.text}</p>
+
+                {isExpanded && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    className="px-6 pb-6 border-t border-gray-50 bg-gray-50/30"
+                  >
+                    <div className="pt-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {q.options.map((opt, oIdx) => (
+                          <div 
+                            key={oIdx} 
+                            className={cn(
+                              "p-3 rounded-xl border text-sm flex items-center gap-3",
+                              q.correctOption === oIdx 
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-900" 
+                                : "bg-white border-gray-100 text-gray-600"
+                            )}
+                          >
+                            <div className={cn(
+                              "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                              q.correctOption === oIdx ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
+                            )}>
+                              {String.fromCharCode(65 + oIdx)}
+                            </div>
+                            {opt}
+                            {q.correctOption === oIdx && <CheckCircle2 size={14} className="ml-auto text-emerald-600" />}
+                          </div>
+                        ))}
+                      </div>
+
+                      {q.explanation && (
+                        <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+                          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <Info size={14} /> Explicação da Resposta
+                          </p>
+                          <p className="text-sm text-gray-600 italic leading-relaxed">{q.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
               </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => { setCurrentQuestion(q); setIsEditing(true); }} className="p-2 text-gray-400 hover:text-emerald-600"><Pencil size={18} /></button>
-                <button onClick={() => handleDeleteQuestion(q.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={18} /></button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -1996,33 +2623,40 @@ function QuestionsBankView({ user }: { user: User | null }) {
             </div>
 
             <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
-              {missingCompetencies.map((missing) => (
-                <div key={missing} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
-                      <BookOpen size={20} />
+              {missingCompetencies.map((missing) => {
+                const count = (pendingImportData || []).filter(row => (row.competency || row.competencia || 'Geral') === missing).length;
+                return (
+                  <div key={missing} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                          <BookOpen size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência no Arquivo</p>
+                          <p className="text-lg font-bold text-gray-900">{missing}</p>
+                        </div>
+                      </div>
+                      <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">
+                        {count} {count === 1 ? 'questão' : 'questões'}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência no Arquivo</p>
-                      <p className="text-lg font-bold text-gray-900">{missing}</p>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setCompetencyMapping(prev => ({
                         ...prev,
                         [missing]: { action: 'create' }
                       }))}
                       className={cn(
-                        "flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all gap-2",
+                        "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1",
                         competencyMapping[missing]?.action === 'create'
                           ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
                           : "border-gray-100 bg-white text-gray-500 hover:border-gray-200"
                       )}
                     >
-                      <Plus size={20} />
-                      <span className="text-sm font-bold">Criar Nova</span>
+                      <Plus size={18} />
+                      <span className="text-[10px] font-bold uppercase">Criar</span>
                     </button>
                     <button
                       onClick={() => setCompetencyMapping(prev => ({
@@ -2030,14 +2664,29 @@ function QuestionsBankView({ user }: { user: User | null }) {
                         [missing]: { action: 'map', target: disciplines[0]?.name }
                       }))}
                       className={cn(
-                        "flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all gap-2",
+                        "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1",
                         competencyMapping[missing]?.action === 'map'
                           ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
                           : "border-gray-100 bg-white text-gray-500 hover:border-gray-200"
                       )}
                     >
-                      <Filter size={20} />
-                      <span className="text-sm font-bold">Mapear Existente</span>
+                      <Filter size={18} />
+                      <span className="text-[10px] font-bold uppercase">Mapear</span>
+                    </button>
+                    <button
+                      onClick={() => setCompetencyMapping(prev => ({
+                        ...prev,
+                        [missing]: { action: 'ignore' }
+                      }))}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1",
+                        competencyMapping[missing]?.action === 'ignore'
+                          ? "border-amber-500 bg-amber-50 text-amber-700 shadow-sm"
+                          : "border-gray-100 bg-white text-gray-500 hover:border-gray-200"
+                      )}
+                    >
+                      <X size={18} />
+                      <span className="text-[10px] font-bold uppercase">Ignorar</span>
                     </button>
                   </div>
 
@@ -2061,8 +2710,9 @@ function QuestionsBankView({ user }: { user: User | null }) {
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
             <div className="p-6 border-t border-gray-100 bg-gray-50 flex gap-3">
               <button
@@ -3121,6 +3771,11 @@ function StudyPlanView({ user }: { user: User | null }) {
       };
 
       await addDoc(collection(db, 'study_plans'), newPlan);
+      await triggerN8NAlert('RecomendacaoPedagogica', {
+        userId: user.uid,
+        weaknesses,
+        priorityTopics: newPlan.priorityTopics
+      });
       toast.success("Plano de estudos adaptativo gerado com sucesso!");
     } catch (err) {
       console.error(err);
@@ -5316,11 +5971,15 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
     return comps;
   }, [result, filter, sortOrder]);
 
-  const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote' | 'professorFeedback' | 'questionFeedback' | 'professorNota' | 'questionNota' | 'fullFeedback' | 'fullQuestionFeedback', value?: string | number, questionId?: string | number, nota?: string | number) => {
+  const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote' | 'professorFeedback' | 'questionFeedback' | 'professorNota' | 'questionNota' | 'fullFeedback' | 'fullQuestionFeedback' | 'questionPrivateNote' | 'studentMessage', value?: string | number, questionId?: string | number, nota?: string | number) => {
     if (!result) return;
+    let updatedResult = { ...result };
     const newCompetencias = [...result.diagnostico_por_competencia];
     const idx = newCompetencias.findIndex(c => c.competencia === competenciaName);
-    if (idx !== -1) {
+
+    if (type === 'studentMessage') {
+      updatedResult = { ...result, mensagem_para_o_aluno: (value !== undefined ? value : editValue) as string };
+    } else if (idx !== -1) {
       if (type === 'recommendation') {
         newCompetencias[idx] = { ...newCompetencias[idx], recomendacoes: (value !== undefined ? value : editValue) as string };
       } else if (type === 'professorFeedback') {
@@ -5358,25 +6017,33 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
           };
           newCompetencias[idx] = { ...newCompetencias[idx], questoes: updatedQuestoes };
         }
+      } else if (type === 'questionPrivateNote') {
+        const qIdx = newCompetencias[idx].questoes?.findIndex(q => q.id === questionId);
+        if (qIdx !== undefined && qIdx !== -1 && newCompetencias[idx].questoes) {
+          const updatedQuestoes = [...newCompetencias[idx].questoes!];
+          updatedQuestoes[qIdx] = { ...updatedQuestoes[qIdx], private_notes: (value !== undefined ? value : privateNoteValue) as string };
+          newCompetencias[idx] = { ...newCompetencias[idx], questoes: updatedQuestoes };
+        }
       } else {
         newCompetencias[idx] = { ...newCompetencias[idx], private_notes: (value !== undefined ? value : privateNoteValue) as string };
       }
-      
-      const updatedResult = { ...result, diagnostico_por_competencia: newCompetencias };
-      onUpdateResult(updatedResult);
-      
-      // Update in Firestore if ID exists
-      if (diagnosticId) {
-        const path = `diagnostics/${diagnosticId}`;
-        try {
-          await updateDoc(doc(db, 'diagnostics', diagnosticId), {
-            result: updatedResult
-          });
-        } catch (err) {
-          handleFirestoreError(err, OperationType.UPDATE, path);
-        }
+      updatedResult = { ...result, diagnostico_por_competencia: newCompetencias };
+    }
+    
+    onUpdateResult(updatedResult);
+    
+    // Update in Firestore if ID exists
+    if (diagnosticId) {
+      const path = `diagnostics/${diagnosticId}`;
+      try {
+        await updateDoc(doc(db, 'diagnostics', diagnosticId), {
+          result: updatedResult
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, path);
       }
     }
+    
     setEditingComp(null);
     setEditingFeedback(null);
     setEditingQuestionFeedback(null);
@@ -5428,11 +6095,51 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
             </div>
           </div>
 
-          <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm flex flex-col md:w-1/2">
-            <h3 className="text-lg font-bold text-emerald-900 mb-2">Mensagem para o Aluno</h3>
-            <p className="text-lg leading-relaxed text-emerald-800 font-medium italic">
-              "{result.mensagem_para_o_aluno}"
-            </p>
+          <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm flex flex-col md:w-1/2 relative group">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold text-emerald-900">Mensagem para o Aluno</h3>
+              {isProfessor && editingComp !== 'studentMessage' && (
+                <button 
+                  onClick={() => {
+                    setEditingComp('studentMessage');
+                    setEditValue(result.mensagem_para_o_aluno);
+                  }}
+                  className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
+            
+            {editingComp === 'studentMessage' ? (
+              <div className="space-y-3">
+                <textarea
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  className="w-full p-3 text-sm rounded-xl border-2 border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none min-h-[100px] transition-all bg-white"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button 
+                    onClick={() => setEditingComp(null)}
+                    className="px-3 py-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-900"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={() => handleSaveEdit('', 'studentMessage')}
+                    className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2"
+                  >
+                    <Check size={14} />
+                    Salvar Mensagem
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-lg leading-relaxed text-emerald-800 font-medium italic">
+                "{result.mensagem_para_o_aluno}"
+              </p>
+            )}
           </div>
           
           <div className="flex gap-3">
@@ -5482,13 +6189,20 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                         width={30}
                       />
                       <Tooltip 
-                        contentStyle={{ 
-                          borderRadius: '12px', 
-                          border: 'none', 
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                          fontSize: '12px'
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white p-3 rounded-xl shadow-xl border border-gray-100 animate-in fade-in zoom-in duration-200">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-xl font-bold text-emerald-600">{payload[0].value}%</span>
+                                  <span className="text-[10px] text-gray-500 font-medium uppercase tracking-tighter">Média</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
-                        formatter={(value: number) => [`${value}%`, 'Média Geral']}
                       />
                       <Area 
                         type="monotone" 
@@ -5498,7 +6212,13 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                         fillOpacity={1} 
                         fill="url(#colorAcuracia)" 
                         dot={{ r: 6, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 8, fill: '#10b981', strokeWidth: 0 }}
+                        activeDot={{ 
+                          r: 12, 
+                          fill: '#10b981', 
+                          strokeWidth: 4, 
+                          stroke: '#fff',
+                          className: "drop-shadow-md transition-all duration-300"
+                        }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -5855,13 +6575,20 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                                       width={25}
                                     />
                                     <Tooltip 
-                                      contentStyle={{ 
-                                        borderRadius: '12px', 
-                                        border: 'none', 
-                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                        fontSize: '12px'
+                                      content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                          return (
+                                            <div className="bg-white p-2 rounded-lg shadow-lg border border-gray-100 animate-in fade-in zoom-in duration-200">
+                                              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
+                                              <div className="flex items-baseline gap-1">
+                                                <span className="text-sm font-bold text-emerald-600">{payload[0].value}%</span>
+                                                <span className="text-[8px] text-gray-500 font-medium uppercase tracking-tighter">Média</span>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                        return null;
                                       }}
-                                      formatter={(value: number) => [`${value}%`, 'Média']}
                                     />
                                     <Line 
                                       type="monotone" 
@@ -5869,7 +6596,13 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                                       stroke="#10b981" 
                                       strokeWidth={3} 
                                       dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
-                                      activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }}
+                                      activeDot={{ 
+                                        r: 10, 
+                                        fill: '#10b981', 
+                                        strokeWidth: 3, 
+                                        stroke: '#fff',
+                                        className: "drop-shadow-sm transition-all duration-300"
+                                      }}
                                       animationDuration={1500}
                                     />
                                   </LineChart>
@@ -6461,6 +7194,63 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                                               >
                                                 Adicionar Feedback Agora
                                               </button>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Question Level Private Notes */}
+                                        {isProfessor && (
+                                          <div className="mt-4 pt-4 border-t border-gray-100/50 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-2">
+                                                <Lock size={12} className="text-gray-400" />
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Notas Privadas (Apenas Professor)</p>
+                                              </div>
+                                              {editingPrivateNote !== `${comp.competencia}-${q.id}-q` && (
+                                                <button 
+                                                  onClick={() => {
+                                                    setEditingPrivateNote(`${comp.competencia}-${q.id}-q`);
+                                                    setPrivateNoteValue(q.private_notes || '');
+                                                  }}
+                                                  className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                                                >
+                                                  <Pencil size={10} />
+                                                  {q.private_notes ? 'Editar' : 'Adicionar'}
+                                                </button>
+                                              )}
+                                            </div>
+                                            
+                                            {editingPrivateNote === `${comp.competencia}-${q.id}-q` ? (
+                                              <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                <textarea
+                                                  value={privateNoteValue}
+                                                  onChange={(e) => setPrivateNoteValue(e.target.value)}
+                                                  className="w-full p-3 text-xs rounded-xl border-2 border-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[60px] transition-all bg-white"
+                                                  placeholder="Notas internas sobre o desempenho do aluno nesta questão..."
+                                                  autoFocus
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                  <button 
+                                                    onClick={() => setEditingPrivateNote(null)}
+                                                    className="px-3 py-1.5 text-[10px] font-bold text-gray-500 hover:text-gray-700"
+                                                  >
+                                                    Cancelar
+                                                  </button>
+                                                  <button 
+                                                    onClick={() => handleSaveEdit(comp.competencia, 'questionPrivateNote', privateNoteValue, q.id)}
+                                                    className="px-4 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2"
+                                                  >
+                                                    <Check size={12} />
+                                                    Salvar Nota
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ) : q.private_notes ? (
+                                              <p className="text-[11px] text-gray-600 italic leading-relaxed bg-white/50 p-2 rounded-lg border border-gray-100">
+                                                "{q.private_notes}"
+                                              </p>
+                                            ) : (
+                                              <p className="text-[10px] text-gray-400 italic">Nenhuma nota privada para esta questão.</p>
                                             )}
                                           </div>
                                         )}
@@ -7832,7 +8622,7 @@ function AppContent() {
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={
                 <Navigate to={
-                  userProfile?.role === 'aluno' ? "/student-dashboard" : (result ? "/dashboard" : "/input")
+                  userProfile?.role === 'aluno' ? "/student-dashboard" : "/dashboard"
                 } replace />
               } />
               <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} defaultType="simulado" /></ProtectedRoute>} />
@@ -7841,7 +8631,12 @@ function AppContent() {
               <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
               <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
               <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudyPlanView user={user} /></ProtectedRoute>} />
-              <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationView user={user} userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationDashboardView user={user} userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} /></ProtectedRoute>} />
+              <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} /></ProtectedRoute>} />
+              <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView /></ProtectedRoute>} />
+              <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView /></ProtectedRoute>} />
+              <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div
@@ -7989,6 +8784,12 @@ function AppContent() {
                   </div>
                 </div>
               </motion.div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/dashboard" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <ProfessorDashboardView user={user} userProfile={userProfile} />
               </ProtectedRoute>
             } />
 

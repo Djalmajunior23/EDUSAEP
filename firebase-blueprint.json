@@ -260,6 +260,266 @@
         "resolvido": { "type": "boolean", "description": "Resolved status." }
       },
       "required": ["tipo_alerta", "nivel", "descricao", "data_geracao", "resolvido"]
+    },
+    "IntervencaoPedagogica": {
+      "title": "IntervencaoPedagogica",
+      "description": "Teacher interventions suggested by AI.",
+      "type": "object",
+      "properties": {
+        "professor_id": { "type": "string", "description": "Professor ID." },
+        "turma_id": { "type": "string", "description": "Class ID." },
+        "competencia_id": { "type": "string", "description": "Competency ID." },
+        "titulo": { "type": "string", "description": "Title of the intervention." },
+        "descricao": { "type": "string", "description": "Detailed description." },
+        "roteiro_aula": { "type": "string", "description": "Suggested lesson plan." },
+        "status": { "type": "string", "enum": ["pendente", "aplicada", "arquivada"], "description": "Status." },
+        "data_geracao": { "type": "string", "format": "date-time", "description": "Generation date." }
+      },
+      "required": ["professor_id", "turma_id", "titulo", "descricao", "data_geracao"]
+    },
+    "BloomAnalysis": {
+      "title": "BloomAnalysis",
+      "description": "Analysis of exam balance based on Bloom's Taxonomy.",
+      "type": "object",
+      "properties": {
+        "exam_id": { "type": "string", "description": "Exam ID." },
+        "distribution": { "type": "object", "description": "Percentage of questions per Bloom level." },
+        "health_score": { "type": "number", "description": "Overall balance score." },
+        "recommendations": { "type": "string", "description": "AI recommendations for balance." },
+        "data_analise": { "type": "string", "format": "date-time", "description": "Analysis date." }
+      },
+      "required": ["exam_id", "distribution", "data_analise"]
+    },
+    "SocraticSession": {
+      "title": "SocraticSession",
+      "description": "Session for the Socratic AI Tutor.",
+      "type": "object",
+      "properties": {
+        "aluno_id": { "type": "string", "description": "Student ID." },
+        "question_id": { "type": "string", "description": "Question being discussed." },
+        "status": { "type": "string", "enum": ["ativa", "concluida"], "description": "Session status." },
+        "history": { "type": "array", "items": { "$ref": "ChatMessage" }, "description": "Message history." },
+        "data_inicio": { "type": "string", "format": "date-time", "description": "Start date." }
+      },
+      "required": ["aluno_id", "question_id", "status", "data_inicio"]
+    },
+    "LearningProfile": {
+      "title": "Learning Profile",
+      "description": "Stores the student's learning style and cognitive profile.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "vark_style": { "type": "string", "enum": ["Visual", "Aural", "Read/Write", "Kinesthetic", "Multimodal"], "description": "VARK learning style." },
+        "cognitive_level": { "type": "string", "description": "Cognitive maturity level." },
+        "behavioral_traits": { "type": "array", "items": { "type": "string" }, "description": "Identified behavioral traits." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update date." }
+      },
+      "required": ["userId", "vark_style", "updatedAt"]
+    },
+    "AdaptiveSession": {
+      "title": "Adaptive Session",
+      "description": "Tracks an adaptive exam session with dynamic difficulty.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "examId": { "type": "string", "description": "Original exam ID." },
+        "currentProficiency": { "type": "number", "description": "Estimated student proficiency (TRI)." },
+        "questionHistory": { "type": "array", "items": { "type": "object" }, "description": "History of questions and answers." },
+        "status": { "type": "string", "enum": ["active", "completed"], "description": "Session status." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Start date." }
+      },
+      "required": ["userId", "examId", "currentProficiency", "status", "createdAt"]
+    },
+    "LessonPlan": {
+      "title": "Lesson Plan",
+      "description": "Stores AI-generated lesson plans based on class cognitive errors.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the professor." },
+        "title": { "type": "string", "description": "The title of the lesson plan." },
+        "objectives": { "type": "array", "items": { "type": "string" }, "description": "Learning objectives." },
+        "topicsToReview": { "type": "array", "items": { "type": "string" }, "description": "Topics that need review." },
+        "practicalActivities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Name of the activity." },
+              "description": { "type": "string", "description": "Description of the activity." },
+              "duration": { "type": "string", "description": "Estimated duration." }
+            }
+          },
+          "description": "Practical activities for the lesson."
+        },
+        "suggestedMaterials": { "type": "array", "items": { "type": "string" }, "description": "Suggested materials." },
+        "aiInsights": { "type": "string", "description": "AI insights and reasoning." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the plan was created." }
+      },
+      "required": ["userId", "title", "objectives", "createdAt"]
+    },
+    "RecoveryPlan": {
+      "title": "Recovery Plan",
+      "description": "Stores individualized recovery plans for students based on cognitive error analysis.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the student this plan is for." },
+        "studentId": { "type": "string", "description": "The ID of the student." },
+        "riskLevel": { "type": "string", "enum": ["Baixo", "Médio", "Alto"], "description": "The risk level of the student." },
+        "summary": { "type": "string", "description": "A summary of the diagnostic." },
+        "recommendedActivities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "competency": { "type": "string", "description": "The competency to focus on." },
+              "activityType": { "type": "string", "description": "The type of activity." },
+              "description": { "type": "string", "description": "Description of the activity." }
+            }
+          },
+          "description": "List of recommended activities."
+        },
+        "professorInterventions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Suggested interventions for the professor."
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the plan was created." }
+      },
+      "required": ["userId", "studentId", "riskLevel", "summary", "createdAt"]
+    },
+    "CognitiveErrorAnalysis": {
+      "title": "Cognitive Error Analysis",
+      "description": "Analysis of student errors by cognitive category.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "submissionId": { "type": "string", "description": "Submission ID." },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "questionId": { "type": "string" },
+              "category": { "type": "string", "enum": ["Interpretação", "Conceito", "Atenção", "Lógica"] },
+              "explanation": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Date of analysis." }
+      },
+      "required": ["userId", "submissionId", "errors", "createdAt"]
+    },
+    "PerformancePrediction": {
+      "title": "Performance Prediction",
+      "description": "AI-generated prediction of student performance in official exams.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "probabilityOfSuccess": { "type": "number", "description": "Probability (0-100)." },
+        "riskLevel": { "type": "string", "enum": ["Baixo", "Médio", "Alto", "Crítico"] },
+        "factors": { "type": "array", "items": { "type": "string" }, "description": "Factors influencing the prediction." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Date of prediction." }
+      },
+      "required": ["userId", "probabilityOfSuccess", "riskLevel", "createdAt"]
+    },
+    "EngagementLog": {
+      "title": "Engagement Log",
+      "description": "Logs student engagement metrics.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "action": { "type": "string", "description": "Action performed (e.g., 'login', 'start_exam')." },
+        "duration": { "type": "number", "description": "Duration in seconds (if applicable)." },
+        "sentiment": { "type": "string", "description": "Detected sentiment (if applicable)." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the action occurred." }
+      },
+      "required": ["userId", "action", "timestamp"]
+    },
+    "LearningDNA": {
+      "title": "Learning DNA",
+      "description": "Dynamic multidimensional profile of the student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "learningStyle": { "type": "string", "enum": ["Visual", "Auditivo", "Leitura/Escrita", "Cinestésico"] },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "weaknesses": { "type": "array", "items": { "type": "string" } },
+        "averagePace": { "type": "string", "description": "Average learning pace (e.g., 'Rápido', 'Moderado')." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "learningStyle", "updatedAt"]
+    },
+    "ContentRecommendation": {
+      "title": "Content Recommendation",
+      "description": "AI-curated external content for the student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "title": { "type": "string", "description": "Title of the content." },
+        "url": { "type": "string", "description": "Link to the external content." },
+        "type": { "type": "string", "enum": ["Vídeo", "Artigo", "Exercício"] },
+        "reason": { "type": "string", "description": "Why this was recommended." },
+        "competency": { "type": "string", "description": "Target competency." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "url", "type", "reason", "createdAt"]
+    },
+    "SmartGoal": {
+      "title": "Smart Goal",
+      "description": "Negotiated weekly micro-goals.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "title": { "type": "string", "description": "Goal title." },
+        "description": { "type": "string", "description": "Goal description." },
+        "status": { "type": "string", "enum": ["Pendente", "Em Progresso", "Concluída", "Falhou"] },
+        "deadline": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "status", "deadline", "createdAt"]
+    },
+    "EducationalMission": {
+      "title": "Educational Mission",
+      "description": "Gamified learning missions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "title": { "type": "string", "description": "Mission title." },
+        "description": { "type": "string", "description": "Mission narrative." },
+        "xpReward": { "type": "number", "description": "XP gained upon completion." },
+        "progress": { "type": "number", "description": "Progress percentage (0-100)." },
+        "status": { "type": "string", "enum": ["Ativa", "Concluída"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "xpReward", "progress", "status", "createdAt"]
+    },
+    "CareerMatch": {
+      "title": "Career Match",
+      "description": "Alignment of student profile with market careers.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student ID." },
+        "careerName": { "type": "string", "description": "Name of the career." },
+        "matchPercentage": { "type": "number", "description": "Match percentage (0-100)." },
+        "missingSkills": { "type": "array", "items": { "type": "string" } },
+        "strongSkills": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "careerName", "matchPercentage", "updatedAt"]
+    },
+    "SmartAlert": {
+      "title": "Smart Alert",
+      "description": "Real-time alerts for professors/management.",
+      "type": "object",
+      "properties": {
+        "targetUserId": { "type": "string", "description": "ID of the user this alert is about." },
+        "type": { "type": "string", "enum": ["Risco de Evasão", "Queda de Desempenho", "Baixo Engajamento", "Erro Coletivo"] },
+        "message": { "type": "string", "description": "Alert message." },
+        "severity": { "type": "string", "enum": ["Baixa", "Média", "Alta", "Crítica"] },
+        "status": { "type": "string", "enum": ["Novo", "Lido", "Resolvido"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "message", "severity", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -334,6 +594,62 @@
     "/alertas_pedagogicos/{alertaId}": {
       "schema": "AlertaPedagogico",
       "description": "Pedagogical alert documents."
+    },
+    "/intervencoes_pedagogicas/{intervencaoId}": {
+      "schema": "IntervencaoPedagogica",
+      "description": "Teacher intervention documents."
+    },
+    "/bloom_analyses/{analysisId}": {
+      "schema": "BloomAnalysis",
+      "description": "Bloom's taxonomy analysis documents."
+    },
+    "/socratic_sessions/{sessionId}": {
+      "schema": "SocraticSession",
+      "description": "Socratic tutor session documents."
+    },
+    "/learning_profiles/{profileId}": {
+      "schema": "LearningProfile",
+      "description": "Student learning profile documents."
+    },
+    "/adaptive_sessions/{sessionId}": {
+      "schema": "AdaptiveSession",
+      "description": "Adaptive exam session documents."
+    },
+    "/cognitive_error_analyses/{analysisId}": {
+      "schema": "CognitiveErrorAnalysis",
+      "description": "Cognitive error analysis documents."
+    },
+    "/performance_predictions/{predictionId}": {
+      "schema": "PerformancePrediction",
+      "description": "Performance prediction documents."
+    },
+    "/engagement_logs/{logId}": {
+      "schema": "EngagementLog",
+      "description": "Engagement log documents."
+    },
+    "/learning_dna/{dnaId}": {
+      "schema": "LearningDNA",
+      "description": "Student learning DNA profiles."
+    },
+    "/content_recommendations/{recId}": {
+      "schema": "ContentRecommendation",
+      "description": "AI-curated content recommendations."
+    },
+    "/smart_goals/{goalId}": {
+      "schema": "SmartGoal",
+      "description": "Negotiated smart goals."
+    },
+    "/educational_missions/{missionId}": {
+      "schema": "EducationalMission",
+      "description": "Gamified educational missions."
+    },
+    "/career_matches/{matchId}": {
+      "schema": "CareerMatch",
+      "description": "Career match profiles."
+    },
+    "/smart_alerts/{alertId}": {
+      "schema": "SmartAlert",
+      "description": "Real-time smart alerts."
     }
   }
 }
