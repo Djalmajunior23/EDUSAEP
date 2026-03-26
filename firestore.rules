@@ -6,6 +6,7 @@ service cloud.firestore {
     // Assumed Data Model
     // ===============================================================
     // Collection: users
+    // Collection: classes
     // Collection: disciplines
     // Collection: competencias
     // Collection: habilidades
@@ -47,15 +48,29 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidDiscipline(data) {
-      return hasRequiredFields(['name', 'code_uc', 'status']) &&
+      return hasRequiredFields(['name', 'code', 'status']) &&
              isValidString('name', 1, 100) &&
-             isValidString('code_uc', 1, 20) &&
+             isValidString('code', 1, 20) &&
+             data.status in ['active', 'inactive'];
+    }
+
+    function isValidClass(data) {
+      return hasRequiredFields(['name', 'period', 'status']) &&
+             isValidString('name', 1, 100) &&
+             isValidString('period', 1, 50) &&
              data.status in ['active', 'inactive'];
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
+
+    match /classes/{classId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidClass(request.resource.data);
+      allow update: if isAdmin() && isValidClass(request.resource.data);
+      allow delete: if isAdmin();
+    }
 
     match /disciplines/{disciplineId} {
       allow read: if isAuthenticated();
@@ -135,6 +150,8 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && 
+        (request.resource.data.role in ['professor', 'aluno'] || request.auth.token.email == "djalmabatistajunior@gmail.com");
       allow update: if isOwner(userId) && request.resource.data.role == resource.data.role; // Cannot change role
     }
   }

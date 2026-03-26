@@ -1,6 +1,8 @@
 // src/components/admin/DataImportView.tsx
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 export function DataImportView() {
   const [file, setFile] = useState<File | null>(null);
@@ -18,8 +20,17 @@ export function DataImportView() {
     
     setStatus('uploading');
     
-    // Simulating webhook call to n8n
     try {
+      // Save metadata to Firestore
+      await addDoc(collection(db, 'importacoes'), {
+        origem: 'Upload Manual (SIAC)',
+        arquivo_nome: file.name,
+        data_importacao: serverTimestamp(),
+        status: 'Processando',
+        observacoes: 'Aguardando processamento do n8n'
+      });
+
+      // Simulating webhook call to n8n
       // In a real scenario, this would be a fetch to your n8n webhook URL
       // const formData = new FormData();
       // formData.append('file', file);
@@ -28,7 +39,7 @@ export function DataImportView() {
       //   body: formData
       // });
       
-      setTimeout(() => {
+      setTimeout(async () => {
         setStatus('success');
       }, 2000);
     } catch (error) {

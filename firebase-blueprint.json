@@ -158,6 +158,17 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "When the settings were last updated." }
       }
     },
+    "Class": {
+      "title": "Class",
+      "description": "A class or group of students.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the class." },
+        "period": { "type": "string", "description": "Period or semester." },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Status." }
+      },
+      "required": ["name", "period", "status"]
+    },
     "Discipline": {
       "title": "Discipline",
       "description": "A discipline or main competency.",
@@ -165,10 +176,10 @@
       "properties": {
         "name": { "type": "string", "description": "Name of the discipline." },
         "description": { "type": "string", "description": "Description of the discipline." },
-        "code_uc": { "type": "string", "description": "UC code." },
+        "code": { "type": "string", "description": "UC code." },
         "status": { "type": "string", "enum": ["active", "inactive"], "description": "Status." }
       },
-      "required": ["name", "code_uc", "status"]
+      "required": ["name", "code", "status"]
     },
     "Competencia": {
       "title": "Competencia",
@@ -291,6 +302,10 @@
     "/settings/global": {
       "schema": "GlobalSettings",
       "description": "Global application settings."
+    },
+    "/classes/{classId}": {
+      "schema": "Class",
+      "description": "Class documents."
     },
     "/disciplines/{disciplineId}": {
       "schema": "Discipline",

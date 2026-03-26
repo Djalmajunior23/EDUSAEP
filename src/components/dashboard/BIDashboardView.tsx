@@ -21,7 +21,9 @@ export function BIDashboardView() {
       setLoading(true);
       try {
         const disciplinesSnap = await getDocs(collection(db, 'disciplines'));
-        const disciplinesData = disciplinesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Discipline));
+        const disciplinesData = disciplinesSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Discipline))
+          .filter(d => d.status === 'active');
         setDisciplines(disciplinesData);
 
         const dashboardData = await getDashboardData(filters);
