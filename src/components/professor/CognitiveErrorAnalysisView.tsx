@@ -573,11 +573,20 @@ export function CognitiveErrorAnalysisView() {
                         <span className="text-xs text-gray-500">Questão ID: {err.questionId}</span>
                       </div>
                       <p className="text-sm text-gray-700 mb-2"><span className="font-medium">Diagnóstico:</span> {err.explanation}</p>
-                      {err.suggested_fix && (
-                        <p className="text-sm text-emerald-700 bg-emerald-50 p-3 rounded-lg border border-emerald-100/50">
-                          <span className="font-medium flex items-center gap-1 mb-1"><Sparkles size={14}/> Intervenção Sugerida:</span>
-                          {err.suggested_fix}
+                      {err.explicacao_detalhada && (
+                        <p className="text-xs text-gray-600 mb-3 italic leading-relaxed">
+                          {err.explicacao_detalhada}
                         </p>
+                      )}
+                      {(err.sugestao_intervencao || err.suggested_fix) && (
+                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100/50">
+                          <p className="text-sm text-emerald-700 font-medium flex items-center gap-1 mb-1">
+                            <Sparkles size={14}/> Intervenção Sugerida:
+                          </p>
+                          <p className="text-sm text-emerald-800">
+                            {err.sugestao_intervencao || err.suggested_fix}
+                          </p>
+                        </div>
                       )}
                     </div>
                   ))}

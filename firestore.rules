@@ -216,6 +216,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /system_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Permite que o sistema registre erros
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && 

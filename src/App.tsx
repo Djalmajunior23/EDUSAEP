@@ -88,7 +88,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies } from './services/geminiService';
+import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan } from './services/geminiService';
 import { triggerN8NAlert } from './services/n8nService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
 import { clsx, type ClassValue } from 'clsx';
@@ -139,6 +139,7 @@ import { AdaptiveExam } from './components/student/AdaptiveExam';
 import { Gamification } from './components/student/Gamification';
 import { ProfessorInsights } from './components/professor/ProfessorInsights';
 import { CognitiveErrorAnalysisView } from './components/professor/CognitiveErrorAnalysisView';
+import { handleFirestoreError, OperationType } from './services/errorService';
 
 
 async function updateXP(userId: string, amount: number) {
@@ -167,7 +168,7 @@ async function updateXP(userId: string, amount: number) {
       }
     }
   } catch (err) {
-    console.error("Error updating XP:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
   }
 }
 
@@ -377,34 +378,6 @@ function ProtectedRoute({ allowedRoles, userProfile, children }: { allowedRoles:
   return <>{children}</>;
 }
 
-// Firestore Error Handling
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
 
 export interface UserProfile {
   uid: string;
@@ -503,28 +476,7 @@ export interface StudyPlan {
   createdAt: any;
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
+
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -545,6 +497,16 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error("ErrorBoundary caught an error", error, errorInfo);
+    // Log to Firestore if possible
+    if (auth.currentUser) {
+      addDoc(collection(db, 'system_logs'), {
+        type: 'FRONTEND_ERROR',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : null,
+        userId: auth.currentUser.uid,
+        timestamp: serverTimestamp()
+      }).catch(console.error);
+    }
   }
 
   render() {
@@ -592,7 +554,14 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
     return history.filter(item => {
       const searchLower = searchTerm.toLowerCase();
       const studentMatch = item.aluno.toLowerCase().includes(searchLower);
-      const dateMatch = new Date(item.createdAt).toLocaleDateString().includes(searchLower);
+      
+      const getDate = (createdAt: any) => {
+        if (!createdAt) return new Date(0);
+        if (createdAt.seconds) return new Date(createdAt.seconds * 1000);
+        return new Date(createdAt);
+      };
+      
+      const dateMatch = getDate(item.createdAt).toLocaleDateString().includes(searchLower);
       return studentMatch || dateMatch;
     });
   }, [history, searchTerm]);
@@ -766,7 +735,7 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
                   "text-xs text-gray-400 mb-4",
                   isBulkEdit && "ml-8"
                 )}>
-                  {new Date(item.createdAt).toLocaleDateString()} às {new Date(item.createdAt).toLocaleTimeString()}
+                  {item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString()} às {item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleTimeString() : new Date(item.createdAt).toLocaleTimeString()}
                 </p>
                 <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                   <div className="flex items-center gap-2">
@@ -822,6 +791,7 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
 
 function ReportsView({ history }: { history: any[] }) {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
+  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -829,6 +799,16 @@ function ReportsView({ history }: { history: any[] }) {
   const students = useMemo(() => {
     const uniqueStudents = Array.from(new Set(history.map(h => h.aluno)));
     return uniqueStudents.sort();
+  }, [history]);
+
+  const competencies = useMemo(() => {
+    const uniqueComps = new Set<string>();
+    history.forEach(h => {
+      h.result.diagnostico_por_competencia.forEach((c: any) => {
+        uniqueComps.add(c.competencia);
+      });
+    });
+    return Array.from(uniqueComps).sort();
   }, [history]);
 
   const suggestedStudents = useMemo(() => {
@@ -846,9 +826,15 @@ function ReportsView({ history }: { history: any[] }) {
     });
     
     Object.entries(studentData).forEach(([aluno, data]) => {
-      const sorted = [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const getDate = (createdAt: any) => {
+        if (!createdAt) return new Date(0);
+        if (createdAt.seconds) return new Date(createdAt.seconds * 1000);
+        return new Date(createdAt);
+      };
+
+      const sorted = [...data].sort((a, b) => getDate(b.createdAt).getTime() - getDate(a.createdAt).getTime());
       
-      const mostRecent = new Date(sorted[0].createdAt);
+      const mostRecent = getDate(sorted[0].createdAt);
       if (mostRecent >= sevenDaysAgo) {
         suggestions.push({ aluno, reason: 'Diagnóstico recente', type: 'recent' });
       }
@@ -884,31 +870,56 @@ function ReportsView({ history }: { history: any[] }) {
   const chartData = useMemo(() => {
     let filtered = [...history];
 
+    const getDate = (createdAt: any) => {
+      if (!createdAt) return new Date(0);
+      if (createdAt.seconds) return new Date(createdAt.seconds * 1000);
+      return new Date(createdAt);
+    };
+
     if (selectedStudent !== 'all') {
       filtered = filtered.filter(h => h.aluno === selectedStudent);
     }
 
     if (startDate) {
-      filtered = filtered.filter(h => new Date(h.createdAt) >= new Date(startDate));
+      const [year, month, day] = startDate.split('-').map(Number);
+      const start = new Date(year, month - 1, day, 0, 0, 0);
+      filtered = filtered.filter(h => getDate(h.createdAt) >= start);
     }
 
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(h => new Date(h.createdAt) <= end);
+      const [year, month, day] = endDate.split('-').map(Number);
+      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      filtered = filtered.filter(h => getDate(h.createdAt) <= end);
     }
 
     // Sort by date
-    filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    filtered.sort((a, b) => getDate(a.createdAt).getTime() - getDate(b.createdAt).getTime());
 
-    return filtered.map(h => ({
-      date: new Date(h.createdAt).toLocaleDateString('pt-BR'),
-      aluno: h.aluno,
-      acuracia: Math.round(h.result.summary.acuracia_geral * 100),
-      acuraciaPonderada: Math.round(h.result.summary.acuracia_ponderada * 100),
-      timestamp: new Date(h.createdAt).getTime()
-    }));
-  }, [history, selectedStudent, startDate, endDate]);
+    return filtered.map(h => {
+      let acuracia = Math.round(h.result.summary.acuracia_geral * 100);
+      let acuraciaPonderada = Math.round(h.result.summary.acuracia_ponderada * 100);
+
+      if (selectedCompetency !== 'all') {
+        const comp = h.result.diagnostico_por_competencia.find((c: any) => c.competencia === selectedCompetency);
+        if (comp) {
+          acuracia = Math.round(comp.acuracia * 100);
+          acuraciaPonderada = Math.round(comp.acuracia_ponderada * 100);
+        } else {
+          return null; // Skip if student didn't have this competency in this diagnostic
+        }
+      }
+
+      const dateObj = getDate(h.createdAt);
+
+      return {
+        date: dateObj.toLocaleDateString('pt-BR'),
+        aluno: h.aluno,
+        acuracia,
+        acuraciaPonderada,
+        timestamp: dateObj.getTime()
+      };
+    }).filter(Boolean) as any[];
+  }, [history, selectedStudent, startDate, endDate, selectedCompetency]);
 
   const groupedData = useMemo(() => {
     if (selectedStudent !== 'all') return { [selectedStudent]: chartData };
@@ -923,16 +934,23 @@ function ReportsView({ history }: { history: any[] }) {
 
   const downloadCSV = () => {
     if (chartData.length === 0) return;
-    const csvContent = [
-      ['Data', 'Aluno', 'Média Geral (%)', 'Média Ponderada (%)'],
-      ...chartData.map(d => [d.date, d.aluno, d.acuracia, d.acuraciaPonderada])
-    ].map(e => e.join(",")).join("\n");
+    const isGeral = selectedCompetency === 'all';
+    const headers = ['Data', 'Aluno', isGeral ? 'Média Geral (%)' : `Acurácia - ${selectedCompetency} (%)`, isGeral ? 'Média Ponderada (%)' : `Acurácia Ponderada - ${selectedCompetency} (%)`, 'Competência'];
+    const rows = chartData.map(d => [
+      d.date, 
+      `"${d.aluno}"`, 
+      d.acuracia, 
+      d.acuraciaPonderada, 
+      `"${isGeral ? 'Geral' : selectedCompetency}"`
+    ]);
+    
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `relatorio_desempenho_${selectedStudent}.csv`);
+    link.setAttribute("download", `relatorio_desempenho_${selectedStudent === 'all' ? 'geral' : selectedStudent}_${isGeral ? 'geral' : selectedCompetency}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -954,9 +972,22 @@ function ReportsView({ history }: { history: any[] }) {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = position - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
       pdf.save(`relatorio_desempenho_${selectedStudent || 'geral'}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -997,7 +1028,9 @@ function ReportsView({ history }: { history: any[] }) {
 
       {/* Summary Table for All Students */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Desempenho Geral dos Alunos</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">
+          Desempenho dos Alunos {selectedCompetency !== 'all' ? `- ${selectedCompetency}` : '(Geral)'}
+        </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50">
@@ -1109,7 +1142,7 @@ function ReportsView({ history }: { history: any[] }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filtrar por Aluno</label>
             <select
@@ -1120,6 +1153,19 @@ function ReportsView({ history }: { history: any[] }) {
               <option value="all">Todos os Alunos</option>
               {students.map(s => (
                 <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filtrar por Competência</label>
+            <select
+              value={selectedCompetency}
+              onChange={(e) => setSelectedCompetency(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            >
+              <option value="all">Geral (Todas)</option>
+              {competencies.map(c => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
@@ -1146,9 +1192,9 @@ function ReportsView({ history }: { history: any[] }) {
 
       {/* Chart */}
       <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-6">Evolução da Média (%)</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-6">Evolução da Média (%) {selectedCompetency !== 'all' && `- ${selectedCompetency}`}</h3>
         {chartData.length > 0 ? (
-          <div className="h-[400px]">
+          <div className="space-y-8">
             {Object.entries(groupedData).map(([student, data]) => (
               <div key={student} className="mb-8">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">{student}</h4>
@@ -1180,20 +1226,22 @@ function ReportsView({ history }: { history: any[] }) {
                       <Line 
                         type="monotone" 
                         dataKey="acuracia" 
-                        name="Média Geral"
+                        name={selectedCompetency === 'all' ? "Média Geral" : `Acurácia - ${selectedCompetency}`}
                         stroke="#10b981" 
                         strokeWidth={3}
                         dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
                         activeDot={{ r: 6, strokeWidth: 0 }}
+                        isAnimationActive={false}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="acuraciaPonderada" 
-                        name="Média Ponderada"
+                        name={selectedCompetency === 'all' ? "Média Ponderada" : `Acurácia Ponderada - ${selectedCompetency}`}
                         stroke="#3b82f6" 
                         strokeWidth={3}
                         dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
                         activeDot={{ r: 6, strokeWidth: 0 }}
+                        isAnimationActive={false}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -1216,8 +1264,8 @@ function ReportsView({ history }: { history: any[] }) {
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Data</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Aluno</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Média Geral</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Média Ponderada</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">{selectedCompetency === 'all' ? 'Média Geral' : `Acurácia - ${selectedCompetency}`}</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">{selectedCompetency === 'all' ? 'Média Ponderada' : `Acurácia Ponderada - ${selectedCompetency}`}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -1484,7 +1532,7 @@ function TasksView({ user }: { user: User | null }) {
                     {task.title}
                   </p>
                   <p className="text-[10px] text-gray-400">
-                    Criado em {new Date(task.createdAt).toLocaleDateString()}
+                    Criado em {task.createdAt?.seconds ? new Date(task.createdAt.seconds * 1000).toLocaleDateString() : new Date(task.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               )}
@@ -1853,7 +1901,7 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
                   <div>
                     <h4 className="font-bold text-gray-900">Diagnóstico de {diag.aluno}</h4>
                     <p className="text-xs text-gray-500">
-                      {new Date(diag.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      {diag.createdAt?.seconds ? new Date(diag.createdAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date(diag.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                     </p>
                   </div>
                 </div>
@@ -2743,6 +2791,10 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [typeFilter, setTypeFilter] = useState<'all' | 'simulado' | 'exercicio'>(defaultType);
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'published'>('all');
+  const [competencyFilter, setCompetencyFilter] = useState('');
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [isFetchingDisciplines, setIsFetchingDisciplines] = useState(false);
+  const [showDisciplineDropdown, setShowDisciplineDropdown] = useState(false);
   const [currentExam, setCurrentExam] = useState<Partial<Exam>>({
     title: '',
     description: '',
@@ -2773,9 +2825,33 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
     return () => unsubscribe();
   }, [user]);
 
+  const handleCompetencyFocus = async () => {
+    if (disciplines.length > 0) {
+      setShowDisciplineDropdown(true);
+      return;
+    }
+    setIsFetchingDisciplines(true);
+    setShowDisciplineDropdown(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'disciplines'), orderBy('name', 'asc')));
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Discipline));
+      setDisciplines(data);
+    } catch (error) {
+      console.error("Error fetching disciplines:", error);
+    } finally {
+      setIsFetchingDisciplines(false);
+    }
+  };
+
   const filteredExams = exams.filter(exam => {
     if (typeFilter !== 'all' && exam.type !== typeFilter) return false;
     if (statusFilter !== 'all' && exam.status !== statusFilter) return false;
+    if (competencyFilter) {
+      const hasCompetency = exam.questions?.some(q => 
+        q.competency?.toLowerCase().includes(competencyFilter.toLowerCase())
+      );
+      if (!hasCompetency) return false;
+    }
     return true;
   });
 
@@ -3173,6 +3249,44 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
             <option value="published">Publicados</option>
             <option value="draft">Rascunhos</option>
           </select>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Filtrar por competência..."
+              value={competencyFilter}
+              onChange={(e) => setCompetencyFilter(e.target.value)}
+              onFocus={handleCompetencyFocus}
+              onBlur={() => setTimeout(() => setShowDisciplineDropdown(false), 200)}
+              className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-gray-700 w-full md:w-64"
+            />
+            {isFetchingDisciplines && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 className="animate-spin text-emerald-600" size={16} />
+              </div>
+            )}
+            {showDisciplineDropdown && disciplines.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                {disciplines
+                  .filter(d => d.name.toLowerCase().includes(competencyFilter.toLowerCase()))
+                  .map(d => (
+                  <button
+                    key={d.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setCompetencyFilter(d.name);
+                      setShowDisciplineDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
+                  >
+                    {d.name}
+                  </button>
+                ))}
+                {disciplines.filter(d => d.name.toLowerCase().includes(competencyFilter.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-2 text-sm text-gray-500">Nenhuma competência encontrada</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -5309,7 +5423,7 @@ function AdminUsersView({ user }: { user: User | null }) {
                         </span>
                       </td>
                       <td className="py-3 text-gray-500">
-                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-'}
+                        {u.createdAt ? ((u.createdAt as any).seconds ? new Date((u.createdAt as any).seconds * 1000).toLocaleDateString('pt-BR') : new Date(u.createdAt as any).toLocaleDateString('pt-BR')) : '-'}
                       </td>
                       <td className="py-3">
                         {u.role === 'aluno' && (
@@ -5514,7 +5628,7 @@ function ChatView({ user, diagnostic }: { user: User | null, diagnostic: Diagnos
                 msg.role === 'user' ? "justify-end text-emerald-100" : "justify-start text-gray-400"
               )}>
                 {msg.role === 'model' && <div className="w-1 h-1 bg-emerald-400 rounded-full" />}
-                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
           </div>
@@ -5857,6 +5971,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
   const [notaValue, setNotaValue] = useState<string | number>('');
   const [privateNoteValue, setPrivateNoteValue] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [loadingSuggestions, setLoadingSuggestions] = useState<Record<string, boolean>>({});
   const reportRef = useRef<HTMLDivElement>(null);
@@ -5931,8 +6046,8 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
       pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
       heightLeft -= pageHeight;
 
-      while (heightLeft >= 0) {
-        position = heightLeft - pdfHeight;
+      while (heightLeft > 0) {
+        position = position - pageHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
         heightLeft -= pageHeight;
@@ -5945,6 +6060,84 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
       toast.error('Erro ao gerar o PDF do relatório.');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleGenerateRecoveryPlan = async () => {
+    if (!result) return;
+    setGeneratingPlan(true);
+    try {
+      // 1. Find student ID from exam_submissions
+      const submissionsQuery = query(
+        collection(db, 'exam_submissions'),
+        where('studentName', '==', result.aluno)
+      );
+      const submissionsSnapshot = await getDocs(submissionsQuery);
+      
+      let studentId = '';
+      if (!submissionsSnapshot.empty) {
+        studentId = submissionsSnapshot.docs[0].data().studentId;
+      } else {
+        // Fallback: try to find in users by name
+        const usersQuery = query(
+          collection(db, 'users'),
+          where('displayName', '==', result.aluno)
+        );
+        const usersSnapshot = await getDocs(usersQuery);
+        if (!usersSnapshot.empty) {
+          studentId = usersSnapshot.docs[0].id;
+        }
+      }
+
+      if (!studentId) {
+        toast.error("Não foi possível identificar o ID do aluno para buscar erros cognitivos.");
+        setGeneratingPlan(false);
+        return;
+      }
+
+      // 2. Fetch cognitive analyses
+      const analysesQuery = query(
+        collection(db, 'cognitive_error_analyses'),
+        where('userId', '==', studentId)
+      );
+      const analysesSnapshot = await getDocs(analysesQuery);
+      
+      if (analysesSnapshot.empty) {
+        toast.warning("Nenhuma análise de erro cognitivo encontrada para este aluno. Gere a análise primeiro.");
+        setGeneratingPlan(false);
+        return;
+      }
+
+      const studentAnalyses = analysesSnapshot.docs.map(doc => doc.data());
+      const aggregatedErrors = studentAnalyses.reduce((acc: any[], curr: any) => {
+        return acc.concat(curr.errors || []);
+      }, []);
+
+      const studentData = {
+        studentId,
+        studentName: result.aluno,
+        totalErrors: aggregatedErrors.length,
+        errors: aggregatedErrors
+      };
+
+      // 3. Generate Plan
+      const plan = await generateRecoveryPlan(studentData);
+      
+      // 4. Save to Firestore
+      await addDoc(collection(db, 'recovery_plans'), {
+        userId: studentId,
+        studentName: result.aluno,
+        ...plan,
+        diagnosticId: diagnosticId,
+        createdAt: serverTimestamp()
+      });
+
+      toast.success("Plano de recuperação gerado e salvo com sucesso!");
+    } catch (error) {
+      console.error("Error generating recovery plan:", error);
+      toast.error("Erro ao gerar plano de recuperação.");
+    } finally {
+      setGeneratingPlan(false);
     }
   };
 
@@ -5974,6 +6167,11 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
     }
     return comps;
   }, [result, filter, sortOrder]);
+
+  const nextStepComp = useMemo(() => {
+    if (!result) return null;
+    return [...result.diagnostico_por_competencia].sort((a, b) => a.acuracia_ponderada - b.acuracia_ponderada)[0];
+  }, [result]);
 
   const handleSaveEdit = async (competenciaName: string, type: 'recommendation' | 'privateNote' | 'professorFeedback' | 'questionFeedback' | 'professorNota' | 'questionNota' | 'fullFeedback' | 'fullQuestionFeedback' | 'questionPrivateNote' | 'studentMessage', value?: string | number, questionId?: string | number, nota?: string | number) => {
     if (!result) return;
@@ -6077,14 +6275,25 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
           Voltar ao Dashboard
         </button>
 
-        <button
-          onClick={exportToPDF}
-          disabled={isExporting}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold hover:bg-gray-50 transition-all disabled:opacity-50 shadow-sm"
-        >
-          {isExporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-          Exportar Relatório PDF
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleGenerateRecoveryPlan}
+            disabled={generatingPlan}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
+          >
+            {generatingPlan ? <Loader2 className="animate-spin" size={14} /> : <Brain size={14} />}
+            Gerar Plano de Recuperação
+          </button>
+
+          <button
+            onClick={exportToPDF}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold hover:bg-gray-50 transition-all disabled:opacity-50 shadow-sm"
+          >
+            {isExporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+            Exportar Relatório PDF
+          </button>
+        </div>
       </div>
 
       <div ref={reportRef} className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
@@ -6159,6 +6368,140 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
         </div>
 
         <div className="space-y-8">
+            {/* Error Category Summary */}
+            {result.diagnostico_por_competencia.some(c => c.questoes?.some(q => !q.acertou && q.analise_erro)) && (
+              <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-6">
+                  <Brain size={20} className="text-amber-600" />
+                  <h3 className="text-xl font-bold text-gray-900">Perfil de Dificuldades Cognitivas</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {['Interpretação', 'Conceito', 'Atenção', 'Lógica'].map(cat => {
+                    const count = result.diagnostico_por_competencia.reduce((acc, c) => 
+                      acc + (c.questoes?.filter(q => !q.acertou && q.analise_erro?.categoria === cat).length || 0), 0
+                    );
+                    if (count === 0) return null;
+                    return (
+                      <div key={cat} className={cn(
+                        "p-4 rounded-xl border flex flex-col items-center justify-center text-center transition-all",
+                        cat === 'Interpretação' ? "bg-blue-50 border-blue-100" :
+                        cat === 'Conceito' ? "bg-emerald-50 border-emerald-100" :
+                        cat === 'Atenção' ? "bg-amber-50 border-amber-100" :
+                        "bg-red-50 border-red-100"
+                      )}>
+                        <p className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest mb-1",
+                          cat === 'Interpretação' ? "text-blue-600" :
+                          cat === 'Conceito' ? "text-emerald-600" :
+                          cat === 'Atenção' ? "text-amber-600" :
+                          "text-red-600"
+                        )}>{cat}</p>
+                        <p className={cn(
+                          "text-3xl font-black",
+                          cat === 'Interpretação' ? "text-blue-900" :
+                          cat === 'Conceito' ? "text-emerald-900" :
+                          cat === 'Atenção' ? "text-amber-900" :
+                          "text-red-900"
+                        )}>{count}</p>
+                        <p className="text-[10px] text-gray-500 font-medium mt-1">Ocorrências</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Next Steps Section */}
+            <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl border border-emerald-500 shadow-lg text-white">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Sparkles size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Seus Próximos Passos</h3>
+                  <p className="text-emerald-100 text-xs">Roteiro personalizado para sua evolução</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Priority 1: Critical Competencies */}
+                {result.diagnostico_por_competencia.filter(c => c.nivel === 'Crítico').length > 0 ? (
+                  <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-50">Prioridade Máxima</p>
+                    </div>
+                    <p className="text-sm font-medium mb-2">Focar nas competências críticas:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {result.diagnostico_por_competencia.filter(c => c.nivel === 'Crítico').map((c, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-red-500/30 text-[10px] font-bold rounded-md border border-red-400/30">
+                          {c.competencia}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-50">Excelente Trabalho</p>
+                    </div>
+                    <p className="text-sm font-medium">Você não possui competências em nível crítico! Continue assim.</p>
+                  </div>
+                )}
+
+                {/* Priority 2: Study Plan */}
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calendar size={14} className="text-emerald-200" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-50">Plano de 7 Dias</p>
+                  </div>
+                  <p className="text-sm font-medium mb-2">Siga o cronograma gerado para reforçar seus pontos fracos.</p>
+                  <button 
+                    onClick={() => {
+                      const el = document.getElementById('recovery-plan');
+                      el?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-[10px] font-bold bg-white text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                  >
+                    Ver Cronograma
+                  </button>
+                </div>
+
+                {/* Priority 3: Cognitive Focus */}
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Brain size={14} className="text-emerald-200" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-50">Foco Cognitivo</p>
+                  </div>
+                  {(() => {
+                    const errors = result.diagnostico_por_competencia.flatMap(c => c.questoes?.filter(q => !q.acertou && q.analise_erro) || []);
+                    const categories = errors.map(e => e.analise_erro?.categoria);
+                    const mostCommon = categories.reduce((acc, cat) => {
+                      if (!cat) return acc;
+                      acc[cat] = (acc[cat] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>);
+                    const topCat = Object.entries(mostCommon).sort((a, b) => b[1] - a[1])[0];
+                    
+                    if (!topCat) return <p className="text-sm font-medium">Analise seus acertos para manter o padrão!</p>;
+                    
+                    return (
+                      <>
+                        <p className="text-sm font-medium mb-2">Atenção redobrada em: <span className="font-bold underline">{topCat[0]}</span></p>
+                        <p className="text-[10px] text-emerald-100 leading-relaxed">
+                          {topCat[0] === 'Interpretação' ? "Leia os enunciados duas vezes e destaque as palavras-chave." :
+                           topCat[0] === 'Conceito' ? "Revise a teoria base antes de partir para os exercícios." :
+                           topCat[0] === 'Atenção' ? "Faça uma revisão final antes de entregar suas respostas." :
+                           "Trabalhe o passo a passo do seu raciocínio lógico."}
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
             {/* Overall Evolution History */}
             {studentHistory.length > 1 && (
               <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
@@ -6239,6 +6582,30 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                 <h3 className="text-xl font-bold text-gray-900">Análise por Competência</h3>
               </div>
               
+              {/* Cognitive Error Legend */}
+              <div className="flex flex-wrap gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tighter">Interpretação:</span>
+                  <span className="text-[9px] text-gray-400">Compreensão do enunciado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tighter">Conceito:</span>
+                  <span className="text-[9px] text-gray-400">Domínio teórico</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tighter">Atenção:</span>
+                  <span className="text-[9px] text-gray-400">Foco e detalhes</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-tighter">Lógica:</span>
+                  <span className="text-[9px] text-gray-400">Raciocínio e processos</span>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
@@ -6366,6 +6733,39 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                               AÇÃO REQUERIDA
                             </motion.div>
                           )}
+                          {nextStepComp?.competencia === comp.competencia && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-full text-[10px] font-bold shadow-sm">
+                              <Zap size={12} />
+                              PRÓXIMO PASSO
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                          <span className={cn(
+                            comp.nivel === 'Forte' ? "text-emerald-600" :
+                            comp.nivel === 'Atenção' ? "text-amber-600" :
+                            "text-red-600"
+                          )}>Domínio da Competência</span>
+                          <span className="text-gray-500">{Math.round(comp.acuracia_ponderada * 100)}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 shadow-inner">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${comp.acuracia_ponderada * 100}%` }}
+                            transition={{ duration: 1.2, ease: "easeOut" }}
+                            className={cn(
+                              "h-full rounded-full relative",
+                              comp.nivel === 'Forte' ? "bg-gradient-to-r from-emerald-400 to-emerald-500" :
+                              comp.nivel === 'Atenção' ? "bg-gradient-to-r from-amber-400 to-amber-500" :
+                              "bg-gradient-to-r from-red-400 to-red-500"
+                            )}
+                          >
+                            <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                          </motion.div>
                         </div>
                       </div>
 
@@ -6607,7 +7007,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                                         stroke: '#fff',
                                         className: "drop-shadow-sm transition-all duration-300"
                                       }}
-                                      animationDuration={1500}
+                                      isAnimationActive={false}
                                     />
                                   </LineChart>
                                 </ResponsiveContainer>
@@ -6887,6 +7287,40 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                                               <p className="text-emerald-700 font-bold">{q.gabarito}</p>
                                             </div>
                                           </div>
+
+                                          {/* Cognitive Error Analysis Section */}
+                                          {!q.acertou && q.analise_erro && (
+                                            <div className="mt-4 p-4 bg-amber-50/50 rounded-xl border border-amber-100/50 space-y-3">
+                                              <div className="flex items-center gap-2">
+                                                <Brain size={14} className="text-amber-600" />
+                                                <p className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Análise Cognitiva do Erro</p>
+                                              </div>
+                                              <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                  <span className={cn(
+                                                    "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
+                                                    q.analise_erro.categoria === 'Interpretação' ? 'bg-blue-100 text-blue-700' :
+                                                    q.analise_erro.categoria === 'Conceito' ? 'bg-emerald-100 text-emerald-700' :
+                                                    q.analise_erro.categoria === 'Atenção' ? 'bg-amber-100 text-amber-700' :
+                                                    'bg-red-100 text-red-700'
+                                                  )}>
+                                                    {q.analise_erro.categoria}
+                                                  </span>
+                                                </div>
+                                                <p className="text-xs text-gray-700 leading-relaxed">
+                                                  <span className="font-bold">Diagnóstico:</span> {q.analise_erro.explicacao_detalhada}
+                                                </p>
+                                                <div className="p-3 bg-white/50 rounded-lg border border-amber-200/50">
+                                                  <p className="text-[9px] font-bold text-amber-800 uppercase mb-1 flex items-center gap-1">
+                                                    <Sparkles size={10} /> Sugestão de Intervenção (Professor)
+                                                  </p>
+                                                  <p className="text-xs text-amber-900 italic">
+                                                    {q.analise_erro.sugestao_intervencao}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
 
                                           {/* Integrated Feedback Section for Incorrect Questions */}
                                           {!q.acertou && (
@@ -7374,6 +7808,53 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
             )}
           </div>
         </div>
+
+        {/* Recovery Plan Section */}
+        {result.plano_de_estudos_7_dias && result.plano_de_estudos_7_dias.length > 0 && (
+          <div id="recovery-plan" className="mt-12 p-8 bg-white rounded-3xl border border-gray-100 shadow-sm scroll-mt-24">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <Calendar size={24} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">Seu Plano de Estudos de 7 Dias</h3>
+                  <p className="text-sm text-gray-500">Cronograma intensivo para superar suas dificuldades</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => navigate('/plan')}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all"
+              >
+                Ver em Tela Cheia
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {result.plano_de_estudos_7_dias.map((dia) => (
+                <div key={dia.dia} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 hover:border-emerald-200 transition-all group">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md">Dia {dia.dia}</span>
+                    <CheckCircle2 size={16} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-3 line-clamp-1">{dia.tema}</h4>
+                  <ul className="space-y-2 mb-4">
+                    {dia.atividades.slice(0, 2).map((atv, idx) => (
+                      <li key={idx} className="text-[10px] text-gray-600 flex gap-2">
+                        <div className="w-1 h-1 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                        <span className="line-clamp-1">{atv}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="pt-3 border-t border-gray-200/50">
+                    <p className="text-[9px] text-gray-400 italic line-clamp-2">"{dia.criterio_sucesso}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Hidden Full Report for PDF Export */}
@@ -7430,7 +7911,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={40} />
-                    <Area type="monotone" dataKey="acuracia" stroke="#10b981" strokeWidth={4} fill="#10b981" fillOpacity={0.1} />
+                    <Area type="monotone" dataKey="acuracia" stroke="#10b981" strokeWidth={4} fill="#10b981" fillOpacity={0.1} isAnimationActive={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -7668,9 +8149,22 @@ function AppContent() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = position - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
       pdf.save(`Plano_Estudos_${result.aluno.replace(/\s+/g, '_')}.pdf`);
       toast.success('PDF exportado com sucesso!');
     } catch (err) {
@@ -8197,26 +8691,35 @@ function AppContent() {
   const evolutionData = useMemo(() => {
     if (!result || !history.length) return [];
     
+    const getDate = (createdAt: any) => {
+      if (!createdAt) return new Date(0);
+      if (createdAt.seconds) return new Date(createdAt.seconds * 1000);
+      return new Date(createdAt);
+    };
+
     let filteredHistory = history.filter(h => h.aluno === result.aluno);
     
     const now = new Date();
     if (evolutionFilter === '7d') {
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filteredHistory = filteredHistory.filter(h => new Date(h.createdAt) >= sevenDaysAgo);
+      filteredHistory = filteredHistory.filter(h => getDate(h.createdAt) >= sevenDaysAgo);
     } else if (evolutionFilter === '30d') {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      filteredHistory = filteredHistory.filter(h => new Date(h.createdAt) >= thirtyDaysAgo);
+      filteredHistory = filteredHistory.filter(h => getDate(h.createdAt) >= thirtyDaysAgo);
     }
 
     const sorted = [...filteredHistory].sort((a, b) => 
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      getDate(a.createdAt).getTime() - getDate(b.createdAt).getTime()
     );
 
-    return sorted.map(h => ({
-      date: new Date(h.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      fullDate: new Date(h.createdAt).toLocaleString('pt-BR'),
-      acuracia: Math.round(h.result.summary.acuracia_geral * 100)
-    }));
+    return sorted.map(h => {
+      const dateObj = getDate(h.createdAt);
+      return {
+        date: dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        fullDate: dateObj.toLocaleString('pt-BR'),
+        acuracia: Math.round(h.result.summary.acuracia_geral * 100)
+      };
+    });
   }, [result, history, evolutionFilter]);
 
   const exportToCSV = () => {
@@ -9201,7 +9704,7 @@ function AppContent() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="max-w-4xl mx-auto space-y-8"
                   >
-                    <div ref={planRef} className="space-y-8 p-4 bg-gray-50 rounded-2xl">
+                    <div id="recovery-plan" ref={planRef} className="space-y-8 p-4 bg-gray-50 rounded-2xl">
                       <div className="text-center space-y-2">
                         <h2 className="text-3xl font-bold">Plano de Estudos - 7 Dias</h2>
                         <p className="text-gray-500">Cronograma intensivo baseado nas competências em nível crítico.</p>

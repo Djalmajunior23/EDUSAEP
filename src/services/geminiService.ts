@@ -2,6 +2,22 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
+/**
+ * Utilitário para limpar e parsear JSON retornado pela IA.
+ * Remove blocos de código markdown se presentes.
+ */
+function safeParseJson(text: string | undefined, fallback: any = {}): any {
+  if (!text) return fallback;
+  try {
+    // Remove ```json ... ``` ou ``` ... ```
+    const cleanJson = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanJson);
+  } catch (error) {
+    console.error("[Gemini] Erro ao parsear JSON:", error, "Texto original:", text);
+    return fallback;
+  }
+}
+
 export interface DiagnosticResult {
   aluno: string;
   summary: {
@@ -30,6 +46,11 @@ export interface DiagnosticResult {
       resposta_aluno: any;
       gabarito: any;
       acertou: boolean;
+      analise_erro?: {
+        categoria: 'Interpretação' | 'Conceito' | 'Atenção' | 'Lógica';
+        explicacao_detalhada: string;
+        sugestao_intervencao: string;
+      };
       professor_feedback?: string;
       professor_nota?: number | string;
       private_notes?: string;
@@ -92,13 +113,18 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
       "distribuicao_bloom": { "Fácil": number, "Médio": number, "Difícil": number },
       "conhecimentos_fracos": string[],
       "recomendacoes": string,
-      "questoes": [
+          "questoes": [
         {
           "id": string | number,
           "enunciado": string,
           "resposta_aluno": any,
           "gabarito": any,
-          "acertou": boolean
+          "acertou": boolean,
+          "analise_erro": {
+            "categoria": "Interpretação" | "Conceito" | "Atenção" | "Lógica",
+            "explicacao_detalhada": "Análise pedagógica profunda e detalhada do processo cognitivo que levou ao erro (mínimo 2 frases, apenas se acertou for false)",
+            "sugestao_intervencao": "Sugestão prática, clara e acionável para o professor intervir pedagogicamente (mínimo 2 frases, apenas se acertou for false)"
+          }
         }
       ]
     }
@@ -124,7 +150,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
     }
   });
 
-  const parsed = JSON.parse(response.text || "[]");
+  const parsed = safeParseJson(response.text, []);
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
@@ -148,7 +174,7 @@ export async function generateSuggestions(conhecimentos: string[], recomendacoes
     }
   });
 
-  return JSON.parse(response.text || "[]");
+  return safeParseJson(response.text, []);
 }
 
 export interface PedagogicalAnalysis {
@@ -196,7 +222,7 @@ RETORNE O RELATÓRIO NO FORMATO JSON SEGUINDO O ESQUEMA DEFINIDO.`
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface LearningProfileResult {
@@ -235,7 +261,7 @@ export async function classifyLearningProfile(behavioralData: any, modelName: st
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface CognitiveErrorResult {
@@ -243,7 +269,9 @@ export interface CognitiveErrorResult {
     questionId: string;
     category: "Interpretação" | "Conceito" | "Atenção" | "Lógica";
     explanation: string;
+    explicacao_detalhada: string;
     suggested_fix: string;
+    sugestao_intervencao: string;
   }>;
 }
 
@@ -257,6 +285,10 @@ export async function analyzeCognitiveErrors(submissionData: any, modelName: str
           {
             text: `Analise os erros cometidos pelo aluno nesta submissão e classifique-os por categoria cognitiva (Interpretação, Conceito, Atenção, Lógica).
             
+            Para cada erro identificado:
+            1. Forneça uma explicação pedagógica profunda e detalhada sobre a falha cognitiva específica que levou ao erro. Não apenas descreva o erro, mas analise o processo de pensamento do aluno.
+            2. Forneça uma sugestão de intervenção prática, clara e acionável para o professor. A sugestão deve incluir atividades, perguntas de sondagem ou materiais de apoio específicos para superar essa dificuldade.
+            
             DADOS DA SUBMISSÃO:
             ${JSON.stringify(submissionData)}
             
@@ -266,8 +298,10 @@ export async function analyzeCognitiveErrors(submissionData: any, modelName: str
                 {
                   "questionId": string,
                   "category": "Interpretação" | "Conceito" | "Atenção" | "Lógica",
-                  "explanation": string,
-                  "suggested_fix": string
+                  "explanation": "Resumo curto do erro",
+                  "explicacao_detalhada": "Análise pedagógica profunda do processo cognitivo (mínimo 2 frases)",
+                  "suggested_fix": "Como o aluno pode corrigir (curto)",
+                  "sugestao_intervencao": "Plano de ação detalhado para o professor (mínimo 2 frases)"
                 }
               ]
             }`
@@ -280,7 +314,7 @@ export async function analyzeCognitiveErrors(submissionData: any, modelName: str
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface RecoveryPlanResult {
@@ -331,7 +365,7 @@ export async function generateRecoveryPlan(studentData: any, modelName: string =
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface LessonPlanResult {
@@ -384,7 +418,7 @@ export async function generateLessonPlan(classData: any, modelName: string = "ge
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface PerformancePredictionResult {
@@ -457,7 +491,7 @@ export async function suggestCompetencies(questions: any[], modelName: string = 
     }
   });
 
-  return JSON.parse(response.text || "[]");
+  return safeParseJson(response.text, []);
 }
 
 export interface GuessDetectionResult {
@@ -495,7 +529,7 @@ export async function detectGuessing(responseTime: number, difficulty: string, i
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface SAEPQuestion {
@@ -546,7 +580,7 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface BloomAnalysisResult {
@@ -582,7 +616,7 @@ export async function analyzeBloomTaxonomy(questions: any[], modelName: string =
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface OpenQuestionGrade {
@@ -623,7 +657,7 @@ export async function gradeOpenQuestion(question: string, answer: string, rubric
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export interface SIPAResult {
@@ -671,7 +705,7 @@ export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Pro
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
 export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview"): Promise<SAEPQuestion> {
@@ -712,5 +746,5 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
