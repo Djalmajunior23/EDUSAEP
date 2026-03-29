@@ -88,8 +88,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { triggerN8NAlert } from './services/n8nService';
 import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies } from './services/geminiService';
+import { triggerN8NAlert } from './services/n8nService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -3771,11 +3771,15 @@ function StudyPlanView({ user }: { user: User | null }) {
       };
 
       await addDoc(collection(db, 'study_plans'), newPlan);
+      
+      // Disparar n8n para gerar recomendações de conteúdo externo
       await triggerN8NAlert('RecomendacaoPedagogica', {
         userId: user.uid,
+        competency: weaknesses.join(', '),
         weaknesses,
         priorityTopics: newPlan.priorityTopics
       });
+
       toast.success("Plano de estudos adaptativo gerado com sucesso!");
     } catch (err) {
       console.error(err);

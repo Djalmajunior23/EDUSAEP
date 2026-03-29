@@ -195,7 +195,8 @@ service cloud.firestore {
     }
 
     match /content_recommendations/{recId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isOwner(resource.data.studentId);
+      allow write: if isAdmin();
     }
 
     match /smart_goals/{goalId} {
@@ -211,7 +212,8 @@ service cloud.firestore {
     }
 
     match /smart_alerts/{alertId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isOwner(resource.data.userId);
+      allow write: if isAdmin();
     }
 
     match /users/{userId} {
