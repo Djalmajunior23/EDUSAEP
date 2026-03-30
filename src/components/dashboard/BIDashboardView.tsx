@@ -7,6 +7,7 @@ import { DashboardFilters } from './DashboardFilters';
 import { PainelInsightsIA } from './PainelInsightsIA';
 import { PainelRecomendacoes } from './PainelRecomendacoes';
 import { ClassRanking } from './ClassRanking';
+import { AggregatedBIView } from './AggregatedBIView';
 import { Discipline } from '../../types';
 import { getDashboardData } from '../../services/dashboardService';
 
@@ -47,6 +48,7 @@ export function BIDashboardView() {
         <>
           <DashboardKPIs data={data.kpi} />
           <DashboardCharts data={data.charts} />
+          <AggregatedBIView data={data.charts.performancePorDisciplina} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <PainelInsightsIA />
             <PainelRecomendacoes />

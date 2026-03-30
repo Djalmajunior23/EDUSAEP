@@ -33,7 +33,10 @@ export async function mapExternalDiscipline(
       }
     ],
     config: {
-      responseMimeType: "application/json"
+      responseMimeType: "application/json",
+      temperature: 1.0,
+      topK: 64,
+      topP: 0.95,
     }
   });
 

@@ -2,6 +2,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
+export const DEFAULT_CONFIG = {
+  temperature: 1.2,
+  topK: 50,
+  topP: 0.9,
+};
+
 /**
  * Utilitário para limpar e parsear JSON retornado pela IA.
  * Remove blocos de código markdown se presentes.
@@ -147,6 +153,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -171,6 +178,7 @@ export async function generateSuggestions(conhecimentos: string[], recomendacoes
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -207,6 +215,7 @@ RETORNE O RELATÓRIO NO FORMATO JSON SEGUINDO O ESQUEMA DEFINIDO.`
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -258,6 +267,7 @@ export async function classifyLearningProfile(behavioralData: any, modelName: st
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -311,6 +321,7 @@ export async function analyzeCognitiveErrors(submissionData: any, modelName: str
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -362,6 +373,7 @@ export async function generateRecoveryPlan(studentData: any, modelName: string =
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -415,6 +427,7 @@ export async function generateLessonPlan(classData: any, modelName: string = "ge
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -454,6 +467,7 @@ export async function predictPerformance(historicalData: any, modelName: string 
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -482,6 +496,7 @@ export async function suggestCompetencies(questions: any[], modelName: string = 
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
       responseSchema: {
         type: Type.ARRAY,
         items: {
@@ -526,6 +541,7 @@ export async function detectGuessing(responseTime: number, difficulty: string, i
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -577,6 +593,7 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -613,6 +630,7 @@ export async function analyzeBloomTaxonomy(questions: any[], modelName: string =
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -654,6 +672,7 @@ export async function gradeOpenQuestion(question: string, answer: string, rubric
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -702,6 +721,7 @@ export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Pro
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 
@@ -743,6 +763,7 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
     ],
     config: {
       responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
     }
   });
 

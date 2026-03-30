@@ -2,6 +2,41 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend } from 'recharts';
 
+const CustomDot = (props: any) => {
+  const { cx, cy, payload } = props;
+
+  if (payload.isMaxVariation) {
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={8} fill="#ef4444" fillOpacity={0.3} />
+        <circle cx={cx} cy={cy} r={4} fill="#ef4444" stroke="#fff" strokeWidth={2} />
+      </g>
+    );
+  }
+
+  return (
+    <circle cx={cx} cy={cy} r={4} fill="#10b981" stroke="#fff" strokeWidth={1} />
+  );
+};
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white p-3 border border-gray-200 shadow-lg rounded-xl">
+        <p className="font-bold text-gray-800 mb-1">{label}</p>
+        <p className="text-emerald-600 font-medium">Média: {data.value}%</p>
+        {data.isMaxVariation && (
+          <p className="text-xs text-red-500 font-bold mt-1 bg-red-50 px-2 py-1 rounded-md">
+            Maior Variação
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export function DashboardCharts({ data }: { data: any }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -25,8 +60,8 @@ export function DashboardCharts({ data }: { data: any }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="date" />
             <YAxis domain={[0, 100]} />
-            <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            <Tooltip content={<CustomTooltip />} />
+            <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={<CustomDot />} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

@@ -83,7 +83,12 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
 
       const response = await genAI.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [{ role: 'user', parts: [{ text: initialPrompt }] }]
+        contents: [{ role: 'user', parts: [{ text: initialPrompt }] }],
+        config: {
+          temperature: 1.0,
+          topK: 64,
+          topP: 0.95,
+        }
       });
       const initialMessage = response.text;
 
@@ -136,6 +141,9 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
         contents: chatHistory,
         config: {
           maxOutputTokens: 500,
+          temperature: 1.0,
+          topK: 64,
+          topP: 0.95,
         }
       });
       

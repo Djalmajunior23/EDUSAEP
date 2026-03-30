@@ -1,6 +1,6 @@
 // src/components/admin/DisciplinesManagementView.tsx
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Discipline } from '../../types';
 import { Plus, Pencil, Trash2, X, Check, Search, BookOpen } from 'lucide-react';
@@ -8,14 +8,17 @@ import { toast } from 'sonner';
 
 export function DisciplinesManagementView() {
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [professors, setProfessors] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Discipline | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Discipline>>({});
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     fetchDisciplines();
+    fetchProfessors();
   }, []);
 
   const fetchDisciplines = async () => {
@@ -31,6 +34,19 @@ export function DisciplinesManagementView() {
     }
   };
 
+  const fetchProfessors = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'users'), where('role', '==', 'professor')));
+      const data = snap.docs.map(doc => {
+        const userData = doc.data() as any;
+        return { id: doc.id, name: userData.displayName || userData.email || 'Professor' };
+      });
+      setProfessors(data);
+    } catch (error) {
+      console.error('Error fetching professors:', error);
+    }
+  };
+
   const handleCreate = async () => {
     if (!editForm.name || !editForm.code) {
       toast.error('Preencha os campos obrigatórios.');
@@ -42,6 +58,7 @@ export function DisciplinesManagementView() {
         code: editForm.code,
         description: editForm.description || '',
         area: editForm.area || 'Geral',
+        teacherId: editForm.teacherId || null,
         status: editForm.status || 'active',
         createdAt: serverTimestamp()
       };
@@ -67,6 +84,7 @@ export function DisciplinesManagementView() {
         code: editForm.code,
         description: editForm.description || '',
         area: editForm.area || 'Geral',
+        teacherId: editForm.teacherId || null,
         status: editForm.status
       });
       toast.success('Disciplina atualizada com sucesso!');
@@ -80,7 +98,8 @@ export function DisciplinesManagementView() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta disciplina?')) return;
+    // if (!window.confirm('Tem certeza que deseja excluir esta disciplina?')) return;
+    toast.info('Excluindo disciplina...');
     try {
       await deleteDoc(doc(db, 'disciplines', id));
       toast.success('Disciplina excluída com sucesso!');
@@ -91,10 +110,27 @@ export function DisciplinesManagementView() {
     }
   };
 
-  const filteredDisciplines = disciplines.filter(d => 
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSort = (key: keyof Discipline) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredDisciplines = disciplines
+    .filter(d => 
+      d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.code.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortConfig.key) return 0;
+      const aValue = a[sortConfig.key] || '';
+      const bValue = b[sortConfig.key] || '';
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -131,10 +167,11 @@ export function DisciplinesManagementView() {
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4">Código</th>
-              <th className="px-6 py-4">Nome da Disciplina</th>
-              <th className="px-6 py-4">Área</th>
-              <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('code')}>Código {sortConfig.key === 'code' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Nome da Disciplina {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('area')}>Área {sortConfig.key === 'area' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('teacherId')}>Professor {sortConfig.key === 'teacherId' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
               <th className="px-6 py-4 text-right">Ações</th>
             </tr>
           </thead>
@@ -167,6 +204,16 @@ export function DisciplinesManagementView() {
                     onChange={e => setEditForm({...editForm, area: e.target.value})}
                     className="w-full px-3 py-1.5 border border-gray-300 rounded-lg"
                   />
+                </td>
+                <td className="px-6 py-4">
+                  <select
+                    value={editForm.teacherId || ''}
+                    onChange={e => setEditForm({...editForm, teacherId: e.target.value})}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Selecione um professor</option>
+                    {professors.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
                 </td>
                 <td className="px-6 py-4">
                   <select
@@ -229,6 +276,16 @@ export function DisciplinesManagementView() {
                       </td>
                       <td className="px-6 py-4">
                         <select
+                          value={editForm.teacherId || ''}
+                          onChange={e => setEditForm({...editForm, teacherId: e.target.value})}
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg"
+                        >
+                          <option value="">Selecione um professor</option>
+                          {professors.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
                           value={editForm.status || 'active'}
                           onChange={e => setEditForm({...editForm, status: e.target.value as any})}
                           className="w-full px-3 py-1.5 border border-gray-300 rounded-lg"
@@ -251,6 +308,9 @@ export function DisciplinesManagementView() {
                       <td className="px-6 py-4 font-mono text-xs text-indigo-600 font-bold">{d.code}</td>
                       <td className="px-6 py-4 font-medium text-gray-900">{d.name}</td>
                       <td className="px-6 py-4 text-gray-600">{d.area}</td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {professors.find(p => p.id === d.teacherId)?.name || '-'}
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                           d.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'

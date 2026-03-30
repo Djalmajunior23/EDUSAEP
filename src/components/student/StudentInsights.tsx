@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import html2canvas from 'html2canvas';
 import { 
   Target, 
   Zap, 
@@ -13,6 +14,7 @@ import {
   BookOpen,
   FileText
 } from 'lucide-react';
+import { getClassCompetencyAverages } from '../../services/dashboardService';
 import { 
   Radar, 
   RadarChart, 
@@ -27,7 +29,11 @@ import {
   CartesianGrid,
   Tooltip,
   AreaChart,
-  Area
+  Area,
+  BarChart,
+  Bar,
+  Legend,
+  Cell
 } from 'recharts';
 import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -45,46 +51,61 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
   const [prediction, setPrediction] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [radarData, setRadarData] = useState<any[]>([]);
+  const [classAverages, setClassAverages] = useState<any[]>([]);
+  const [diagnosticData, setDiagnosticData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generatingProfile, setGeneratingProfile] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
+    if (!reportRef.current) return;
+    
     setGeneratingPDF(true);
-    const doc = new jsPDF();
-    const studentName = submissions[0]?.studentName || 'Aluno';
+    toast.info('Preparando seu relatório detalhado...');
     
-    doc.setFontSize(18);
-    doc.text(`Relatório de Desempenho: ${studentName}`, 14, 22);
-    
-    doc.setFontSize(12);
-    doc.text('Histórico de Evolução:', 14, 32);
-    
-    const tableData = submissions.map(sub => [
-      new Date(sub.completedAt).toLocaleDateString('pt-BR'),
-      sub.score,
-      sub.maxScore
-    ]);
-    
-    autoTable(doc, {
-      startY: 35,
-      head: [['Data', 'Nota', 'Nota Máxima']],
-      body: tableData,
-    });
-    
-    doc.text('Análise por Competência:', 14, (doc as any).lastAutoTable.finalY + 10);
-    
-    const competencyData = radarData.map(r => [r.subject, `${r.A.toFixed(2)}%`]);
-    
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 15,
-      head: [['Competência', 'Acurácia']],
-      body: competencyData,
-    });
-    
-    doc.save(`${studentName}_relatorio.pdf`);
-    setGeneratingPDF(false);
-    toast.success("PDF gerado com sucesso!");
+    try {
+      const element = reportRef.current;
+      const studentName = submissions[0]?.studentName || 'Aluno';
+      
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#FFFFFF',
+        ignoreElements: (el) => {
+          return el.tagName === 'BUTTON';
+        }
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = position - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`Relatorio_Desempenho_${studentName.replace(/\s+/g, '_')}.pdf`);
+      toast.success("Relatório exportado com sucesso!");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Erro ao gerar o PDF do relatório.");
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   const handleGenerateProfile = async () => {
@@ -165,10 +186,24 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
       }
     );
 
+    // Fetch diagnostic data
+    const diagnosticUnsubscribe = onSnapshot(
+      query(collection(db, 'diagnostics'), where('studentId', '==', studentId)),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          setDiagnosticData(snapshot.docs[0].data());
+        }
+      }
+    );
+
+    // Fetch class averages
+    getClassCompetencyAverages().then(setClassAverages);
+
     return () => {
       profileUnsubscribe();
       predictionUnsubscribe();
       submissionsUnsubscribe();
+      diagnosticUnsubscribe();
     };
   }, [studentId]);
 
@@ -181,7 +216,7 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div ref={reportRef} className="space-y-8 p-4 bg-white dark:bg-gray-950 rounded-3xl">
       {/* Top Stats & Prediction */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <motion.div 
@@ -428,6 +463,71 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
           </ul>
         </div>
       </div>
+
+      {/* Competency Performance Comparison */}
+      {radarData.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Desempenho por Competência</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {radarData.map((item, i) => {
+              const avg = classAverages.find(a => a.competency === item.subject)?.average || 0;
+              return (
+                <div key={i} className="space-y-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-bold text-gray-700 dark:text-gray-300">{item.subject}</span>
+                    <span className="text-xs text-gray-500">Aluno: {item.A.toFixed(0)}% | Turma: {avg.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-20 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[{ name: 'Aluno', value: item.A }, { name: 'Turma', value: avg }]} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                        <XAxis type="number" domain={[0, 100]} hide />
+                        <YAxis type="category" dataKey="name" hide />
+                        <Tooltip cursor={{ fill: 'transparent' }} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                          <Cell fill={item.A >= avg ? '#10b981' : '#ef4444'} />
+                          <Cell fill="#94a3b8" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Comparison with SIAC */}
+      {diagnosticData && (
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Comparação: Plataforma vs. SIAC</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="text-sm font-bold text-gray-500 mb-4">Plataforma (Simulados)</h4>
+              <div className="space-y-2">
+                {radarData.map((item, i) => (
+                  <div key={i} className="flex justify-between text-xs">
+                    <span>{item.subject}</span>
+                    <span className="font-bold text-emerald-600">{item.A.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-gray-500 mb-4">SIAC (Diagnóstico)</h4>
+              <div className="space-y-2">
+                {/* Assuming diagnosticData has a structure similar to competencyResults */}
+                {Object.entries(diagnosticData.competencyResults || {}).map(([key, val]: any, i) => (
+                  <div key={i} className="flex justify-between text-xs">
+                    <span>{key}</span>
+                    <span className="font-bold text-blue-600">{(val.acuracia * 100).toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

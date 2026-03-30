@@ -22,6 +22,7 @@ export interface Discipline {
   description?: string;
   area: string;
   status: 'active' | 'inactive';
+  teacherId?: string;
 }
 
 export interface Skill {

@@ -2,6 +2,7 @@ import { BIDashboardView } from './components/dashboard/BIDashboardView';
 import { DataImportView } from './components/admin/DataImportView';
 import { ClassesManagementView } from './components/admin/ClassesManagementView';
 import { DisciplinesManagementView } from './components/admin/DisciplinesManagementView';
+import { getClassCompetencyAverages } from './services/dashboardService';
 import React, { useState, useMemo, useEffect, Component, useRef } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -61,6 +62,7 @@ import {
   Info,
   Trophy,
   TrendingUp,
+  TrendingDown,
   Sparkles,
   Mail,
   RotateCcw,
@@ -82,7 +84,8 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend
+  Legend,
+  LabelList
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
@@ -456,10 +459,12 @@ export interface StudyPlan {
   userId: string;
   strengths: string[];
   weaknesses: string[];
+  detailedWeaknesses?: string[];
   priorityTopics: Array<{
     topic: string;
     reason: string;
     priority: 'Alta' | 'Média' | 'Baixa';
+    details?: string;
   }>;
   recommendedExercises: Array<{
     id: string;
@@ -593,7 +598,8 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} diagnósticos selecionados? Esta ação não pode ser desfeita.`)) return;
+    // if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} diagnósticos selecionados? Esta ação não pode ser desfeita.`)) return;
+    toast.info(`Excluindo ${selectedIds.size} diagnósticos...`);
 
     try {
       const batch = writeBatch(db);
@@ -717,7 +723,8 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
+                        // if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
+                        if (true) {
                           deleteDiagnostic(item.id);
                         }
                       }}
@@ -2071,7 +2078,8 @@ function QuestionsBankView({ user }: { user: User | null }) {
   };
 
   const handleDeleteQuestion = async (id: string) => {
-    if (!window.confirm("Excluir esta questão do banco?")) return;
+    // if (!window.confirm("Excluir esta questão do banco?")) return;
+    toast.info("Excluindo questão...");
     try {
       await deleteDoc(doc(db, 'questions', id));
       toast.success("Questão excluída.");
@@ -2109,7 +2117,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
         const response = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
           contents: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
-          O texto pode vir de um documento (PDF ou DOCX) e pode conter ruídos ou formatação irregular.
+          O texto pode vir de um documento (PDF, DOCX, CSV ou Excel) e pode conter ruídos ou formatação irregular.
           Este é um fragmento de um documento que pode conter centenas de questões.
           
           Para cada questão identificada, extraia:
@@ -2136,8 +2144,11 @@ function QuestionsBankView({ user }: { user: User | null }) {
           Texto para análise:
           ${chunk}`,
           config: {
-            responseMimeType: "application/json",
-            responseSchema: {
+      responseMimeType: "application/json",
+      temperature: 1.2,
+      topK: 50,
+      topP: 0.9,
+      responseSchema: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
@@ -2276,6 +2287,25 @@ function QuestionsBankView({ user }: { user: User | null }) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("O arquivo é muito grande. O tamanho máximo permitido é 10MB.");
+      return;
+    }
+
+    const validateExtractedText = (text: string): boolean => {
+      const cleanText = text.trim();
+      if (!cleanText) {
+        toast.error("O arquivo está vazio ou não contém texto legível.");
+        return false;
+      }
+      if (cleanText.length < 50) {
+        toast.error("O conteúdo do arquivo é muito curto para conter questões válidas.");
+        return false;
+      }
+      return true;
+    };
+
     const fileName = file.name.toLowerCase();
     const processQuestions = async (data: any[]) => {
       setIsImporting(true);
@@ -2337,28 +2367,55 @@ function QuestionsBankView({ user }: { user: User | null }) {
     };
 
     if (fileName.endsWith('.csv')) {
+      setIsImporting(true);
       Papa.parse(file, {
-        header: true,
-        dynamicTyping: true,
-        complete: (results) => processQuestions(results.data),
-        error: (err) => toast.error("Erro ao ler CSV: " + err.message)
+        header: false,
+        complete: async (results) => {
+          try {
+            const text = results.data.map((row: any) => row.join(' ')).join('\n');
+            if (!validateExtractedText(text)) {
+              setIsImporting(false);
+              return;
+            }
+            toast.info("Processando CSV com IA...");
+            const data = await parseQuestionsWithGemini(text);
+            processQuestions(data);
+          } catch (err: any) {
+            toast.error("Erro ao processar CSV com IA: " + err.message);
+            setIsImporting(false);
+          }
+        },
+        error: (err) => {
+          toast.error("Erro ao ler CSV: " + err.message);
+          setIsImporting(false);
+        }
       });
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      setIsImporting(true);
       const reader = new FileReader();
-      reader.onload = (evt) => {
+      reader.onload = async (evt) => {
         try {
           const bstr = evt.target?.result;
           const wb = XLSX.read(bstr, { type: 'binary' });
           const wsname = wb.SheetNames[0];
           const ws = wb.Sheets[wsname];
-          const data = XLSX.utils.sheet_to_json(ws);
-          processQuestions(data);
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          const text = data.map((row: any) => (row as any[]).join(' ')).join('\n');
+          if (!validateExtractedText(text)) {
+            setIsImporting(false);
+            return;
+          }
+          toast.info("Processando Excel com IA...");
+          const parsedData = await parseQuestionsWithGemini(text);
+          processQuestions(parsedData);
         } catch (err: any) {
           toast.error("Erro ao ler Excel: " + err.message);
+          setIsImporting(false);
         }
       };
       reader.readAsBinaryString(file);
     } else if (fileName.endsWith('.pdf')) {
+      setIsImporting(true);
       const reader = new FileReader();
       reader.onload = async (evt) => {
         try {
@@ -2371,11 +2428,16 @@ function QuestionsBankView({ user }: { user: User | null }) {
             const pageText = textContent.items.map((item: any) => (item as any).str).join(' ');
             fullText += pageText + '\n';
           }
+          if (!validateExtractedText(fullText)) {
+            setIsImporting(false);
+            return;
+          }
           toast.info("Processando PDF com IA...");
           const data = await parseQuestionsWithGemini(fullText);
           processQuestions(data);
         } catch (err: any) {
           toast.error("Erro ao ler PDF: " + err.message);
+          setIsImporting(false);
         }
       };
       reader.readAsArrayBuffer(file);
@@ -2384,20 +2446,28 @@ function QuestionsBankView({ user }: { user: User | null }) {
         toast.error("Arquivos .doc (legado) não são suportados. Por favor, salve como .docx e tente novamente.");
         return;
       }
+      setIsImporting(true);
       const reader = new FileReader();
       reader.onload = async (evt) => {
         try {
           const arrayBuffer = evt.target?.result as ArrayBuffer;
           const result = await mammoth.extractRawText({ arrayBuffer });
           const fullText = result.value;
+          if (!validateExtractedText(fullText)) {
+            setIsImporting(false);
+            return;
+          }
           toast.info("Processando DOCX com IA...");
           const data = await parseQuestionsWithGemini(fullText);
           processQuestions(data);
         } catch (err: any) {
           toast.error("Erro ao ler DOCX: " + err.message);
+          setIsImporting(false);
         }
       };
       reader.readAsArrayBuffer(file);
+    } else {
+      toast.error("Formato de arquivo não suportado. Use CSV, Excel, PDF ou DOCX.");
     }
   };
 
@@ -2921,7 +2991,8 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
   };
 
   const handleDeleteExam = async (id: string, type: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir este ${type === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
+    // if (!window.confirm(`Tem certeza que deseja excluir este ${type === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
+    toast.info(`Excluindo ${type === 'simulado' ? 'simulado' : 'exercício'}...`);
     try {
       await deleteDoc(doc(db, 'exams', id));
       toast.success(`${type === 'simulado' ? 'Simulado' : 'Exercício'} excluído.`);
@@ -3008,8 +3079,11 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
                     model: 'gemini-3-flash-preview',
                     contents: prompt,
                     config: {
-                      responseMimeType: 'application/json',
-                      responseSchema: {
+      responseMimeType: "application/json",
+      temperature: 1.2,
+      topK: 50,
+      topP: 0.9,
+      responseSchema: {
                         type: Type.ARRAY,
                         items: {
                           type: Type.OBJECT,
@@ -3665,14 +3739,129 @@ function StudentExamsView({ user }: { user: User | null }) {
   );
 }
 
-function StudyPlanView({ user }: { user: User | null }) {
+function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const navigate = useNavigate();
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generatingTips, setGeneratingTips] = useState(false);
+  const [generatingRefined, setGeneratingRefined] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [savingDetails, setSavingDetails] = useState<string | null>(null);
+
+  const refineSuggestions = async () => {
+    if (!studyPlan || !user) return;
+    setGeneratingRefined(true);
+    try {
+      const prompt = `Como um tutor educacional especialista no SAEP, gere um novo conjunto de 3 Tópicos Prioritários para estudo, mais específicos e detalhados.
+      
+      FRAQUEZAS GERAIS (Competências): ${studyPlan.weaknesses.join(', ')}
+      CONHECIMENTOS ESPECÍFICOS FRÁGEIS: ${studyPlan.detailedWeaknesses?.join(', ') || 'Não detalhados'}
+      TÓPICOS ANTERIORES SUGERIDOS: ${studyPlan.priorityTopics.map(t => `${t.topic} (${t.reason})`).join('; ')}
+      
+      OBJETIVO:
+      Aprofundar nas fraquezas e sugerir tópicos mais granulares, técnicos e específicos que os anteriores. 
+      As sugestões devem ser acionáveis e focadas em superar os conhecimentos específicos frágeis.
+      
+      RETORNE APENAS UM JSON NO FORMATO:
+      {
+        "priorityTopics": [
+          { "topic": "Nome do Tópico Específico", "reason": "Por que estudar isso agora?", "priority": "Alta" | "Média" | "Baixa" }
+        ]
+      }`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: { 
+          responseMimeType: "application/json",
+          temperature: 1.2,
+          topK: 50,
+          topP: 0.9,
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              priorityTopics: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    reason: { type: Type.STRING },
+                    priority: { type: Type.STRING }
+                  },
+                  required: ["topic", "reason", "priority"]
+                }
+              }
+            },
+            required: ["priorityTopics"]
+          }
+        }
+      });
+
+      const aiData = JSON.parse(response.text || '{}');
+      
+      if (aiData.priorityTopics && studyPlan.id) {
+        await updateDoc(doc(db, 'study_plans', studyPlan.id), {
+          priorityTopics: aiData.priorityTopics
+        });
+        toast.success("Sugestões refinadas com sucesso!");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao refinar sugestões.");
+    } finally {
+      setGeneratingRefined(false);
+    }
+  };
+
+  const saveDetails = async (topicIndex: number, details: string) => {
+    if (!studyPlan) return;
+    setSavingDetails(`${topicIndex}`);
+    try {
+      const newTopics = [...studyPlan.priorityTopics];
+      newTopics[topicIndex].details = details;
+      await updateDoc(doc(db, 'study_plans', studyPlan.id), { priorityTopics: newTopics });
+      toast.success("Detalhes salvos!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar detalhes.");
+    } finally {
+      setSavingDetails(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const exportToPDF = async () => {
+    if (!reportRef.current) return;
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Plano_Estudos_${user?.uid || 'aluno'}.pdf`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao exportar PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const toggleTask = (taskId: string) => {
     setCompletedTasks(prev => 
@@ -3704,6 +3893,9 @@ function StudyPlanView({ user }: { user: User | null }) {
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
+          temperature: 1.2,
+          topK: 50,
+          topP: 0.9,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -3792,21 +3984,36 @@ function StudyPlanView({ user }: { user: User | null }) {
 
       const strengths: string[] = [];
       const weaknesses: string[] = [];
+      const detailedWeaknesses: string[] = [];
       const competencyAnalysis: any[] = [];
 
       Object.entries(competencyStats).forEach(([comp, stats]) => {
         const accuracy = stats.correct / stats.total;
         competencyAnalysis.push({ competency: comp, accuracy, ...stats });
         if (accuracy >= 0.75) strengths.push(comp);
-        else if (accuracy < 0.6) weaknesses.push(comp);
+        else if (accuracy < 0.6) {
+          weaknesses.push(comp);
+          // Collect detailed weaknesses from diagnostics if available
+          diagnostics.forEach(diag => {
+            (diag.result?.diagnostico_por_competencia || []).forEach((c: any) => {
+              if (c.competencia === comp && c.conhecimentos_fracos) {
+                detailedWeaknesses.push(...c.conhecimentos_fracos);
+              }
+            });
+          });
+        }
       });
+
+      // Remove duplicates from detailedWeaknesses
+      const uniqueDetailedWeaknesses = Array.from(new Set(detailedWeaknesses));
 
       // 3. Use Gemini to generate the adaptive plan
       const prompt = `Como um tutor educacional especialista no SAEP, gere um plano de estudos ADAPTATIVO e PERSONALIZADO.
       
       PERFIL DO ALUNO:
       - Pontos Fortes: ${strengths.join(', ') || 'Nenhum identificado ainda'}
-      - Pontos Fracos: ${weaknesses.join(', ') || 'Nenhum identificado ainda'}
+      - Pontos Fracos (Competências): ${weaknesses.join(', ') || 'Nenhum identificado ainda'}
+      - Conhecimentos Específicos Frágeis: ${uniqueDetailedWeaknesses.join(', ') || 'Não detalhados'}
       - Análise Detalhada: ${JSON.stringify(competencyAnalysis)}
       
       CONTEÚDO DISPONÍVEL:
@@ -3834,6 +4041,9 @@ function StudyPlanView({ user }: { user: User | null }) {
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
+          temperature: 1.2,
+          topK: 50,
+          topP: 0.9,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -3877,6 +4087,7 @@ function StudyPlanView({ user }: { user: User | null }) {
         userId: user.uid,
         strengths,
         weaknesses,
+        detailedWeaknesses: uniqueDetailedWeaknesses,
         priorityTopics: aiData.priorityTopics || [],
         recommendedExercises: aiData.recommendedExercises || [],
         competencyAnalysis,
@@ -3928,6 +4139,14 @@ function StudyPlanView({ user }: { user: User | null }) {
           >
             {generating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} className="group-hover:scale-110 transition-transform" />}
             {generating ? "Analisando Desempenho..." : "Atualizar Meu Plano"}
+          </button>
+          <button 
+            onClick={exportToPDF}
+            disabled={isExporting}
+            className="group relative flex items-center gap-3 px-8 py-4 bg-emerald-800 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl disabled:opacity-50"
+          >
+            {isExporting ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+            Exportar PDF
           </button>
         </div>
         
@@ -3984,7 +4203,7 @@ function StudyPlanView({ user }: { user: User | null }) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div ref={reportRef} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Column: Priority Topics & Exercises */}
           <div className="lg:col-span-8 space-y-8">
             {/* Priority Topics */}
@@ -4019,10 +4238,44 @@ function StudyPlanView({ user }: { user: User | null }) {
                         <ArrowRight size={20} />
                       </div>
                     </div>
+                    {(userProfile?.role === 'professor' || userProfile?.role === 'admin') && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Detalhes Adicionais (Professor)</label>
+                        <textarea
+                          value={topic.details || ''}
+                          onChange={(e) => {
+                            const newTopics = [...studyPlan.priorityTopics];
+                            newTopics[idx].details = e.target.value;
+                            setStudyPlan({...studyPlan, priorityTopics: newTopics});
+                          }}
+                          className="w-full mt-1 p-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm"
+                          placeholder="Adicione informações complementares..."
+                        />
+                        <button
+                          onClick={() => saveDetails(idx, topic.details || '')}
+                          disabled={savingDetails === `${idx}`}
+                          className="mt-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all disabled:opacity-50"
+                        >
+                          {savingDetails === `${idx}` ? 'Salvando...' : 'Salvar Detalhes'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
+
             </section>
+
+            <div className="flex justify-center">
+              <button
+                onClick={refineSuggestions}
+                disabled={generatingRefined}
+                className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-3 disabled:opacity-50"
+              >
+                {generatingRefined ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
+                {generatingRefined ? "Refinando Sugestões..." : "Refinar Sugestões de Estudo"}
+              </button>
+            </div>
 
             {/* Recommended Exercises */}
             <section className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
@@ -4084,6 +4337,28 @@ function StudyPlanView({ user }: { user: User | null }) {
                       <p className="text-[10px] text-gray-400 text-right">{comp.correct} acertos de {comp.total} questões</p>
                     </div>
                   ))}
+                </div>
+              </section>
+            )}
+
+            {/* History Chart */}
+            {history.length > 0 && (
+              <section className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <History className="text-emerald-600" size={28} /> Histórico de Evolução
+                </h3>
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={history.map(h => ({
+                      date: h.completedAt?.seconds ? new Date(h.completedAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'N/A',
+                      acuracia: Math.round((h.accuracy || 0) * 100)
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={40} />
+                      <Area type="monotone" dataKey="acuracia" stroke="#10b981" strokeWidth={4} fill="#10b981" fillOpacity={0.1} isAnimationActive={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </section>
             )}
@@ -4202,7 +4477,8 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
 
   const handleSubmit = async () => {
     if (answers.includes(-1)) {
-      if (!window.confirm("Você ainda tem questões sem resposta. Deseja enviar assim mesmo?")) return;
+      // if (!window.confirm("Você ainda tem questões sem resposta. Deseja enviar assim mesmo?")) return;
+      toast.warning("Enviando com questões sem resposta...");
     }
 
     setIsSubmitting(true);
@@ -4933,6 +5209,11 @@ Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explíci
       const response = await ai.models.generateContent({
         model: "gemini-3.1-pro-preview",
         contents: prompt,
+        config: {
+          temperature: 1.2,
+          topK: 50,
+          topP: 0.9,
+        }
       });
 
       setAnalysis(response.text || "Não foi possível gerar a análise.");
@@ -5138,7 +5419,8 @@ function AdminUsersView({ user }: { user: User | null }) {
   };
 
   const handleDeleteUser = async (uid: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita no banco de dados.")) return;
+    // if (!window.confirm("Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita no banco de dados.")) return;
+    toast.info("Excluindo usuário...");
     
     try {
       await deleteDoc(doc(db, 'users', uid));
@@ -5956,7 +6238,7 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
   );
 }
 
-function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null, userProfile: UserProfile | null, history: any[] }) {
+function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history, classAverages }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null, userProfile: UserProfile | null, history: any[], classAverages: Record<string, number> }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'Todos' | 'Forte' | 'Atenção' | 'Crítico'>('Todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -6742,30 +7024,51 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                         </div>
                       </div>
 
-                      {/* Progress Bar */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                          <span className={cn(
-                            comp.nivel === 'Forte' ? "text-emerald-600" :
-                            comp.nivel === 'Atenção' ? "text-amber-600" :
-                            "text-red-600"
-                          )}>Domínio da Competência</span>
-                          <span className="text-gray-500">{Math.round(comp.acuracia_ponderada * 100)}%</span>
+                      {/* Progress Bar and Class Comparison */}
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                            <span className={cn(
+                              comp.nivel === 'Forte' ? "text-emerald-600" :
+                              comp.nivel === 'Atenção' ? "text-amber-600" :
+                              "text-red-600"
+                            )}>Domínio da Competência</span>
+                            <span className="text-gray-500">{Math.round(comp.acuracia_ponderada * 100)}%</span>
+                          </div>
+                          <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 shadow-inner">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${comp.acuracia_ponderada * 100}%` }}
+                              transition={{ duration: 1.2, ease: "easeOut" }}
+                              className={cn(
+                                "h-full rounded-full relative",
+                                comp.nivel === 'Forte' ? "bg-gradient-to-r from-emerald-400 to-emerald-500" :
+                                comp.nivel === 'Atenção' ? "bg-gradient-to-r from-amber-400 to-amber-500" :
+                                "bg-gradient-to-r from-red-400 to-red-500"
+                              )}
+                            >
+                              <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                            </motion.div>
+                          </div>
                         </div>
-                        <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 shadow-inner">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${comp.acuracia_ponderada * 100}%` }}
-                            transition={{ duration: 1.2, ease: "easeOut" }}
-                            className={cn(
-                              "h-full rounded-full relative",
-                              comp.nivel === 'Forte' ? "bg-gradient-to-r from-emerald-400 to-emerald-500" :
-                              comp.nivel === 'Atenção' ? "bg-gradient-to-r from-amber-400 to-amber-500" :
-                              "bg-gradient-to-r from-red-400 to-red-500"
-                            )}
-                          >
-                            <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                          </motion.div>
+
+                        {/* Class Comparison Indicator */}
+                        <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <Users size={14} className="text-blue-500" />
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Média da Turma</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-gray-700">{Math.round(classAverages[comp.competencia] || 0)}%</span>
+                            <div className={cn(
+                              "px-2 py-0.5 rounded text-[9px] font-bold uppercase",
+                              (comp.acuracia_ponderada * 100) >= (classAverages[comp.competencia] || 0) 
+                                ? "bg-emerald-100 text-emerald-700" 
+                                : "bg-red-100 text-red-700"
+                            )}>
+                              {(comp.acuracia_ponderada * 100) >= (classAverages[comp.competencia] || 0) ? "Acima" : "Abaixo"}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -7809,6 +8112,80 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
           </div>
         </div>
 
+        {/* Comparação com a Turma Section */}
+        {result.diagnostico_por_competencia && result.diagnostico_por_competencia.length > 0 && (
+          <div className="mt-12 p-8 bg-white rounded-3xl border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                <BarChart3 size={24} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">Comparação com a Turma</h3>
+                <p className="text-sm text-gray-500">Desempenho do aluno em relação à média da turma por competência</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {result.diagnostico_por_competencia.map((comp, idx) => {
+                const studentScore = Math.round(comp.acuracia_ponderada * 100);
+                const classScore = Math.round(classAverages[comp.competencia] || 0);
+                const isAboveAverage = studentScore >= classScore;
+
+                return (
+                  <div key={idx} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="font-bold text-gray-900 line-clamp-1" title={comp.competencia}>{comp.competencia}</h4>
+                      <span className={cn(
+                        "px-2 py-1 text-[10px] font-bold uppercase rounded-md whitespace-nowrap ml-2",
+                        isAboveAverage ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                      )}>
+                        {isAboveAverage ? "Acima da Média" : "Abaixo da Média"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Student Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="text-gray-600">Aluno</span>
+                          <span className="text-gray-900 font-bold">{studentScore}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${studentScore}%` }}
+                            transition={{ duration: 1, delay: idx * 0.1 }}
+                            className={cn(
+                              "h-full rounded-full",
+                              isAboveAverage ? "bg-emerald-500" : "bg-red-500"
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Class Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="text-gray-500">Média da Turma</span>
+                          <span className="text-gray-700 font-bold">{classScore}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${classScore}%` }}
+                            transition={{ duration: 1, delay: idx * 0.1 }}
+                            className="h-full rounded-full bg-blue-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Recovery Plan Section */}
         {result.plano_de_estudos_7_dias && result.plano_de_estudos_7_dias.length > 0 && (
           <div id="recovery-plan" className="mt-12 p-8 bg-white rounded-3xl border border-gray-100 shadow-sm scroll-mt-24">
@@ -7955,6 +8332,38 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history 
                       </div>
                     </div>
                   </div>
+
+                  <div className="mt-4 p-4 bg-gray-50 rounded-xl">
+                    <div className="flex justify-between text-sm mb-4">
+                      <span className="font-bold text-gray-700">Comparação com a Turma</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-600">Aluno</span>
+                          <span className="font-bold">{(comp.acuracia_ponderada * 100).toFixed(0)}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={cn("h-full", (comp.acuracia_ponderada * 100) >= (classAverages[comp.competencia] || 0) ? "bg-emerald-500" : "bg-red-500")}
+                            style={{ width: `${Math.min(100, Math.max(0, comp.acuracia_ponderada * 100))}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Média da Turma</span>
+                          <span className="font-bold text-gray-600">{(classAverages[comp.competencia] || 0).toFixed(0)}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-400"
+                            style={{ width: `${Math.min(100, Math.max(0, classAverages[comp.competencia] || 0))}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-12">
@@ -8037,6 +8446,7 @@ function AppContent() {
   const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [classAverages, setClassAverages] = useState<Record<string, number>>({});
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' || 
@@ -8044,6 +8454,18 @@ function AppContent() {
     }
     return false;
   });
+
+  useEffect(() => {
+    const fetchAverages = async () => {
+      const averages = await getClassCompetencyAverages();
+      const averagesMap: Record<string, number> = {};
+      averages.forEach(avg => {
+        averagesMap[avg.competency] = avg.average;
+      });
+      setClassAverages(averagesMap);
+    };
+    fetchAverages();
+  }, []);
 
   useEffect(() => {
     if (darkMode) {
@@ -8410,7 +8832,7 @@ function AppContent() {
 
       // Save user profile in Firestore
       const userRef = doc(db, 'users', user.uid);
-      const role = user.email === 'djalmabatistajunior@gmail.com' ? 'admin' : 'professor';
+      const role = user.email === 'djalmabatistajunior@gmail.com' ? 'admin' : 'aluno';
       const matricula = user.email?.substring(0, 10);
       await setDoc(userRef, {
         uid: user.uid,
@@ -9137,7 +9559,7 @@ function AppContent() {
               <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} /></ProtectedRoute>} />
               <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
               <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
-              <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudyPlanView user={user} /></ProtectedRoute>} />
+              <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><StudyPlanView user={user} userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationDashboardView user={user} userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} /></ProtectedRoute>} />
               <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} /></ProtectedRoute>} />
@@ -9393,6 +9815,7 @@ function AppContent() {
                   diagnosticId={currentDiagnosticId} 
                   userProfile={userProfile}
                   history={history}
+                  classAverages={classAverages}
                 />
               </ProtectedRoute>
             } />
@@ -9709,6 +10132,81 @@ function AppContent() {
                         <h2 className="text-3xl font-bold">Plano de Estudos - 7 Dias</h2>
                         <p className="text-gray-500">Cronograma intensivo baseado nas competências em nível crítico.</p>
                         <p className="text-sm font-bold text-emerald-600 uppercase tracking-widest">{result.aluno}</p>
+                      </div>
+
+                      {/* Performance Comparison per Competency */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 px-2">
+                          <BarChart3 size={20} className="text-emerald-600" />
+                          <h3 className="text-lg font-bold text-gray-800">Seu Desempenho vs. Média da Turma</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {result.diagnostico_por_competencia.map((comp, idx) => {
+                            const studentScore = Math.round((comp.acuracia_ponderada || comp.acuracia) * 100);
+                            const classScore = Math.round(classAverages[comp.competencia] || 0);
+                            const isAboveAverage = studentScore >= classScore;
+
+                            return (
+                              <motion.div 
+                                key={idx} 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 flex flex-col"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <h4 className="font-bold text-gray-900 text-sm line-clamp-2 leading-tight" title={comp.competencia}>
+                                    {comp.competencia}
+                                  </h4>
+                                  <div className={cn(
+                                    "flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                    isAboveAverage ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                                  )}>
+                                    {isAboveAverage ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                                    {isAboveAverage ? "Acima" : "Abaixo"}
+                                  </div>
+                                </div>
+
+                                <div className="h-[120px] w-full mt-auto">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart 
+                                      data={[
+                                        { name: 'Você', value: studentScore, fill: '#10b981' },
+                                        { name: 'Turma', value: classScore, fill: '#94a3b8' }
+                                      ]}
+                                      margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
+                                    >
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                      <XAxis 
+                                        dataKey="name" 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 600 }} 
+                                      />
+                                      <YAxis domain={[0, 100]} hide />
+                                      <Tooltip 
+                                        cursor={{ fill: '#f9fafb' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                      />
+                                      <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={35}>
+                                        <LabelList 
+                                          dataKey="value" 
+                                          position="top" 
+                                          formatter={(val: number) => `${val}%`} 
+                                          style={{ fontSize: '11px', fontWeight: 'bold', fill: '#374151' }} 
+                                        />
+                                        {/* Color individual bars */}
+                                        {[{ name: 'Você', value: studentScore, fill: '#10b981' }, { name: 'Turma', value: classScore, fill: '#94a3b8' }].map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                      </Bar>
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       <div className="space-y-4">

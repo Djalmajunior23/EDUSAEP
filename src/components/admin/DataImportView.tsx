@@ -32,16 +32,14 @@ export function DataImportView() {
 
       // Simulating webhook call to n8n
       // In a real scenario, this would be a fetch to your n8n webhook URL
-      // const formData = new FormData();
-      // formData.append('file', file);
-      // await fetch('https://your-n8n-instance.com/webhook/import-siac', {
-      //   method: 'POST',
-      //   body: formData
-      // });
+      const formData = new FormData();
+      formData.append('file', file);
+      await fetch('https://n8n.meudominio.com/webhook/import-siac', {
+        method: 'POST',
+        body: formData
+      });
       
-      setTimeout(async () => {
-        setStatus('success');
-      }, 2000);
+      setStatus('success');
     } catch (error) {
       console.error('Error uploading file:', error);
       setStatus('error');

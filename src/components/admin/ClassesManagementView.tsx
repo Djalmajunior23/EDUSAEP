@@ -76,7 +76,8 @@ export function ClassesManagementView() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta turma?')) return;
+    // if (!window.confirm('Tem certeza que deseja excluir esta turma?')) return;
+    toast.info('Excluindo turma...');
     try {
       await deleteDoc(doc(db, 'classes', id));
       toast.success('Turma excluída com sucesso!');
