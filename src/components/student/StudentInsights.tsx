@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import html2canvas from 'html2canvas';
+import { pdfExportService } from '../../modules/simulados/services/pdfExportService';
 import { 
   Target, 
   Zap, 
@@ -12,9 +12,11 @@ import {
   ChevronRight,
   Sparkles,
   BookOpen,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { getClassCompetencyAverages } from '../../services/dashboardService';
+import { cn } from '../../lib/utils';
 import { 
   Radar, 
   RadarChart, 
@@ -38,9 +40,8 @@ import {
 import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
 import { classifyLearningProfile, predictPerformance } from '../../services/geminiService';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 interface StudentInsightsProps {
   studentId: string;
@@ -65,44 +66,13 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
     toast.info('Preparando seu relatório detalhado...');
     
     try {
-      const element = reportRef.current;
       const studentName = submissions[0]?.studentName || 'Aluno';
+      const filename = `Relatorio_Desempenho_${studentName.replace(/\s+/g, '_')}`;
       
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#FFFFFF',
-        ignoreElements: (el) => {
-          return el.tagName === 'BUTTON';
-        }
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let heightLeft = pdfHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = position - pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      pdf.save(`Relatorio_Desempenho_${studentName.replace(/\s+/g, '_')}.pdf`);
+      await pdfExportService.exportElementToPDF(reportRef.current, filename);
       toast.success("Relatório exportado com sucesso!");
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast.error("Erro ao gerar o PDF do relatório.");
+    } catch (error: any) {
+      toast.error(`Erro ao gerar o PDF do relatório: ${error?.message || 'Erro desconhecido'}`);
     } finally {
       setGeneratingPDF(false);
     }
@@ -134,7 +104,7 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
 
       toast.success("Perfil de aprendizado gerado com sucesso!");
     } catch (error) {
-      console.error("Error generating learning profile:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'learning_profiles');
       toast.error("Erro ao gerar perfil de aprendizado.");
     } finally {
       setGeneratingProfile(false);
@@ -151,6 +121,9 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
         if (!snapshot.empty) {
           setProfile(snapshot.docs[0].data());
         }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'learning_profiles');
       }
     );
 
@@ -161,6 +134,9 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
         if (!snapshot.empty) {
           setPrediction(snapshot.docs[0].data());
         }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'performance_predictions');
       }
     );
 
@@ -183,6 +159,9 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
           setRadarData(radar);
         }
         setLoading(false);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'exam_submissions');
       }
     );
 
@@ -193,6 +172,9 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
         if (!snapshot.empty) {
           setDiagnosticData(snapshot.docs[0].data());
         }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'diagnostics');
       }
     );
 
@@ -216,7 +198,29 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
   }
 
   return (
-    <div ref={reportRef} className="space-y-8 p-4 bg-white dark:bg-gray-950 rounded-3xl">
+    <div ref={reportRef} className="space-y-8 p-6 bg-white dark:bg-gray-950 rounded-3xl">
+      {/* Header with PDF Export */}
+      <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Diagnóstico de Desempenho</h2>
+          <p className="text-sm text-gray-500">Análise detalhada de competências e evolução acadêmica.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGeneratePDF}
+            disabled={generatingPDF || submissions.length === 0}
+            className="px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-gray-200 dark:shadow-none"
+          >
+            {generatingPDF ? (
+              <Loader2 className="animate-spin" size={18} />
+            ) : (
+              <FileText size={18} />
+            )}
+            Exportar Relatório PDF
+          </button>
+        </div>
+      </div>
+
       {/* Top Stats & Prediction */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <motion.div 
@@ -230,14 +234,6 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Perfil VARK</span>
-              <button
-                onClick={handleGeneratePDF}
-                disabled={generatingPDF || submissions.length === 0}
-                className="px-2 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1"
-              >
-                {generatingPDF ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FileText size={12} />}
-                PDF
-              </button>
               {!profile && (
                 <button
                   onClick={handleGenerateProfile}
@@ -528,6 +524,53 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
           </div>
         </div>
       )}
+
+      {/* Student Journey Timeline */}
+      <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400">
+            <Clock size={20} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Jornada do Aluno</h3>
+            <p className="text-sm text-gray-500">Histórico de atividades e evolução</p>
+          </div>
+        </div>
+
+        <div className="relative border-l-2 border-gray-100 dark:border-gray-800 ml-4 space-y-8 pb-4">
+          {submissions.length === 0 ? (
+            <p className="text-sm text-gray-500 pl-6">Nenhuma atividade registrada ainda.</p>
+          ) : (
+            submissions.map((sub, idx) => (
+              <div key={sub.id} className="relative pl-6">
+                <div className={cn(
+                  "absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-900",
+                  sub.score / sub.maxScore >= 0.7 ? "bg-emerald-500" : 
+                  sub.score / sub.maxScore >= 0.5 ? "bg-amber-500" : "bg-red-500"
+                )} />
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      {sub.completedAt?.seconds ? new Date(sub.completedAt.seconds * 1000).toLocaleDateString() : 'Recente'}
+                    </span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                      sub.score / sub.maxScore >= 0.7 ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" : 
+                      sub.score / sub.maxScore >= 0.5 ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"
+                    )}>
+                      {Math.round((sub.score / sub.maxScore) * 100)}% Acerto
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-gray-900 dark:text-white">{sub.type === 'simulado' ? 'Simulado' : 'Exercício'}</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Pontuação: {sub.score} de {sub.maxScore}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

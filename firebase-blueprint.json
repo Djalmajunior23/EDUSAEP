@@ -101,9 +101,109 @@
         "questions": { "type": "array", "items": { "$ref": "Question" }, "description": "The list of questions in this exam." },
         "createdBy": { "type": "string", "description": "The ID of the user who created this exam." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the exam was created." },
-        "status": { "type": "string", "enum": ["draft", "published"], "description": "The status of the exam." }
+        "status": { "type": "string", "enum": ["draft", "published", "active", "closed"], "description": "The status of the exam." },
+        "applicationMode": { "type": "string", "enum": ["internal", "external", "hybrid"], "description": "How the exam is applied." },
+        "startDate": { "type": "string", "format": "date-time", "description": "Opening date." },
+        "endDate": { "type": "string", "format": "date-time", "description": "Closing date." },
+        "maxAttempts": { "type": "number", "description": "Max attempts allowed." },
+        "correctionPolicy": { "type": "string", "enum": ["highest_score", "last_attempt", "first_attempt"], "description": "Policy for multiple attempts." }
       },
-      "required": ["title", "subject", "questions", "createdBy"]
+      "required": ["title", "subject", "questions", "createdBy", "applicationMode"]
+    },
+    "SimuladoForm": {
+      "title": "Simulado Form",
+      "description": "Metadata for the external form linked to a simulado.",
+      "type": "object",
+      "properties": {
+        "simuladoId": { "type": "string" },
+        "provider": { "type": "string" },
+        "externalFormId": { "type": "string" },
+        "publicUrl": { "type": "string" },
+        "adminUrl": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastSyncAt": { "type": "string", "format": "date-time" },
+        "responseCount": { "type": "number" },
+        "integrationToken": { "type": "string" }
+      },
+      "required": ["simuladoId", "provider", "externalFormId", "publicUrl"]
+    },
+    "ImportedResponse": {
+      "title": "Imported Response",
+      "description": "A response imported from an external form.",
+      "type": "object",
+      "properties": {
+        "simuladoId": { "type": "string" },
+        "formId": { "type": "string" },
+        "alunoId": { "type": "string" },
+        "alunoNome": { "type": "string" },
+        "alunoEmail": { "type": "string" },
+        "alunoMatricula": { "type": "string" },
+        "turma": { "type": "string" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "source": { "type": "string" },
+        "attemptNumber": { "type": "number" },
+        "answers": { "type": "object" },
+        "totalCorrect": { "type": "number" },
+        "totalWrong": { "type": "number" },
+        "score": { "type": "number" },
+        "percentage": { "type": "number" },
+        "processingStatus": { "type": "string" },
+        "externalResponseId": { "type": "string" },
+        "hash": { "type": "string" }
+      },
+      "required": ["simuladoId", "formId", "alunoNome", "submittedAt", "answers"]
+    },
+    "ResponseItem": {
+      "title": "Response Item",
+      "description": "Individual question response detail for an imported response.",
+      "type": "object",
+      "properties": {
+        "importedResponseId": { "type": "string" },
+        "questionId": { "type": "string" },
+        "selectedAlternative": { "type": "string" },
+        "correctAlternative": { "type": "string" },
+        "isCorrect": { "type": "boolean" },
+        "competenceId": { "type": "string" },
+        "disciplineId": { "type": "string" },
+        "descriptorId": { "type": "string" },
+        "difficultyLevel": { "type": "string" }
+      },
+      "required": ["importedResponseId", "questionId", "selectedAlternative", "isCorrect"]
+    },
+    "ImportLog": {
+      "title": "Import Log",
+      "description": "Log of a form response sync/import execution.",
+      "type": "object",
+      "properties": {
+        "simuladoId": { "type": "string" },
+        "formId": { "type": "string" },
+        "executedBy": { "type": "string" },
+        "executedAt": { "type": "string", "format": "date-time" },
+        "totalRead": { "type": "number" },
+        "totalImported": { "type": "number" },
+        "totalRejected": { "type": "number" },
+        "totalDuplicated": { "type": "number" },
+        "status": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["simuladoId", "formId", "executedAt", "status"]
+    },
+    "ImportInconsistency": {
+      "title": "Import Inconsistency",
+      "description": "A response that could not be automatically associated with a student.",
+      "type": "object",
+      "properties": {
+        "importLogId": { "type": "string" },
+        "importedResponseId": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "originalData": { "type": "object" },
+        "resolutionStatus": { "type": "string" },
+        "resolvedBy": { "type": "string" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["importLogId", "importedResponseId", "type", "resolutionStatus"]
     },
     "Submission": {
       "title": "Submission",
@@ -650,6 +750,26 @@
     "/smart_alerts/{alertId}": {
       "schema": "SmartAlert",
       "description": "Real-time smart alerts."
+    },
+    "/simulado_forms/{formId}": {
+      "schema": "SimuladoForm",
+      "description": "External form metadata."
+    },
+    "/imported_responses/{responseId}": {
+      "schema": "ImportedResponse",
+      "description": "Responses imported from external forms."
+    },
+    "/response_items/{itemId}": {
+      "schema": "ResponseItem",
+      "description": "Detailed items for imported responses."
+    },
+    "/import_logs/{logId}": {
+      "schema": "ImportLog",
+      "description": "Logs of import executions."
+    },
+    "/import_inconsistencies/{inconsistencyId}": {
+      "schema": "ImportInconsistency",
+      "description": "Inconsistencies found during import."
     }
   }
 }

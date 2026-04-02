@@ -1,0 +1,149 @@
+{
+  "name": "EduSAEP - Alertas e Planos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "edusaep-study-plan",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.type }}",
+              "value2": "PlanoAulaGerado"
+            }
+          ]
+        }
+      },
+      "name": "É Plano de Aula?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.type }}",
+              "value2": "RecomendacaoPedagogica"
+            }
+          ]
+        }
+      },
+      "name": "É Recomendação?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.type }}",
+              "value2": "PlanoRecuperacao"
+            }
+          ]
+        }
+      },
+      "name": "É Recuperação?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "content": "## Novo Plano de Aula Gerado\n\n**Turma:** {{ $json.body.turma_id }}\n**Professor:** {{ $json.body.professor_id }}"
+      },
+      "name": "Notificar Plano de Aula",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "content": "## Nova Recomendação Pedagógica\n\n**Competência:** {{ $json.body.competency }}"
+      },
+      "name": "Notificar Recomendação",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "content": "## Novo Plano de Recuperação\n\nPlano gerado com sucesso."
+      },
+      "name": "Notificar Recuperação",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [700, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "É Plano de Aula?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "É Recomendação?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "É Recuperação?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Plano de Aula?": {
+      "main": [
+        [
+          {
+            "node": "Notificar Plano de Aula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Recomendação?": {
+      "main": [
+        [
+          {
+            "node": "Notificar Recomendação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Recuperação?": {
+      "main": [
+        [
+          {
+            "node": "Notificar Recuperação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "tags": ["EduSAEP", "Alertas"]
+}

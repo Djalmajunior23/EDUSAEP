@@ -1,4 +1,6 @@
 import { toast } from 'sonner';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 segundos
@@ -10,12 +12,28 @@ async function delay(ms: number) {
 /**
  * Serviço para disparar alertas e automações para o n8n em produção.
  */
-export async function triggerN8NAlert(type: string, data: any, attempt = 1): Promise<boolean> {
-  // URL da sua VPS com n8n
-  const WEBHOOK_URL = 'https://n8n.meudominio.com/webhook/edusaep-study-plan';
+export async function triggerN8NAlert(webhookUrl: string | null, type: string, data: any, attempt = 1): Promise<boolean> {
+  let finalUrl = webhookUrl;
+
+  if (!finalUrl) {
+    try {
+      const docRef = doc(db, 'settings', 'global');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().webhookUrl) {
+        finalUrl = docSnap.data().webhookUrl;
+      }
+    } catch (err) {
+      console.error("[n8n] Erro ao buscar webhook global:", err);
+    }
+  }
+
+  if (!finalUrl) {
+    console.warn(`[n8n] Webhook URL não configurada para o alerta ${type}.`);
+    return false;
+  }
 
   try {
-    const response = await fetch(WEBHOOK_URL, {
+    const response = await fetch(finalUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -20,6 +20,34 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Webhook for external form responses (n8n integration)
+  app.post("/api/webhooks/forms", async (req, res) => {
+    const { simuladoId, formId, responses, integrationToken } = req.body;
+    const authHeader = req.headers.authorization;
+
+    // Simple token validation
+    if (!authHeader || authHeader !== `Bearer ${process.env.WEBHOOK_SECRET}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    console.log(`[WEBHOOK] Received ${responses.length} responses for simulado ${simuladoId}`);
+
+    // In a real Cloud Function, we would trigger a background task here.
+    // For this environment, we'll return success and assume the frontend or a separate process will sync.
+    // However, we could also process them here if we had access to Firebase Admin.
+    // Since we're using the client SDK in the frontend, we'll let the frontend trigger the sync.
+    
+    res.json({ status: "received", count: responses.length });
+  });
+
+  // Endpoint to trigger manual sync/import
+  app.post("/api/simulados/sync", async (req, res) => {
+    const { formId, userId } = req.body;
+    // This could call the syncFormResponses logic if we had a server-side Firebase Admin setup.
+    // For now, we'll just acknowledge the request.
+    res.json({ status: "sync_triggered", formId });
+  });
+
   // Error logging endpoint for the frontend
   app.post("/api/logs", (req, res) => {
     const { type, message, stack, userId } = req.body;

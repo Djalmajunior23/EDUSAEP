@@ -32,6 +32,7 @@ import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '../../services/geminiService';
 import { triggerN8NAlert } from '../../services/n8nService';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 export function ProfessorInsights() {
   const [classes, setClasses] = useState<any[]>([]);
@@ -68,7 +69,7 @@ export function ProfessorInsights() {
         });
       }
     } catch (error) {
-      console.error("Error generating SIPA:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'sipa_interventions');
     } finally {
       setIsGeneratingSIPA(false);
     }
@@ -82,6 +83,8 @@ export function ProfessorInsights() {
         setSelectedClassId(data[0].id);
       }
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'classes');
     });
     return () => unsubscribe();
   }, []);
@@ -112,6 +115,8 @@ export function ProfessorInsights() {
       }));
 
       setClassData(chartData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'exam_submissions');
     });
 
     return () => unsubscribe();
@@ -134,7 +139,7 @@ export function ProfessorInsights() {
         });
         
         // Trigger n8n integration
-        await triggerN8NAlert('PlanoAulaGerado', {
+        await triggerN8NAlert(null, 'PlanoAulaGerado', {
           planId: docRef.id,
           professor_id: auth.currentUser.uid,
           turma_id: selectedClassId,
@@ -142,7 +147,7 @@ export function ProfessorInsights() {
         });
       }
     } catch (error) {
-      console.error("Error generating lesson plan:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'lesson_plans');
     } finally {
       setIsGeneratingPlan(false);
     }

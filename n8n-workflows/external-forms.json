@@ -1,0 +1,59 @@
+{
+  "name": "EduSAEP - Formulários Externos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "external-forms",
+        "options": {}
+      },
+      "name": "Webhook (Receber Respostas)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sua-api.com/api/webhooks/forms",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "formId",
+              "value": "={{ $json.body.formId }}"
+            },
+            {
+              "name": "alunoEmail",
+              "value": "={{ $json.body.email }}"
+            },
+            {
+              "name": "respostas",
+              "value": "={{ $json.body.respostas }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Enviar para EduSAEP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (Receber Respostas)": {
+      "main": [
+        [
+          {
+            "node": "Enviar para EduSAEP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "tags": ["EduSAEP", "Forms"]
+}

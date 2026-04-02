@@ -4,6 +4,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp
 import { db } from '../../firebase';
 import { Discipline } from '../../types';
 import { Plus, Pencil, Trash2, X, Check, Search, BookOpen } from 'lucide-react';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
 
 export function DisciplinesManagementView() {
@@ -27,7 +28,7 @@ export function DisciplinesManagementView() {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Discipline));
       setDisciplines(data);
     } catch (error) {
-      console.error('Error fetching disciplines:', error);
+      handleFirestoreError(error, OperationType.LIST, 'disciplines');
       toast.error('Erro ao carregar disciplinas.');
     } finally {
       setLoading(false);
@@ -43,7 +44,7 @@ export function DisciplinesManagementView() {
       });
       setProfessors(data);
     } catch (error) {
-      console.error('Error fetching professors:', error);
+      handleFirestoreError(error, OperationType.LIST, 'users');
     }
   };
 
@@ -68,7 +69,7 @@ export function DisciplinesManagementView() {
       setEditForm({});
       fetchDisciplines();
     } catch (error) {
-      console.error('Error creating discipline:', error);
+      handleFirestoreError(error, OperationType.CREATE, 'disciplines');
       toast.error('Erro ao criar disciplina.');
     }
   };
@@ -92,7 +93,7 @@ export function DisciplinesManagementView() {
       setEditForm({});
       fetchDisciplines();
     } catch (error) {
-      console.error('Error updating discipline:', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'disciplines');
       toast.error('Erro ao atualizar disciplina.');
     }
   };
@@ -105,7 +106,7 @@ export function DisciplinesManagementView() {
       toast.success('Disciplina excluída com sucesso!');
       fetchDisciplines();
     } catch (error) {
-      console.error('Error deleting discipline:', error);
+      handleFirestoreError(error, OperationType.DELETE, 'disciplines');
       toast.error('Erro ao excluir disciplina.');
     }
   };

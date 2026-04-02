@@ -4,6 +4,8 @@ import { Brain, AlertCircle, Loader2, BarChart3, Users, Filter, Search, FileText
 import { db, auth } from '../../firebase';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { analyzeCognitiveErrors, CognitiveErrorResult, generateRecoveryPlan, RecoveryPlanResult, generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { triggerN8NAlert } from '../../services/n8nService';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 
@@ -27,6 +29,8 @@ export function CognitiveErrorAnalysisView() {
     const unsubscribeSubs = onSnapshot(subQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSubmissions(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'exam_submissions');
     });
 
     // Fetch existing analyses
@@ -35,6 +39,8 @@ export function CognitiveErrorAnalysisView() {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAnalyses(data);
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'cognitive_error_analyses');
     });
 
     return () => {
@@ -48,14 +54,18 @@ export function CognitiveErrorAnalysisView() {
       setRecoveryPlan(null);
       // Fetch latest lesson plan for the class
       const fetchLessonPlan = async () => {
-        const q = query(collection(db, 'lesson_plans'));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const plans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-          plans.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
-          setLessonPlan(plans[0]);
-        } else {
-          setLessonPlan(null);
+        try {
+          const q = query(collection(db, 'lesson_plans'));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const plans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+            plans.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+            setLessonPlan(plans[0]);
+          } else {
+            setLessonPlan(null);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.LIST, 'lesson_plans');
         }
       };
       fetchLessonPlan();
@@ -65,15 +75,19 @@ export function CognitiveErrorAnalysisView() {
     setLessonPlan(null); // Clear lesson plan when a specific student is selected
 
     const fetchPlan = async () => {
-      const q = query(collection(db, 'recovery_plans'), where('userId', '==', selectedStudent));
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        // Get the most recent plan
-        const plans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-        plans.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
-        setRecoveryPlan(plans[0]);
-      } else {
-        setRecoveryPlan(null);
+      try {
+        const q = query(collection(db, 'recovery_plans'), where('userId', '==', selectedStudent));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          // Get the most recent plan
+          const plans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+          plans.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+          setRecoveryPlan(plans[0]);
+        } else {
+          setRecoveryPlan(null);
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'recovery_plans');
       }
     };
 
@@ -120,7 +134,7 @@ export function CognitiveErrorAnalysisView() {
         toast.info("Nenhum erro novo encontrado para análise.");
       }
     } catch (error) {
-      console.error("Error generating cognitive analysis:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'cognitive_error_analyses');
       toast.error("Erro ao gerar análise de erros cognitivos.");
     } finally {
       setAnalyzing(false);
@@ -164,7 +178,7 @@ export function CognitiveErrorAnalysisView() {
 
       toast.success("Plano de recuperação gerado com sucesso!");
     } catch (error) {
-      console.error("Error generating recovery plan:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'recovery_plans');
       toast.error("Erro ao gerar plano de recuperação.");
     } finally {
       setGeneratingPlan(false);
@@ -175,9 +189,7 @@ export function CognitiveErrorAnalysisView() {
     if (!recoveryPlan) return;
     
     try {
-      // Simulate sending to n8n webhook
-      // await fetch('YOUR_N8N_WEBHOOK_URL', { method: 'POST', body: JSON.stringify(recoveryPlan) });
-      
+      await triggerN8NAlert(null, 'PlanoRecuperacao', recoveryPlan);
       toast.success("Plano enviado para automação (n8n) com sucesso!");
     } catch (error) {
       toast.error("Erro ao notificar via n8n.");
@@ -215,7 +227,7 @@ export function CognitiveErrorAnalysisView() {
 
       toast.success("Plano de aula gerado com sucesso!");
     } catch (error) {
-      console.error("Error generating lesson plan:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'lesson_plans');
       toast.error("Erro ao gerar plano de aula.");
     } finally {
       setGeneratingLessonPlan(false);

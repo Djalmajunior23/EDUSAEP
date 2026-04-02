@@ -1,5 +1,6 @@
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from './errorService';
 
 export async function createPedagogicalAlert(
   type: 'alertas_pedagogicos' | 'recomendacoes_pedagogicas',
@@ -16,9 +17,8 @@ export async function createPedagogicalAlert(
       createdAt: serverTimestamp(),
       status: 'pendente'
     });
-    console.log(`${type} criado com sucesso.`);
   } catch (error) {
-    console.error(`Erro ao criar ${type}:`, error);
+    handleFirestoreError(error, OperationType.CREATE, type);
     throw error;
   }
 }

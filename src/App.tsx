@@ -48,6 +48,7 @@ import {
   Search,
   Filter,
   ChevronLeft,
+  ExternalLink,
   Users,
   Square,
   X,
@@ -57,6 +58,7 @@ import {
   Menu,
   Database,
   Zap,
+  RefreshCw,
   ArrowRight,
   Target,
   Info,
@@ -89,8 +91,6 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan } from './services/geminiService';
 import { triggerN8NAlert } from './services/n8nService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
@@ -105,6 +105,12 @@ import {
   Navigate,
   useParams
 } from 'react-router-dom';
+import { ExternalFormManager } from './modules/simulados/components/ExternalFormManager';
+import { ImportInconsistencyManager } from './modules/simulados/components/ImportInconsistencyManager';
+import { SimuladoForm } from './modules/simulados/types';
+import { simuladoService } from './modules/simulados/services/simuladoService';
+import { pdfExportService } from './modules/simulados/services/pdfExportService';
+import { NotificationBell } from './components/notifications/NotificationBell';
 import { auth, db, googleProvider } from './firebase';
 import { 
   signInWithPopup, 
@@ -133,9 +139,11 @@ import {
   updateDoc,
   setDoc,
   writeBatch,
-  limit
+  limit,
+  Timestamp
 } from 'firebase/firestore';
 
+import { ExternalFormsView } from './components/professor/ExternalFormsView';
 import { SocraticTutor } from './components/student/SocraticTutor';
 import { StudentInsights } from './components/student/StudentInsights';
 import { AdaptiveExam } from './components/student/AdaptiveExam';
@@ -194,7 +202,6 @@ function ItemGeneratorView({ user }: { user: User | null }) {
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
     } catch (err) {
-      console.error(err);
       toast.error("Erro ao gerar questão.");
     } finally {
       setIsGenerating(false);
@@ -212,7 +219,7 @@ function ItemGeneratorView({ user }: { user: User | null }) {
       toast.success("Questão salva no banco de questões!");
       setGeneratedQuestion(null);
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.CREATE, 'questions');
       toast.error("Erro ao salvar questão.");
     }
   };
@@ -437,8 +444,13 @@ export interface Exam {
   questions: Question[];
   createdBy: string;
   createdAt: any;
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'active' | 'closed';
   type: 'simulado' | 'exercicio';
+  applicationMode?: 'internal' | 'external' | 'hybrid';
+  startDate?: any;
+  endDate?: any;
+  maxAttempts?: number;
+  correctionPolicy?: 'highest_score' | 'last_attempt' | 'first_attempt';
 }
 
 export interface ExamSubmission {
@@ -611,7 +623,7 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
       setIsBulkEdit(false);
       toast.success(`${selectedIds.size} diagnósticos excluídos com sucesso.`);
     } catch (err) {
-      console.error("Bulk Delete Error", err);
+      handleFirestoreError(err, OperationType.DELETE, 'diagnostics');
       toast.error("Erro ao excluir alguns diagnósticos.");
     }
   };
@@ -969,35 +981,10 @@ function ReportsView({ history }: { history: any[] }) {
     if (!element) return;
     
     try {
-      const canvas = await html2canvas(element, { 
-        scale: 2, 
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#FFFFFF'
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = position - pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      pdf.save(`relatorio_desempenho_${selectedStudent || 'geral'}.pdf`);
+      const filename = `relatorio_desempenho_${selectedStudent || 'geral'}`;
+      await pdfExportService.exportElementToPDF(element, filename);
+      toast.success("PDF exportado com sucesso!");
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('Erro ao gerar PDF. Tente novamente.');
     }
   };
@@ -2031,23 +2018,29 @@ function QuestionsBankView({ user }: { user: User | null }) {
   };
 
   useEffect(() => {
+    if (!user) return;
     const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const questionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
       setQuestions(questionsData);
       setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'questions');
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (!user) return;
     const q = query(collection(db, 'disciplines'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Discipline));
       setDisciplines(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'disciplines');
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const uniqueCompetencies = useMemo(() => {
     const comps = new Set(questions.map(q => q.competency).filter(Boolean));
@@ -2854,7 +2847,8 @@ function QuestionsBankView({ user }: { user: User | null }) {
   );
 }
 
-function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | null, defaultType?: 'simulado' | 'exercicio' }) {
+function ExamsManagementView({ user, userProfile, defaultType = 'simulado' }: { user: User | null, userProfile: UserProfile | null, defaultType?: 'simulado' | 'exercicio' }) {
+  const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -2865,13 +2859,19 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [isFetchingDisciplines, setIsFetchingDisciplines] = useState(false);
   const [showDisciplineDropdown, setShowDisciplineDropdown] = useState(false);
+  const [generatingFormId, setGeneratingFormId] = useState<string | null>(null);
+  const [syncingFormId, setSyncingFormId] = useState<string | null>(null);
+  const [activeForms, setActiveForms] = useState<SimuladoForm[]>([]);
   const [currentExam, setCurrentExam] = useState<Partial<Exam>>({
     title: '',
     description: '',
     subject: '',
     questions: [],
     status: 'draft',
-    type: defaultType
+    type: defaultType,
+    applicationMode: 'internal',
+    maxAttempts: 1,
+    correctionPolicy: 'highest_score'
   });
 
   useEffect(() => {
@@ -2895,6 +2895,18 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'simulado_forms'), where('status', '==', 'active'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const formsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SimuladoForm));
+      setActiveForms(formsData);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'simulado_forms');
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const handleCompetencyFocus = async () => {
     if (disciplines.length > 0) {
       setShowDisciplineDropdown(true);
@@ -2907,7 +2919,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Discipline));
       setDisciplines(data);
     } catch (error) {
-      console.error("Error fetching disciplines:", error);
+      handleFirestoreError(error, OperationType.LIST, 'disciplines');
     } finally {
       setIsFetchingDisciplines(false);
     }
@@ -2980,11 +2992,37 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
         await updateDoc(doc(db, 'exams', currentExam.id), examData);
         toast.success(`${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} atualizado com sucesso!`);
       } else {
-        await addDoc(collection(db, 'exams'), examData);
+        const docRef = await addDoc(collection(db, 'exams'), examData);
         toast.success(`${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} criado com sucesso!`);
+        
+        // Notify all students if published
+        if (examData.status === 'published') {
+          const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+          const { notificationService } = await import('./services/notificationService');
+          
+          const title = examData.type === 'simulado' ? 'Novo Simulado Disponível' : 'Novo Exercício Disponível';
+          const message = `O ${examData.type} "${examData.title}" foi publicado e está disponível para você.`;
+          const link = examData.type === 'simulado' ? '/student-exams' : '/exercises';
+          
+          const notificationPromises = usersSnapshot.docs.map(userDoc => 
+            notificationService.createNotification(userDoc.id, title, message, 'info', link)
+          );
+          
+          await Promise.all(notificationPromises);
+        }
       }
       setIsEditing(false);
-      setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: typeFilter === 'all' ? 'simulado' : typeFilter });
+      setCurrentExam({ 
+        title: '', 
+        description: '', 
+        subject: '', 
+        questions: [], 
+        status: 'draft', 
+        type: typeFilter === 'all' ? 'simulado' : typeFilter,
+        applicationMode: 'internal',
+        maxAttempts: 1,
+        correctionPolicy: 'highest_score'
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'exams');
     }
@@ -3035,6 +3073,101 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
     const updatedQuestions = [...(currentExam.questions || [])];
     updatedQuestions.splice(index, 1);
     setCurrentExam({ ...currentExam, questions: updatedQuestions });
+  };
+
+  const handleGenerateExternalForm = async (simuladoId: string) => {
+    let webhookUrl = userProfile?.settings?.webhookUrl;
+    
+    // Fallback to global webhook if user one is not set
+    if (!webhookUrl) {
+      try {
+        const globalSettingsDoc = await getDoc(doc(db, 'settings', 'global'));
+        if (globalSettingsDoc.exists()) {
+          webhookUrl = globalSettingsDoc.data().webhookUrl;
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, 'settings/global');
+      }
+    }
+
+    if (!webhookUrl) {
+      toast.error("URL do Webhook n8n não configurada. Verifique as configurações do seu perfil ou contate um administrador.");
+      return;
+    }
+
+    setGeneratingFormId(simuladoId);
+    try {
+      await simuladoService.generateExternalForm(simuladoId, webhookUrl);
+      toast.success("Formulário externo gerado com sucesso!");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `simulado_forms/${simuladoId}`);
+    } finally {
+      setGeneratingFormId(null);
+    }
+  };
+
+  const handleExportGradesCSV = async (examId: string, examTitle: string) => {
+    toast.info("Gerando CSV de notas...");
+    try {
+      const submissionsSnap = await getDocs(query(collection(db, 'exam_submissions'), where('resourceId', '==', examId)));
+      if (submissionsSnap.empty) {
+        toast.warning("Nenhuma submissão encontrada para esta avaliação.");
+        return;
+      }
+
+      const submissions = submissionsSnap.docs.map(doc => doc.data() as ExamSubmission);
+      
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Nome do Aluno,Pontuação,Pontuação Máxima,Data de Conclusão\n";
+
+      submissions.forEach(sub => {
+        const date = sub.completedAt?.seconds ? new Date(sub.completedAt.seconds * 1000).toLocaleDateString() : 'N/A';
+        csvContent += `"${sub.studentName}",${sub.score},${sub.maxScore},${date}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Notas_${examTitle.replace(/\s+/g, '_')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("CSV exportado com sucesso!");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'exam_submissions');
+      toast.error("Erro ao exportar notas.");
+    }
+  };
+
+  const handleSyncFormResponses = async (formId: string) => {
+    let webhookUrl = userProfile?.settings?.webhookUrl;
+    
+    if (!webhookUrl) {
+      try {
+        const globalSettingsDoc = await getDoc(doc(db, 'settings', 'global'));
+        if (globalSettingsDoc.exists()) {
+          webhookUrl = globalSettingsDoc.data().webhookUrl;
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, 'settings/global');
+      }
+    }
+
+    if (!webhookUrl || !user) {
+      toast.error("URL do Webhook n8n não configurada.");
+      return;
+    }
+
+    setSyncingFormId(formId);
+    try {
+      await simuladoService.syncFormResponses(formId, webhookUrl, user.uid);
+      toast.success("Respostas sincronizadas com sucesso!");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `simulado_forms/${formId}/sync`);
+    } finally {
+      setSyncingFormId(null);
+    }
   };
 
   if (isEditing) {
@@ -3104,7 +3237,7 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
                   setCurrentExam({ ...currentExam, questions });
                   toast.success("Arquivo processado com sucesso!");
                 } catch (err) {
-                  console.error(err);
+                  console.error("Error processing file:", err);
                   toast.error("Erro ao processar arquivo.");
                 } finally {
                   setIsProcessingFile(false);
@@ -3177,6 +3310,77 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
               placeholder={`Descreva o objetivo deste ${currentExam.type === 'simulado' ? 'simulado' : 'exercício'}...`}
             />
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Modo de Aplicação</label>
+              <select
+                value={currentExam.applicationMode}
+                onChange={(e) => setCurrentExam({ ...currentExam, applicationMode: e.target.value as any })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="internal">Interno (Plataforma)</option>
+                <option value="external">Externo (Formulário)</option>
+                <option value="hybrid">Híbrido (Ambos)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Data de Início</label>
+              <input 
+                type="datetime-local" 
+                value={currentExam.startDate ? new Date(currentExam.startDate.seconds * 1000).toISOString().slice(0, 16) : ''} 
+                onChange={(e) => setCurrentExam({ ...currentExam, startDate: Timestamp.fromDate(new Date(e.target.value)) })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Data de Fim</label>
+              <input 
+                type="datetime-local" 
+                value={currentExam.endDate ? new Date(currentExam.endDate.seconds * 1000).toISOString().slice(0, 16) : ''} 
+                onChange={(e) => setCurrentExam({ ...currentExam, endDate: Timestamp.fromDate(new Date(e.target.value)) })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          {(currentExam.applicationMode === 'external' || currentExam.applicationMode === 'hybrid') && currentExam.id && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-4">
+              <h4 className="font-bold text-amber-800 flex items-center gap-2">
+                <Settings size={18} /> Configurações de Formulário Externo
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-amber-600 uppercase tracking-widest">Máximo de Tentativas</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={currentExam.maxAttempts} 
+                    onChange={(e) => setCurrentExam({ ...currentExam, maxAttempts: parseInt(e.target.value) })}
+                    className="w-full p-3 bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-amber-600 uppercase tracking-widest">Política de Correção</label>
+                  <select
+                    value={currentExam.correctionPolicy}
+                    onChange={(e) => setCurrentExam({ ...currentExam, correctionPolicy: e.target.value as any })}
+                    className="w-full p-3 bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="highest_score">Maior Nota</option>
+                    <option value="last_attempt">Última Tentativa</option>
+                    <option value="first_attempt">Primeira Tentativa</option>
+                  </select>
+                </div>
+              </div>
+              
+              <ExternalFormManager 
+                simuladoId={currentExam.id} 
+                user={user} 
+                webhookUrl={userProfile?.settings?.webhookUrl || ''} 
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -3288,12 +3492,28 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
           )}
           <button 
             onClick={() => {
-              setCurrentExam({ title: '', description: '', subject: '', questions: [], status: 'draft', type: typeFilter === 'all' ? 'simulado' : typeFilter });
+              setCurrentExam({ 
+                title: '', 
+                description: '', 
+                subject: '', 
+                questions: [], 
+                status: 'draft', 
+                type: typeFilter === 'all' ? 'simulado' : typeFilter,
+                applicationMode: 'internal',
+                maxAttempts: 1,
+                correctionPolicy: 'highest_score'
+              });
               setIsEditing(true);
             }}
             className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all"
           >
             <Plus size={20} /> Novo {typeFilter === 'all' ? 'Simulado' : typeFilter === 'simulado' ? 'Simulado' : 'Exercício'}
+          </button>
+          <button 
+            onClick={() => navigate('/simulados/inconsistencies')}
+            className="flex items-center gap-2 px-6 py-3 bg-amber-100 text-amber-700 rounded-xl font-bold hover:bg-amber-200 transition-all"
+          >
+            <AlertCircle size={20} /> Inconsistências
           </button>
         </div>
       </div>
@@ -3429,6 +3649,43 @@ function ExamsManagementView({ user, defaultType = 'simulado' }: { user: User | 
               
               <p className="text-xs text-gray-600 line-clamp-2 flex-1">{exam.description}</p>
               
+              {(() => {
+                const activeForm = activeForms.find(f => f.simuladoId === exam.id);
+                return (
+                  <div className="space-y-2">
+                    {activeForm && (
+                      <button
+                        onClick={() => handleSyncFormResponses(activeForm.id)}
+                        disabled={syncingFormId === activeForm.id}
+                        className="w-full py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 border border-emerald-100"
+                      >
+                        {syncingFormId === activeForm.id ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+                        Sincronizar Respostas
+                      </button>
+                    )}
+                    
+                    {(!activeForm && (exam.applicationMode === 'external' || exam.applicationMode === 'hybrid')) && (
+                      <button
+                        onClick={() => handleGenerateExternalForm(exam.id)}
+                        disabled={generatingFormId === exam.id}
+                        className="w-full py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2 border border-amber-100"
+                      >
+                        {generatingFormId === exam.id ? <Loader2 className="animate-spin" size={14} /> : <ExternalLink size={14} />}
+                        Gerar Formulário Externo
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleExportGradesCSV(exam.id, exam.title)}
+                      className="w-full py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2 border border-blue-100"
+                    >
+                      <Download size={14} />
+                      Exportar Notas (CSV)
+                    </button>
+                  </div>
+                );
+              })()}
+
               <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-gray-400">
                   <CheckSquare size={14} />
@@ -3462,6 +3719,8 @@ function ExercisesView({ user }: { user: User | null }) {
     const unsubscribeExams = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
       setExercises(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'exams');
     });
 
     const submissionsQuery = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid), where('type', '==', 'exercise'));
@@ -3469,6 +3728,8 @@ function ExercisesView({ user }: { user: User | null }) {
       const submissionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSubmission));
       setSubmissions(submissionsData);
       setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'exam_submissions');
     });
 
     return () => {
@@ -3607,6 +3868,7 @@ function ExercisesView({ user }: { user: User | null }) {
 function StudentExamsView({ user }: { user: User | null }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
+  const [forms, setForms] = useState<SimuladoForm[]>([]);
   const [loading, setLoading] = useState(true);
   const [takingExam, setTakingExam] = useState<Exam | null>(null);
   const navigate = useNavigate();
@@ -3623,6 +3885,8 @@ function StudentExamsView({ user }: { user: User | null }) {
     const unsubscribeExams = onSnapshot(examsQuery, (snapshot) => {
       const examsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
       setExams(examsData);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'exams');
     });
 
     // Fetch user submissions
@@ -3630,16 +3894,49 @@ function StudentExamsView({ user }: { user: User | null }) {
     const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
       const submissionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSubmission));
       setSubmissions(submissionsData);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'exam_submissions');
+    });
+
+    // Fetch active forms
+    const formsQuery = query(collection(db, 'simulado_forms'), where('status', '==', 'active'));
+    const unsubscribeForms = onSnapshot(formsQuery, (snapshot) => {
+      const formsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SimuladoForm));
+      setForms(formsData);
       setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'simulado_forms');
     });
 
     return () => {
       unsubscribeExams();
       unsubscribeSubmissions();
+      unsubscribeForms();
     };
   }, [user]);
 
   if (takingExam) {
+    // Check for date restrictions
+    const now = new Date();
+    if (takingExam.startDate && now < new Date(takingExam.startDate.seconds * 1000)) {
+      toast.error("Este simulado ainda não está aberto.");
+      setTakingExam(null);
+      return null;
+    }
+    if (takingExam.endDate && now > new Date(takingExam.endDate.seconds * 1000)) {
+      toast.error("Este simulado já foi encerrado.");
+      setTakingExam(null);
+      return null;
+    }
+
+    // Check for max attempts
+    const userSubmissions = submissions.filter(s => s.resourceId === takingExam.id);
+    if (takingExam.maxAttempts && userSubmissions.length >= takingExam.maxAttempts) {
+      toast.error(`Você já atingiu o limite de ${takingExam.maxAttempts} tentativas para este simulado.`);
+      setTakingExam(null);
+      return null;
+    }
+
     return <ExamTakingView exam={takingExam} user={user} onCancel={() => setTakingExam(null)} />;
   }
 
@@ -3711,12 +4008,27 @@ function StudentExamsView({ user }: { user: User | null }) {
                       <p className="text-lg font-bold text-emerald-600">{submission.score.toFixed(1)} / {submission.maxScore}</p>
                     </div>
                   ) : (
-                    <button 
-                      onClick={() => setTakingExam(exam)}
-                      className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all"
-                    >
-                      Iniciar Simulado
-                    </button>
+                    <div className="flex flex-col gap-2 w-full sm:w-auto">
+                      {(exam.applicationMode === 'internal' || exam.applicationMode === 'hybrid' || !exam.applicationMode) && (
+                        <button 
+                          onClick={() => setTakingExam(exam)}
+                          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all text-sm"
+                        >
+                          Iniciar na Plataforma
+                        </button>
+                      )}
+                      {(exam.applicationMode === 'external' || exam.applicationMode === 'hybrid') && (
+                        <a 
+                          href={forms.find(f => f.simuladoId === exam.id)?.publicUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-6 py-2 bg-white text-emerald-600 border-2 border-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all text-sm text-center flex items-center justify-center gap-2"
+                        >
+                          <ExternalLink size={16} />
+                          Responder em Formulário
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -3812,8 +4124,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         toast.success("Sugestões refinadas com sucesso!");
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Erro ao refinar sugestões.");
+      handleFirestoreError(err, OperationType.WRITE, `study_plans/${studyPlan?.id}`);
     } finally {
       setGeneratingRefined(false);
     }
@@ -3828,8 +4139,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
       await updateDoc(doc(db, 'study_plans', studyPlan.id), { priorityTopics: newTopics });
       toast.success("Detalhes salvos!");
     } catch (err) {
-      console.error(err);
-      toast.error("Erro ao salvar detalhes.");
+      handleFirestoreError(err, OperationType.WRITE, `study_plans/${studyPlan.id}`);
     } finally {
       setSavingDetails(null);
     }
@@ -3840,6 +4150,8 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
     const q = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'exam_submissions');
     });
     return () => unsubscribe();
   }, [user]);
@@ -3848,16 +4160,11 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
     if (!reportRef.current) return;
     setIsExporting(true);
     try {
-      const canvas = await html2canvas(reportRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Plano_Estudos_${user?.uid || 'aluno'}.pdf`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao exportar PDF.");
+      const filename = `Plano_Estudos_${user?.uid || 'aluno'}`;
+      await pdfExportService.exportElementToPDF(reportRef.current, filename);
+      toast.success("PDF exportado com sucesso!");
+    } catch (err: any) {
+      toast.error(`Erro ao exportar PDF: ${err?.message || 'Erro desconhecido'}`);
     } finally {
       setIsExporting(false);
     }
@@ -3918,8 +4225,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         toast.success("Dicas geradas com sucesso!");
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Erro ao gerar dicas do tutor.");
+      handleFirestoreError(err, OperationType.WRITE, `study_plans/${studyPlan?.id}`);
     } finally {
       setGeneratingTips(false);
     }
@@ -3933,6 +4239,8 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         setStudyPlan({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as StudyPlan);
       }
       setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'study_plans');
     });
     return () => unsubscribe();
   }, [user]);
@@ -4098,7 +4406,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
       await addDoc(collection(db, 'study_plans'), newPlan);
       
       // Disparar n8n para gerar recomendações de conteúdo externo
-      await triggerN8NAlert('RecomendacaoPedagogica', {
+      await triggerN8NAlert(userProfile?.settings?.webhookUrl || null, 'RecomendacaoPedagogica', {
         userId: user.uid,
         competency: weaknesses.join(', '),
         weaknesses,
@@ -4107,8 +4415,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
 
       toast.success("Plano de estudos adaptativo gerado com sucesso!");
     } catch (err) {
-      console.error(err);
-      toast.error("Erro ao gerar plano de estudos adaptativo.");
+      handleFirestoreError(err, OperationType.WRITE, 'study_plans');
     } finally {
       setGenerating(false);
     }
@@ -4911,7 +5218,7 @@ function GamificationView({ user, userProfile }: { user: User | null, userProfil
           });
           toast.success(`Você ganhou ${score} XP!`);
         } catch (err) {
-          console.error("Error updating XP:", err);
+          handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
         }
       }
     }
@@ -5110,7 +5417,9 @@ function GamificationView({ user, userProfile }: { user: User | null, userProfil
 function BIAnalysisView({ user }: { user: User | null }) {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [dataStats, setDataStats] = useState<{ students: number, submissions: number, diagnostics: number } | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Fetch basic stats to show before generating
@@ -5126,11 +5435,26 @@ function BIAnalysisView({ user }: { user: User | null }) {
           diagnostics: diagnosticsSnap.size
         });
       } catch (err) {
-        console.error("Error fetching stats:", err);
+        handleFirestoreError(err, OperationType.LIST, 'users/exam_submissions/diagnostics');
       }
     };
     fetchStats();
   }, []);
+
+  const exportToPDF = async () => {
+    if (!reportRef.current) return;
+    setIsExporting(true);
+    toast.info("Gerando PDF da análise...");
+    try {
+      const filename = `Analise_BI_Educacional_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`;
+      await pdfExportService.exportElementToPDF(reportRef.current, filename);
+      toast.success("PDF exportado com sucesso!");
+    } catch (err: any) {
+      toast.error(`Erro ao exportar PDF: ${err?.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const generateAnalysis = async () => {
     setLoading(true);
@@ -5152,7 +5476,7 @@ function BIAnalysisView({ user }: { user: User | null }) {
         const studentDiags = diagnostics.filter(d => (d as any).userId === s.uid || (d as any).aluno === s.displayName);
         
         const examsTaken = studentSubs.map(sub => {
-          const exam = exams.find(e => e.id === (sub as any).examId);
+          const exam = exams.find(e => e.id === (sub as any).resourceId);
           return {
             title: exam?.title || 'Desconhecido',
             subject: exam?.subject || 'Desconhecido',
@@ -5219,7 +5543,6 @@ Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explíci
       setAnalysis(response.text || "Não foi possível gerar a análise.");
       toast.success("Análise de BI gerada com sucesso!");
     } catch (err) {
-      console.error("Error generating BI analysis:", err);
       toast.error("Erro ao gerar análise de BI.");
     } finally {
       setLoading(false);
@@ -5294,19 +5617,31 @@ Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explíci
       )}
 
       {analysis && (
-        <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden">
-          <div className="bg-emerald-900 p-8 text-white">
-            <h3 className="text-2xl font-bold flex items-center gap-3">
-              <BarChart3 size={28} className="text-emerald-400" />
-              Relatório de Inteligência Pedagógica
-            </h3>
-            <p className="text-emerald-100/80 mt-2">
-              Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
-            </p>
+        <div className="space-y-6">
+          <div className="flex justify-end">
+            <button
+              onClick={exportToPDF}
+              disabled={isExporting}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:opacity-50 shadow-lg shadow-gray-200"
+            >
+              {isExporting ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+              {isExporting ? 'Exportando...' : 'Exportar Relatório PDF'}
+            </button>
           </div>
-          <div className="p-8 md:p-12">
-            <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:text-gray-900 prose-p:text-gray-600 prose-li:text-gray-600">
-              <Markdown>{analysis}</Markdown>
+          <div ref={reportRef} className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-emerald-900 p-8 text-white">
+              <h3 className="text-2xl font-bold flex items-center gap-3">
+                <BarChart3 size={28} className="text-emerald-400" />
+                Relatório de Inteligência Pedagógica
+              </h3>
+              <p className="text-emerald-100/80 mt-2">
+                Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
+              </p>
+            </div>
+            <div className="p-8 md:p-12">
+              <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:text-gray-900 prose-p:text-gray-600 prose-li:text-gray-600">
+                <Markdown>{analysis}</Markdown>
+              </div>
             </div>
           </div>
         </div>
@@ -5827,7 +6162,7 @@ function ChatView({ user, diagnostic }: { user: User | null, diagnostic: Diagnos
         createdAt: new Date().toISOString()
       });
     } catch (err) {
-      console.error("Chat Error", err);
+      handleFirestoreError(err, OperationType.WRITE, path);
     } finally {
       setIsTyping(false);
     }
@@ -5995,7 +6330,7 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
           setGlobalWebhookUrl(docSnap.data().webhookUrl || '');
         }
       } catch (err) {
-        console.error("Error fetching global settings:", err);
+        handleFirestoreError(err, OperationType.GET, 'settings/global');
       }
     };
     fetchGlobalSettings();
@@ -6074,7 +6409,7 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
         {/* Account Info */}
         <div className="flex items-center gap-6 pb-8 border-b border-gray-100">
           {user?.photoURL ? (
-            <img src={user.photoURL} alt="Profile" className="w-20 h-20 rounded-2xl border border-gray-200 shadow-sm" referrerPolicy="no-referrer" />
+            <img src={user.photoURL} alt="Profile" className="w-20 h-20 rounded-2xl border border-gray-200 shadow-sm" referrerPolicy="no-referrer" crossOrigin="anonymous" />
           ) : (
             <div className="w-20 h-20 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-2xl shadow-sm">
               {user?.displayName?.charAt(0) || user?.email?.charAt(0)}
@@ -6277,7 +6612,6 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
       const newSuggestions = await generateSuggestions(comp.conhecimentos_fracos, comp.recomendacoes);
       setSuggestions(prev => ({ ...prev, [comp.competencia]: newSuggestions }));
     } catch (err) {
-      console.error(err);
       toast.error("Erro ao gerar sugestões.");
     } finally {
       setLoadingSuggestions(prev => ({ ...prev, [comp.competencia]: false }));
@@ -6291,55 +6625,13 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
   };
 
   const exportToPDF = async () => {
-    if (!fullReportRef.current || !result) return;
-    
+    if (!result) return;
     setIsExporting(true);
-    toast.info('Preparando relatório PDF detalhado...');
-    
     try {
-      const element = fullReportRef.current;
-      
-      // Temporarily make it visible for html2canvas
-      element.style.display = 'block';
-      
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#FFFFFF',
-        ignoreElements: (el) => {
-          return el.tagName === 'BUTTON';
-        }
-      });
-      
-      // Hide it again
-      element.style.display = 'none';
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let heightLeft = pdfHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = position - pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`Relatorio_Desempenho_${result.aluno.replace(/\s+/g, '_')}.pdf`);
+      await pdfExportService.exportDiagnosticReport(result, userProfile);
       toast.success('Relatório exportado com sucesso!');
-    } catch (err) {
-      console.error('PDF Export Error', err);
-      toast.error('Erro ao gerar o PDF do relatório.');
+    } catch (err: any) {
+      toast.error(`Erro ao gerar o PDF do relatório: ${err?.message || 'Erro desconhecido'}`);
     } finally {
       setIsExporting(false);
     }
@@ -6414,9 +6706,19 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
         createdAt: serverTimestamp()
       });
 
+      // 5. Notify student
+      const { notificationService } = await import('./services/notificationService');
+      await notificationService.createNotification(
+        studentId,
+        'Novo Plano de Recuperação',
+        'Um novo plano de estudos personalizado foi gerado para você.',
+        'info',
+        '/study-plan'
+      );
+
       toast.success("Plano de recuperação gerado e salvo com sucesso!");
     } catch (error) {
-      console.error("Error generating recovery plan:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'recovery_plans');
       toast.error("Erro ao gerar plano de recuperação.");
     } finally {
       setGeneratingPlan(false);
@@ -8456,16 +8758,21 @@ function AppContent() {
   });
 
   useEffect(() => {
+    if (!isAuthReady) return;
     const fetchAverages = async () => {
-      const averages = await getClassCompetencyAverages();
-      const averagesMap: Record<string, number> = {};
-      averages.forEach(avg => {
-        averagesMap[avg.competency] = avg.average;
-      });
-      setClassAverages(averagesMap);
+      try {
+        const averages = await getClassCompetencyAverages();
+        const averagesMap: Record<string, number> = {};
+        averages.forEach(avg => {
+          averagesMap[avg.competency] = avg.average;
+        });
+        setClassAverages(averagesMap);
+      } catch (err) {
+        // Error handled by service
+      }
     };
     fetchAverages();
-  }, []);
+  }, [isAuthReady]);
 
   useEffect(() => {
     if (darkMode) {
@@ -8477,7 +8784,7 @@ function AppContent() {
   }, [darkMode]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!isAuthReady || !user) return;
     
     const assignExams = async () => {
       try {
@@ -8497,11 +8804,11 @@ function AppContent() {
           }
         }
       } catch (err) {
-        console.error("Error assigning exams:", err);
+        handleFirestoreError(err, OperationType.WRITE, 'student_exams');
       }
     };
     assignExams();
-  }, [user]);
+  }, [user, isAuthReady]);
 
   const planRef = useRef<HTMLDivElement>(null);
 
@@ -8533,6 +8840,7 @@ function AppContent() {
       { type: 'header', label: 'Gestão de Dados' },
       { id: 'bi-analysis', label: 'Análise BI', icon: TrendingUp, path: '/bi-analysis', description: 'Insights da Turma' },
       { id: 'data-import', label: 'Importação n8n', icon: Database, path: '/data-import', description: 'Integração SIAC' },
+      { id: 'external-forms', label: 'Formulários Externos', icon: ExternalLink, path: '/external-forms', description: 'Sincronização n8n' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
@@ -8560,37 +8868,10 @@ function AppContent() {
     toast.info('Preparando PDF...');
     
     try {
-      const canvas = await html2canvas(planRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#F9FAFB'
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = position - pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      pdf.save(`Plano_Estudos_${result.aluno.replace(/\s+/g, '_')}.pdf`);
+      const filename = `Plano_Estudos_${result.aluno.replace(/\s+/g, '_')}`;
+      await pdfExportService.exportElementToPDF(planRef.current, filename);
       toast.success('PDF exportado com sucesso!');
     } catch (err) {
-      console.error('PDF Error', err);
       toast.error('Erro ao gerar PDF.');
     } finally {
       setLoading(false);
@@ -8598,6 +8879,7 @@ function AppContent() {
   };
 
   useEffect(() => {
+    if (!isAuthReady) return;
     const parts = location.pathname.split('/');
     const view = parts[1];
     const id = parts[2];
@@ -8621,16 +8903,16 @@ function AppContent() {
             setCurrentDiagnosticId(id);
           }
         } catch (err) {
-          console.error("Error loading diagnostic from URL", err);
+          handleFirestoreError(err, OperationType.GET, `diagnostics/${id}`);
         }
       };
       fetchDiagnostic();
     }
-  }, [location.pathname, currentDiagnosticId]);
+  }, [location.pathname, currentDiagnosticId, isAuthReady, userProfile, user]);
 
   const activeTab = useMemo(() => {
     const path = location.pathname.split('/')[1] || 'input';
-    return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat' | 'profile' | 'aluno' | 'admin-users' | 'student-dashboard' | 'student-exams';
+    return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat' | 'profile' | 'aluno' | 'admin-users' | 'student-dashboard' | 'student-exams' | 'external-forms';
   }, [location]);
 
   // Auth Listener
@@ -8726,16 +9008,17 @@ function AppContent() {
 
   // Global Settings Listener
   useEffect(() => {
+    if (!isAuthReady || !user) return;
     const docRef = doc(db, 'settings', 'global');
     const unsubscribe = onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         setGlobalSettings(snapshot.data());
       }
     }, (err) => {
-      console.error("Error listening to global settings:", err);
+      handleFirestoreError(err, OperationType.GET, 'settings/global');
     });
     return () => unsubscribe();
-  }, []);
+  }, [isAuthReady, user]);
 
   // Test Connection
   useEffect(() => {
@@ -9187,14 +9470,17 @@ function AppContent() {
       {/* Sidebar for Desktop */}
       {user && userProfile && (
         <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 hidden lg:flex flex-col h-screen sticky top-0 shrink-0">
-          <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 dark:shadow-none shrink-0">
-              <BarChart3 size={24} />
+          <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 dark:shadow-none shrink-0">
+                <BarChart3 size={24} />
+              </div>
+              <div className="overflow-hidden">
+                <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">EduDiagnóstico</h1>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider truncate">SAEP Pro</p>
+              </div>
             </div>
-            <div className="overflow-hidden">
-              <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">EduDiagnóstico</h1>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider truncate">SAEP Pro</p>
-            </div>
+            <NotificationBell userId={user.uid} />
           </div>
           
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -9227,7 +9513,7 @@ function AppContent() {
           <div className="p-4 border-t border-gray-100 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600" referrerPolicy="no-referrer" />
+                <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600" referrerPolicy="no-referrer" crossOrigin="anonymous" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">
                   {user.displayName?.charAt(0) || user.email?.charAt(0)}
@@ -9302,6 +9588,7 @@ function AppContent() {
             </div>
             
             <div className="flex items-center gap-3">
+              {user && <NotificationBell userId={user.uid} />}
               <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
               {!user && (
                 <button 
@@ -9360,7 +9647,7 @@ function AppContent() {
                 <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
                   <div className="flex items-center gap-3 mb-4 px-4">
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600" referrerPolicy="no-referrer" />
+                      <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600" referrerPolicy="no-referrer" crossOrigin="anonymous" />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">
                         {user.displayName?.charAt(0) || user.email?.charAt(0)}
@@ -9554,8 +9841,9 @@ function AppContent() {
                   userProfile?.role === 'aluno' ? "/student-dashboard" : "/dashboard"
                 } replace />
               } />
-              <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} defaultType="simulado" /></ProtectedRoute>} />
-              <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} defaultType="exercicio" /></ProtectedRoute>} />
+              <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} defaultType="simulado" /></ProtectedRoute>} />
+              <Route path="/simulados/inconsistencies" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ImportInconsistencyManager /></ProtectedRoute>} />
+              <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} defaultType="exercicio" /></ProtectedRoute>} />
               <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} /></ProtectedRoute>} />
               <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
               <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
@@ -9761,7 +10049,7 @@ function AppContent() {
 
             <Route path="/exams-management" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
-                <ExamsManagementView user={user} />
+                <ExamsManagementView user={user} userProfile={userProfile} />
               </ProtectedRoute>
             } />
 
@@ -9780,6 +10068,12 @@ function AppContent() {
             <Route path="/bi-analysis" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <BIDashboardView />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/external-forms" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <ExternalFormsView user={user} userProfile={userProfile} />
               </ProtectedRoute>
             } />
 

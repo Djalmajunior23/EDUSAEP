@@ -4,6 +4,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp
 import { db } from '../../firebase';
 import { Class } from '../../types';
 import { Plus, Pencil, Trash2, X, Check, Search, Users } from 'lucide-react';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
 
 export function ClassesManagementView() {
@@ -24,7 +25,7 @@ export function ClassesManagementView() {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
       setClasses(data);
     } catch (error) {
-      console.error('Error fetching classes:', error);
+      handleFirestoreError(error, OperationType.LIST, 'classes');
       toast.error('Erro ao carregar turmas.');
     } finally {
       setLoading(false);
@@ -49,7 +50,7 @@ export function ClassesManagementView() {
       setEditForm({});
       fetchClasses();
     } catch (error) {
-      console.error('Error creating class:', error);
+      handleFirestoreError(error, OperationType.CREATE, 'classes');
       toast.error('Erro ao criar turma.');
     }
   };
@@ -70,7 +71,7 @@ export function ClassesManagementView() {
       setEditForm({});
       fetchClasses();
     } catch (error) {
-      console.error('Error updating class:', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'classes');
       toast.error('Erro ao atualizar turma.');
     }
   };
@@ -83,7 +84,7 @@ export function ClassesManagementView() {
       toast.success('Turma excluída com sucesso!');
       fetchClasses();
     } catch (error) {
-      console.error('Error deleting class:', error);
+      handleFirestoreError(error, OperationType.DELETE, 'classes');
       toast.error('Erro ao excluir turma.');
     }
   };

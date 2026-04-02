@@ -1,8 +1,9 @@
 // src/components/admin/DataImportView.tsx
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 export function DataImportView() {
   const [file, setFile] = useState<File | null>(null);
@@ -34,14 +35,30 @@ export function DataImportView() {
       // In a real scenario, this would be a fetch to your n8n webhook URL
       const formData = new FormData();
       formData.append('file', file);
-      await fetch('https://n8n.meudominio.com/webhook/import-siac', {
+      
+      let webhookUrl = '';
+      try {
+        const docRef = doc(db, 'settings', 'global');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().webhookUrl) {
+          webhookUrl = docSnap.data().webhookUrl;
+        }
+      } catch (err) {
+        console.error("[n8n] Erro ao buscar webhook global:", err);
+      }
+
+      if (!webhookUrl) {
+        throw new Error("URL do Webhook n8n não configurada nas configurações globais.");
+      }
+
+      await fetch(webhookUrl, {
         method: 'POST',
         body: formData
       });
       
       setStatus('success');
     } catch (error) {
-      console.error('Error uploading file:', error);
+      handleFirestoreError(error, OperationType.CREATE, 'importacoes');
       setStatus('error');
     }
   };

@@ -4,6 +4,7 @@ import { MessageSquare, Send, Loader2, X, HelpCircle, Sparkles, ArrowRight } fro
 import { db, auth } from '../../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { GoogleGenAI } from "@google/genai";
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import Markdown from 'react-markdown';
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -59,7 +60,7 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
         startNewSession();
       }
     }, (error) => {
-      console.error("Error fetching Socratic session:", error);
+      handleFirestoreError(error, OperationType.LIST, 'socratic_sessions');
     });
 
     return () => unsubscribe();
@@ -109,7 +110,7 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
       const docRef = await addDoc(collection(db, 'socratic_sessions'), newSession);
       setSessionId(docRef.id);
     } catch (error) {
-      console.error("Error starting Socratic session:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'socratic_sessions');
     } finally {
       setIsLoading(false);
     }
@@ -164,7 +165,7 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
       });
 
     } catch (error) {
-      console.error("Error sending message to Socratic Tutor:", error);
+      handleFirestoreError(error, OperationType.UPDATE, 'socratic_sessions');
     } finally {
       setIsLoading(false);
     }

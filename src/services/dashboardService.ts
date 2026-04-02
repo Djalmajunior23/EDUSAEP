@@ -2,6 +2,7 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Discipline } from '../types';
+import { handleFirestoreError, OperationType } from './errorService';
 
 export interface UserProfile {
   uid: string;
@@ -156,7 +157,7 @@ export async function getDashboardData(filters: { disciplineId?: string }): Prom
       }
     };
   } catch (error) {
-    console.error("Error fetching dashboard data:", error);
+    handleFirestoreError(error, OperationType.LIST, 'dashboard_data');
     return {
       kpi: { mediaGeral: 75, totalAlunos: 45, taxaConclusao: 85, alunosEmRisco: 12 },
       charts: {
@@ -219,7 +220,7 @@ export async function getClassCompetencyAverages(): Promise<{ competency: string
       average: stats.count > 0 ? (stats.totalAccuracy / stats.count) * 100 : 0
     }));
   } catch (error) {
-    console.error("Error fetching class competency averages:", error);
+    handleFirestoreError(error, OperationType.LIST, 'exam_submissions');
     return [];
   }
 }

@@ -15,6 +15,7 @@ import {
 import { db, auth } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getNextAdaptiveQuestion, SAEPQuestion } from '../../services/geminiService';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 interface AdaptiveExamProps {
   examId: string;
@@ -52,7 +53,7 @@ export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamPro
       setSessionId(sessionRef.id);
       fetchNextQuestion(50, []);
     } catch (error) {
-      console.error("Error starting adaptive session:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'adaptive_sessions');
     }
   };
 
@@ -93,7 +94,7 @@ export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamPro
         questionHistory: newHistory
       });
     } catch (error) {
-      console.error("Error updating adaptive session:", error);
+      handleFirestoreError(error, OperationType.UPDATE, 'adaptive_sessions');
     }
   };
 
@@ -128,7 +129,7 @@ export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamPro
 
       onComplete(score);
     } catch (error) {
-      console.error("Error finishing adaptive exam:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'adaptive_sessions/exam_submissions');
     }
   };
 
