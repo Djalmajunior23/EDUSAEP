@@ -61,13 +61,26 @@ export function ImportInconsistencyManager() {
       const snap = await getDocs(q);
       const allStudents = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       
-      const filtered = allStudents.filter(s => 
-        s.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.matricula?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const term = searchTerm.toLowerCase();
       
-      setStudents(filtered);
+      // Calculate relevance score for better ordering
+      const scoredStudents = allStudents
+        .map(s => {
+          let score = 0;
+          const name = s.displayName?.toLowerCase() || '';
+          const email = s.email?.toLowerCase() || '';
+          const mat = s.matricula?.toLowerCase() || '';
+
+          if (name.includes(term)) score += 3;
+          if (email.includes(term)) score += 2;
+          if (mat.includes(term)) score += 1;
+          
+          return { ...s, score };
+        })
+        .filter(s => s.score > 0)
+        .sort((a, b) => b.score - a.score);
+      
+      setStudents(scoredStudents);
     } catch (err) {
       handleFirestoreError(err, OperationType.GET, 'users');
       toast.error("Erro ao buscar alunos.");

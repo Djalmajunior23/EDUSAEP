@@ -29,7 +29,7 @@ import {
   Legend
 } from 'recharts';
 import { db, auth } from '../../firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '../../services/geminiService';
 import { triggerN8NAlert } from '../../services/n8nService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
@@ -39,10 +39,26 @@ export function ProfessorInsights() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classData, setClassData] = useState<any[]>([]);
   const [lessonPlan, setLessonPlan] = useState<LessonPlanResult | null>(null);
+  const [activityNotes, setActivityNotes] = useState<Record<number, string>>({});
   const [sipaResult, setSipaResult] = useState<SIPAResult | null>(null);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [isGeneratingSIPA, setIsGeneratingSIPA] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const handleUpdateActivityNote = async (index: number, note: string) => {
+    setActivityNotes(prev => ({ ...prev, [index]: note }));
+    if (lessonPlan && lessonPlan.id) {
+      try {
+        const docRef = doc(db, 'lesson_plans', lessonPlan.id);
+        const updatedActivities = lessonPlan.practicalActivities?.map((act, i) => 
+          i === index ? { ...act, professor_notes: note } : act
+        );
+        await updateDoc(docRef, { practicalActivities: updatedActivities });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `lesson_plans/${lessonPlan.id}`);
+      }
+    }
+  };
 
   // ... (rest of the component logic)
 
@@ -126,7 +142,19 @@ export function ProfessorInsights() {
     if (!selectedClassId || classData.length === 0) return;
     setIsGeneratingPlan(true);
     try {
-      const plan = await generateLessonPlan(classData);
+      // Fetch students in class
+      const classDoc = classes.find(c => c.id === selectedClassId);
+      const studentIds = classDoc?.studentIds || [];
+      
+      // Fetch cognitive analyses for these students
+      let cognitiveAnalyses: any[] = [];
+      if (studentIds.length > 0) {
+        const q = query(collection(db, 'cognitive_error_analyses'), where('userId', 'in', studentIds));
+        const snapshot = await getDocs(q);
+        cognitiveAnalyses = snapshot.docs.map(doc => doc.data());
+      }
+
+      const plan = await generateLessonPlan(classData, cognitiveAnalyses);
       setLessonPlan(plan);
       
       // Save to Firestore
@@ -372,6 +400,12 @@ export function ProfessorInsights() {
                           <span className="text-xs bg-white/20 px-2 py-1 rounded-md">{act.duration}</span>
                         </div>
                         <p className="text-xs text-emerald-100 pl-10">{act.description}</p>
+                        <textarea
+                          placeholder="Adicionar observações para esta atividade..."
+                          className="mt-2 w-full p-2 text-xs bg-white/10 rounded-lg border border-white/20 focus:ring-1 focus:ring-white outline-none"
+                          value={activityNotes[i] || act.professor_notes || ''}
+                          onChange={(e) => handleUpdateActivityNote(i, e.target.value)}
+                        />
                       </li>
                     ))}
                   </ul>

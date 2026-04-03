@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Brain, AlertCircle, Loader2, BarChart3, Users, Filter, Search, FileText, Sparkles, Target, Send, BookOpen } from 'lucide-react';
+import { Brain, AlertCircle, Loader2, BarChart3, Users, Filter, Search, FileText, Sparkles, Target, Send, BookOpen, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { db, auth } from '../../firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, where, updateDoc, doc } from 'firebase/firestore';
 import { analyzeCognitiveErrors, CognitiveErrorResult, generateRecoveryPlan, RecoveryPlanResult, generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { triggerN8NAlert } from '../../services/n8nService';
@@ -20,6 +20,7 @@ export function CognitiveErrorAnalysisView() {
   const [lessonPlan, setLessonPlan] = useState<LessonPlanResult | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -141,15 +142,34 @@ export function CognitiveErrorAnalysisView() {
     }
   };
 
+  const handleArchiveAnalysis = async (analysisId: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'cognitive_error_analyses', analysisId), {
+        archived: !currentStatus,
+        updatedAt: serverTimestamp()
+      });
+      toast.success(currentStatus ? "Análise restaurada com sucesso!" : "Análise arquivada com sucesso!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `cognitive_error_analyses/${analysisId}`);
+      toast.error("Erro ao alterar status da análise.");
+    }
+  };
+
+  const filteredAnalyses = analyses.filter(a => {
+    const matchesStudent = selectedStudent === 'all' || a.userId === selectedStudent;
+    const matchesArchived = showArchived ? true : !a.archived;
+    return matchesStudent && matchesArchived;
+  });
+
   const handleGeneratePlan = async () => {
     if (selectedStudent === 'all') {
       toast.warning("Selecione um aluno específico para gerar o plano de recuperação.");
       return;
     }
 
-    const studentAnalyses = analyses.filter(a => a.userId === selectedStudent);
+    const studentAnalyses = analyses.filter(a => a.userId === selectedStudent && !a.archived);
     if (studentAnalyses.length === 0) {
-      toast.warning("Nenhuma análise encontrada para este aluno.");
+      toast.warning("Nenhuma análise ativa encontrada para este aluno.");
       return;
     }
 
@@ -197,15 +217,16 @@ export function CognitiveErrorAnalysisView() {
   };
 
   const handleGenerateLessonPlan = async () => {
-    if (analyses.length === 0) {
-      toast.warning("Nenhuma análise encontrada para a turma.");
+    const activeAnalyses = analyses.filter(a => !a.archived);
+    if (activeAnalyses.length === 0) {
+      toast.warning("Nenhuma análise ativa encontrada para a turma.");
       return;
     }
 
     setGeneratingLessonPlan(true);
     try {
-      // Aggregate all errors
-      const aggregatedErrors = analyses.reduce((acc, curr) => {
+      // Aggregate all errors from active analyses
+      const aggregatedErrors = activeAnalyses.reduce((acc, curr) => {
         return acc.concat(curr.errors || []);
       }, []);
 
@@ -546,28 +567,50 @@ export function CognitiveErrorAnalysisView() {
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <FileText size={20} className="text-emerald-600" /> Relatório Detalhado
           </h3>
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
+              ${showArchived ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {showArchived ? <Eye size={16} /> : <EyeOff size={16} />}
+            {showArchived ? 'Ocultar Arquivados' : 'Mostrar Arquivados'}
+          </button>
         </div>
         <div className="divide-y divide-gray-100">
-          {analyses.length === 0 ? (
+          {filteredAnalyses.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              Nenhuma análise gerada ainda. Clique em "Gerar Novas Análises" para começar.
+              {showArchived ? "Nenhuma análise encontrada nos arquivos." : "Nenhuma análise ativa gerada ainda."}
             </div>
           ) : (
-            analyses.map((analysis) => (
-              <div key={analysis.id} className="p-6 hover:bg-gray-50 transition-colors">
+            filteredAnalyses.map((analysis) => (
+              <div key={analysis.id} className={`p-6 hover:bg-gray-50 transition-colors ${analysis.archived ? 'opacity-60 bg-gray-50/50' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
                       {analysis.userId.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">Aluno ID: {analysis.userId.substring(0, 8)}...</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900">Aluno ID: {analysis.userId.substring(0, 8)}...</p>
+                        {analysis.archived && (
+                          <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold uppercase">Arquivado</span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">Submissão: {analysis.submissionId}</p>
                     </div>
                   </div>
-                  <span className="text-xs font-medium text-gray-400">
-                    {new Date(analysis.createdAt?.toDate()).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-medium text-gray-400">
+                      {new Date(analysis.createdAt?.toDate()).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => handleArchiveAnalysis(analysis.id, analysis.archived)}
+                      className={`p-2 rounded-lg transition-colors ${analysis.archived ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                      title={analysis.archived ? "Restaurar" : "Arquivar"}
+                    >
+                      {analysis.archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="space-y-3 pl-13">

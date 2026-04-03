@@ -106,7 +106,8 @@
         "startDate": { "type": "string", "format": "date-time", "description": "Opening date." },
         "endDate": { "type": "string", "format": "date-time", "description": "Closing date." },
         "maxAttempts": { "type": "number", "description": "Max attempts allowed." },
-        "correctionPolicy": { "type": "string", "enum": ["highest_score", "last_attempt", "first_attempt"], "description": "Policy for multiple attempts." }
+        "correctionPolicy": { "type": "string", "enum": ["highest_score", "last_attempt", "first_attempt"], "description": "Policy for multiple attempts." },
+        "difficulty": { "type": "string", "enum": ["fácil", "médio", "difícil", "misto"], "description": "Overall difficulty level of the exam." }
       },
       "required": ["title", "subject", "questions", "createdBy", "applicationMode"]
     },
@@ -232,6 +233,7 @@
         "recommendedExercises": { "type": "array", "items": { "type": "object" }, "description": "Recommended content and exercises." },
         "recommendations": { "type": "array", "items": { "type": "string" }, "description": "General recommendations." },
         "competencyAnalysis": { "type": "object", "description": "Detailed competency performance data." },
+        "difficultyLevel": { "type": "string", "enum": ["básico", "intermediário", "avançado"], "description": "Intensity level of the study plan." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the plan was generated." }
       },
       "required": ["userId", "strengths", "weaknesses", "createdAt"]
@@ -426,6 +428,7 @@
         "currentProficiency": { "type": "number", "description": "Estimated student proficiency (TRI)." },
         "questionHistory": { "type": "array", "items": { "type": "object" }, "description": "History of questions and answers." },
         "status": { "type": "string", "enum": ["active", "completed"], "description": "Session status." },
+        "targetDifficulty": { "type": "string", "enum": ["fácil", "médio", "difícil"], "description": "Target difficulty level for the session." },
         "createdAt": { "type": "string", "format": "date-time", "description": "Start date." }
       },
       "required": ["userId", "examId", "currentProficiency", "status", "createdAt"]

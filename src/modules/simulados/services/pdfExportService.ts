@@ -9,7 +9,18 @@ export const pdfExportService = {
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
       
+      const checkPageBreak = (currentY: number, neededHeight: number) => {
+        if (currentY + neededHeight > pageHeight - 20) {
+          doc.addPage();
+          return 20;
+        }
+        return currentY;
+      };
+
       // Header
       doc.setFillColor(16, 185, 129); // Emerald-500
       doc.rect(0, 0, pageWidth, 40, 'F');
@@ -17,23 +28,23 @@ export const pdfExportService = {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text('Relatório de Desempenho Pedagógico', 15, 25);
+      doc.text('Relatório de Desempenho Pedagógico', margin, 25);
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 15, 33);
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 33);
 
       // Student Info
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Informações do Aluno', 15, 55);
+      doc.text('Informações do Aluno', margin, 55);
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Nome: ${result.aluno || profile?.displayName || 'N/A'}`, 15, 62);
-      doc.text(`E-mail: ${profile?.email || 'N/A'}`, 15, 67);
-      if (profile?.matricula) doc.text(`Matrícula: ${profile.matricula}`, 15, 72);
+      doc.text(`Nome: ${result.aluno || profile?.displayName || 'N/A'}`, margin, 62);
+      doc.text(`E-mail: ${profile?.email || 'N/A'}`, margin, 67);
+      if (profile?.matricula) doc.text(`Matrícula: ${profile.matricula}`, margin, 72);
       
       // Exam Info
       doc.setFontSize(14);
@@ -51,13 +62,14 @@ export const pdfExportService = {
 
       // Competencies Table
       doc.setFontSize(14);
-      doc.text('Desempenho por Competência', 15, 90);
+      doc.text('Desempenho por Competência', margin, 90);
       
-      const competenceData = (result.diagnostico_por_competencia || []).map((comp) => [
+      const competencies = result.diagnostico_por_competencia || [];
+      const competenceData = competencies.map((comp) => [
         comp.competencia || 'N/A',
         comp.total_questoes || 0,
         comp.acertos || 0,
-        `${((comp.acuracia || 0) * 100).toFixed(1)}%`,
+        `${((comp.acuracia_ponderada || comp.acuracia || 0) * 100).toFixed(1)}%`,
         comp.nivel || 'N/A'
       ]);
 
@@ -67,49 +79,58 @@ export const pdfExportService = {
         body: competenceData,
         theme: 'striped',
         headStyles: { fillColor: [16, 185, 129] },
-        styles: { fontSize: 9 }
+        styles: { fontSize: 9, cellPadding: 3 },
+        alternateRowStyles: { fillColor: [245, 255, 250] },
+        margin: { left: margin, right: margin }
       });
 
       // Feedback Section
       let currentY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 15 : 150;
       
+      currentY = checkPageBreak(currentY, 15);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Alertas e Observações', 15, currentY);
+      doc.text('Alertas e Observações', margin, currentY);
+      currentY += 7;
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       const alerts = result.summary?.alertas_dados && result.summary.alertas_dados.length > 0 
         ? result.summary.alertas_dados.join(', ') 
         : 'Nenhum alerta crítico identificado.';
-      const splitAlerts = doc.splitTextToSize(alerts, pageWidth - 30);
-      doc.text(splitAlerts, 15, currentY + 7);
-      currentY += (splitAlerts.length * 5) + 15;
+      const splitAlerts = doc.splitTextToSize(alerts, contentWidth);
+      
+      splitAlerts.forEach((line: string) => {
+        currentY = checkPageBreak(currentY, 7);
+        doc.text(line, margin, currentY);
+        currentY += 5;
+      });
+      currentY += 10;
 
       // Recommendations
-      if (currentY > 250) {
-        doc.addPage();
-        currentY = 20;
-      }
-
+      currentY = checkPageBreak(currentY, 15);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Recomendações por Competência', 15, currentY);
+      doc.text('Recomendações por Competência', margin, currentY);
       currentY += 10;
 
       (result.diagnostico_por_competencia || []).forEach((comp) => {
-        if (currentY > 270) {
-          doc.addPage();
-          currentY = 20;
-        }
+        const splitRec = doc.splitTextToSize(comp.recomendacoes || 'Sem recomendações.', contentWidth);
+        
+        currentY = checkPageBreak(currentY, 10);
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text(comp.competencia || 'N/A', 15, currentY);
+        doc.text(comp.competencia || 'N/A', margin, currentY);
+        currentY += 5;
+        
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        const splitRec = doc.splitTextToSize(comp.recomendacoes || 'Sem recomendações.', pageWidth - 30);
-        doc.text(splitRec, 15, currentY + 5);
-        currentY += (splitRec.length * 4) + 10;
+        splitRec.forEach((line: string) => {
+          currentY = checkPageBreak(currentY, 6);
+          doc.text(line, margin, currentY);
+          currentY += 4;
+        });
+        currentY += 6;
       });
 
       // Footer
@@ -121,40 +142,85 @@ export const pdfExportService = {
         doc.text(
           `Página ${i} de ${pageCount} - Gerado pelo Sistema de Diagnóstico Pedagógico`,
           pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 10,
+          pageHeight - 10,
           { align: 'center' }
         );
       }
 
       doc.save(`Relatorio_Diagnostico_${(result.aluno || 'aluno').replace(/\s+/g, '_')}.pdf`);
     } catch (error) {
+      console.error('Erro ao exportar relatório PDF:', error);
       throw error;
     }
   },
 
   async exportElementToPDF(element: HTMLElement, filename: string) {
     try {
+      // Ensure element is visible and has dimensions
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        // Try to wait a bit if it's a rendering issue
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Store original scroll position
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+
+      // Scroll to top to ensure html2canvas captures correctly
+      window.scrollTo(0, 0);
+
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
-        logging: true,
+        allowTaint: true,
+        logging: false,
         backgroundColor: '#FFFFFF',
-        windowWidth: document.documentElement.scrollWidth,
-        windowHeight: document.documentElement.scrollHeight,
-        onclone: (clonedDoc) => {
-          const svgs = clonedDoc.querySelectorAll('svg');
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDoc, clonedElement) => {
+          // Fix for SVGs in html2canvas
+          const svgs = clonedElement.querySelectorAll('svg');
           svgs.forEach(svg => {
+            const svgRect = svg.getBoundingClientRect();
+            if (svgRect.width > 0 && svgRect.height > 0) {
+              svg.setAttribute('width', svgRect.width.toString());
+              svg.setAttribute('height', svgRect.height.toString());
+            }
             if (!svg.getAttribute('xmlns')) {
               svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
             }
           });
+
+          // Ensure cloned element is visible and has correct layout for capture
+          if (clonedElement instanceof HTMLElement) {
+            clonedElement.style.overflow = 'visible';
+            clonedElement.style.height = 'auto';
+            clonedElement.style.width = `${element.offsetWidth}px`;
+            clonedElement.style.position = 'relative';
+            clonedElement.style.display = 'block';
+            
+            // Remove any sticky or fixed positioning that might break capture
+            const stickyElements = clonedElement.querySelectorAll('*');
+            stickyElements.forEach(el => {
+              if (el instanceof HTMLElement) {
+                const style = window.getComputedStyle(el);
+                if (style.position === 'sticky' || style.position === 'fixed') {
+                  el.style.position = 'relative';
+                }
+              }
+            });
+          }
         }
       });
       
-      const imgData = canvas.toDataURL('image/png');
+      // Restore scroll position
+      window.scrollTo(scrollX, scrollY);
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
       
-      if (imgData === 'data:,') {
-        throw new Error('Canvas vazio. Falha ao renderizar o elemento.');
+      if (!imgData || imgData === 'data:,') {
+        throw new Error('Falha ao capturar imagem do elemento. O canvas está vazio.');
       }
 
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -165,18 +231,21 @@ export const pdfExportService = {
       let heightLeft = pdfHeight;
       let position = 0;
 
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      // Add first page
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
       heightLeft -= pageHeight;
 
+      // Add subsequent pages if content is longer than one page
       while (heightLeft > 0) {
         position = position - pageHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
         heightLeft -= pageHeight;
       }
 
       pdf.save(`${filename}.pdf`);
     } catch (error) {
+      console.error('Erro no PDF Export Service:', error);
       throw error;
     }
   }

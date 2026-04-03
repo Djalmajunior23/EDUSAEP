@@ -31,12 +31,11 @@ export interface DashboardData {
 
 export async function getDashboardData(filters: { disciplineId?: string }): Promise<DashboardData> {
   try {
-    const usersSnap = await getDocs(collection(db, 'users'));
     const submissionsSnap = await getDocs(collection(db, 'exam_submissions'));
     const disciplinesSnap = await getDocs(collection(db, 'disciplines'));
     
-    const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile & { id: string }));
-    const users = allUsers.filter(u => u.role === 'aluno' || !u.role); // Include students or those without a role
+    const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+    const users = usersSnap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile & { id: string }));
     let submissions = submissionsSnap.docs.map(d => d.data());
     const disciplines = disciplinesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Discipline));
 

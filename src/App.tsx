@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Share2,
   Copy,
   LayoutDashboard,
   Calendar,
@@ -69,7 +70,11 @@ import {
   Mail,
   RotateCcw,
   Star,
-  Brain
+  Brain,
+  Archive,
+  ArchiveRestore,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -335,13 +340,13 @@ function ItemGeneratorView({ user }: { user: User | null }) {
                 className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
               >
                 <Database size={20} />
-                Salvar no Banco de Questões
+                Salvar no Banco de Questões (Confirmar)
               </button>
               <button 
-                onClick={handleGenerate}
-                className="px-8 py-4 bg-white text-emerald-600 border-2 border-emerald-600 rounded-xl font-bold hover:bg-emerald-50 transition-all"
+                onClick={() => setGeneratedQuestion(null)}
+                className="px-8 py-4 bg-white text-gray-600 border-2 border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all"
               >
-                Gerar Outra
+                Cancelar
               </button>
             </div>
           </motion.div>
@@ -432,6 +437,8 @@ export interface Question {
   skill?: string;
   difficulty: 'fácil' | 'médio' | 'difícil';
   explanation?: string;
+  note?: string;
+  feedback?: string;
   createdAt?: any;
   createdBy?: string;
 }
@@ -557,18 +564,20 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurrentDiagnosticId, userProfile }: { history: any[], deleteDiagnostic: (id: string) => void, setResult: (res: any) => void, navigate: any, setCurrentDiagnosticId: (id: string) => void, userProfile: UserProfile | null }) {
+function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, navigate, setCurrentDiagnosticId, userProfile }: { history: any[], deleteDiagnostic: (id: string) => void, archiveDiagnostic: (id: string, currentStatus: boolean) => void, setResult: (res: any) => void, navigate: any, setCurrentDiagnosticId: (id: string) => void, userProfile: UserProfile | null }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isBulkEdit, setIsBulkEdit] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [showArchived, setShowArchived] = useState(false);
+  const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc');
 
   const isStudent = userProfile?.role === 'aluno';
   const isProfessor = userProfile?.role === 'professor' || userProfile?.role === 'admin';
 
   const filteredHistory = useMemo(() => {
-    return history.filter(item => {
+    const filtered = history.filter(item => {
       const searchLower = searchTerm.toLowerCase();
       const studentMatch = item.aluno.toLowerCase().includes(searchLower);
       
@@ -579,16 +588,31 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
       };
       
       const dateMatch = getDate(item.createdAt).toLocaleDateString().includes(searchLower);
-      return studentMatch || dateMatch;
+      const matchesSearch = studentMatch || dateMatch;
+      const matchesArchived = showArchived ? true : !item.archived;
+      
+      return matchesSearch && matchesArchived;
     });
-  }, [history, searchTerm]);
+
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+      if (sortOption.startsWith('name')) {
+        comparison = a.aluno.localeCompare(b.aluno);
+      } else {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds : new Date(a.createdAt).getTime() / 1000;
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds : new Date(b.createdAt).getTime() / 1000;
+        comparison = dateA - dateB;
+      }
+      return sortOption.endsWith('asc') ? comparison : -comparison;
+    });
+  }, [history, searchTerm, showArchived, sortOption]);
 
   const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
   const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, showArchived]);
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -640,6 +664,18 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
           <p className="text-gray-500">{isStudent ? 'Acesse seus resultados anteriores.' : 'Acesse diagnósticos gerados anteriormente.'}</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {isProfessor && (
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                showArchived ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              {showArchived ? <Eye size={14} /> : <EyeOff size={14} />}
+              {showArchived ? 'Ocultar Arquivados' : 'Mostrar Arquivados'}
+            </button>
+          )}
           {isProfessor && filteredHistory.length > 0 && (
             <button
               onClick={() => {
@@ -655,7 +691,40 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
               {isBulkEdit ? 'Cancelar Seleção' : 'Seleção em Massa'}
             </button>
           )}
-          <div className="relative w-full md:w-72">
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            <div className="text-xs text-gray-500 font-medium">
+              {filteredHistory.length} resultados encontrados
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-500 bg-white border border-gray-200 px-3 py-2 rounded-xl">
+              <span>Ordenar:</span>
+              <select 
+                value={sortOption} 
+                onChange={(e) => setSortOption(e.target.value as 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc')}
+                className="bg-transparent outline-none font-bold text-emerald-600"
+              >
+                <option value="date-desc">Data (Mais recente)</option>
+                <option value="date-asc">Data (Mais antiga)</option>
+                <option value="name-asc">Nome (A-Z)</option>
+                <option value="name-desc">Nome (Z-A)</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-500 bg-white border border-gray-200 px-3 py-2 rounded-xl">
+              <span>Mostrar:</span>
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent outline-none font-bold text-emerald-600"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            <div className="relative w-full md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
@@ -667,6 +736,7 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
           </div>
         </div>
       </div>
+    </div>
 
       {isBulkEdit && isProfessor && (
         <motion.div 
@@ -709,9 +779,9 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
               <div 
                 key={item.id} 
                 className={cn(
-                  "bg-white p-6 rounded-2xl border transition-all group relative",
+                  "bg-white p-6 rounded-2xl border transition-all group relative hover:scale-[1.02] hover:shadow-lg",
                   isBulkEdit && selectedIds.has(item.id) ? "border-emerald-500 shadow-md" : "border-gray-200 shadow-sm hover:shadow-md",
-                  isBulkEdit && "cursor-pointer"
+                  isBulkEdit && "cursor-pointer hover:scale-100 hover:shadow-sm"
                 )}
                 onClick={() => isBulkEdit && toggleSelect(item.id)}
               >
@@ -732,24 +802,48 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
                     <FileText size={20} />
                   </div>
                   {!isStudent && !isBulkEdit && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
-                        if (true) {
-                          deleteDiagnostic(item.id);
-                        }
-                      }}
-                      className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          archiveDiagnostic(item.id, item.archived);
+                        }}
+                        className={cn(
+                          "p-2 transition-all opacity-0 group-hover:opacity-100 rounded-lg",
+                          item.archived ? "text-blue-600 hover:bg-blue-50" : "text-gray-300 hover:text-amber-600 hover:bg-amber-50"
+                        )}
+                        title={item.archived ? "Restaurar" : "Arquivar"}
+                      >
+                        {item.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
+                          if (true) {
+                            deleteDiagnostic(item.id);
+                          }
+                        }}
+                        className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-red-50"
+                        title="Excluir"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   )}
                 </div>
-                <h3 className={cn(
-                  "font-bold text-gray-900 mb-1 truncate",
-                  isBulkEdit && "ml-8"
-                )}>{item.aluno}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className={cn(
+                    "font-bold text-gray-900 truncate",
+                    isBulkEdit && "ml-8"
+                  )}>{item.aluno}</h3>
+                  {item.archived && (
+                    <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold uppercase">Arquivado</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mb-2">
+                  {item.result.diagnostico_por_competencia?.sort((a: any, b: any) => a.acuracia - b.acuracia)[0]?.competencia || 'Sem competência'}
+                </div>
                 <p className={cn(
                   "text-xs text-gray-400 mb-4",
                   isBulkEdit && "ml-8"
@@ -782,24 +876,60 @@ function HistoryView({ history, deleteDiagnostic, setResult, navigate, setCurren
           </div>
           
           {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 pt-4">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 hover:bg-gray-50"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm font-medium text-gray-600">
-                Página {currentPage} de {totalPages}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-100">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                Página {currentPage} de {totalPages} • {filteredHistory.length} resultados
               </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 hover:bg-gray-50"
-              >
-                <ChevronRight size={18} />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-all"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    if (pageNum < 1 || pageNum > totalPages) return null;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={cn(
+                          "w-10 h-10 rounded-xl text-sm font-bold transition-all",
+                          currentPage === pageNum 
+                            ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100" 
+                            : "text-gray-500 hover:bg-gray-100"
+                        )}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-all"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1561,13 +1691,54 @@ import { firebaseConfig } from './firebase';
 
 function ProfessorDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalExams: 0,
+    avgScore: 0,
+    recentActivity: [] as any[]
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchStats = async () => {
+      try {
+        // Fetch total students
+        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'aluno'));
+        const studentsSnap = await getDocs(studentsQuery);
+        
+        // Fetch diagnostics for stats
+        const diagQuery = query(collection(db, 'diagnostics'), orderBy('createdAt', 'desc'), limit(50));
+        const diagSnap = await getDocs(diagQuery);
+        
+        const diags = diagSnap.docs.map(doc => doc.data());
+        const totalExams = diags.length;
+        const totalScore = diags.reduce((acc, curr) => acc + (curr.result?.summary?.acuracia_geral * 100 || 0), 0);
+        const avgScore = totalExams > 0 ? totalScore / totalExams : 0;
+
+        setStats({
+          totalStudents: studentsSnap.size,
+          totalExams,
+          avgScore,
+          recentActivity: diagSnap.docs.slice(0, 5).map(doc => ({ id: doc.id, ...doc.data() }))
+        });
+      } catch (err) {
+        console.error("Error fetching professor stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [user]);
   
   return (
     <div className="space-y-8 py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Painel do Professor</h1>
-          <p className="text-gray-500">Bem-vindo, {userProfile?.displayName || 'Professor'}. Gerencie suas turmas e simulados.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Painel do Professor</h1>
+          <p className="text-gray-500 dark:text-gray-400">Bem-vindo, {userProfile?.displayName || 'Professor'}. Gerencie suas turmas e simulados.</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -1579,133 +1750,161 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/exams')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
+            <Users size={24} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total de Alunos</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{loading ? '...' : stats.totalStudents}</p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center">
             <BookOpen size={24} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900">Gestão de Simulados</h3>
-            <p className="text-xs text-gray-500">Crie e gerencie avaliações padrão SAEP.</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Simulados Aplicados</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{loading ? '...' : stats.totalExams}</p>
           </div>
-          <div className="mt-auto flex items-center gap-2 text-emerald-600 text-xs font-bold">
-            Gerenciar <ArrowRight size={14} />
-          </div>
-        </motion.button>
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/questions-bank')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
-            <Database size={24} />
-          </div>
-          <div>
-            <h3 className="font-bold text-gray-900">Banco de Questões</h3>
-            <p className="text-xs text-gray-500">Acesse e organize questões por competência.</p>
-          </div>
-          <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
-            Acessar <ArrowRight size={14} />
-          </div>
-        </motion.button>
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/professor-insights')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center">
             <TrendingUp size={24} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900">Insights da Turma</h3>
-            <p className="text-xs text-gray-500">Análise de desempenho e planos de aula IA.</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Média de Acertos</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{loading ? '...' : `${stats.avgScore.toFixed(1)}%`}</p>
           </div>
-          <div className="mt-auto flex items-center gap-2 text-purple-600 text-xs font-bold">
-            Analisar <ArrowRight size={14} />
-          </div>
-        </motion.button>
+        </div>
+      </div>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/cognitive-analysis')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
-            <Brain size={24} />
-          </div>
-          <div>
-            <h3 className="font-bold text-gray-900">Erros Cognitivos</h3>
-            <p className="text-xs text-gray-500">Análise profunda das dificuldades dos alunos.</p>
-          </div>
-          <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
-            Analisar <ArrowRight size={14} />
-          </div>
-        </motion.button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <LayoutDashboard size={20} className="text-emerald-600" />
+            Ações Rápidas
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/exams')}
+              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+            >
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
+                <BookOpen size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Gestão de Simulados</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Crie e gerencie avaliações padrão SAEP.</p>
+              </div>
+              <div className="mt-auto flex items-center gap-2 text-emerald-600 text-xs font-bold">
+                Gerenciar <ArrowRight size={14} />
+              </div>
+            </motion.button>
 
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/questions-bank')}
+              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+            >
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center">
+                <Database size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Banco de Questões</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Acesse e organize questões por competência.</p>
+              </div>
+              <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
+                Acessar <ArrowRight size={14} />
+              </div>
+            </motion.button>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/history')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
-            <History size={24} />
-          </div>
-          <div>
-            <h3 className="font-bold text-gray-900">Histórico</h3>
-            <p className="text-xs text-gray-500">Veja diagnósticos anteriores e resultados.</p>
-          </div>
-          <div className="mt-auto flex items-center gap-2 text-amber-600 text-xs font-bold">
-            Ver Tudo <ArrowRight size={14} />
-          </div>
-        </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/professor-insights')}
+              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+            >
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center">
+                <TrendingUp size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Insights da Turma</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Análise de desempenho e planos de aula IA.</p>
+              </div>
+              <div className="mt-auto flex items-center gap-2 text-purple-600 text-xs font-bold">
+                Analisar <ArrowRight size={14} />
+              </div>
+            </motion.button>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/reports')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
-            <BarChart3 size={24} />
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/cognitive-analysis')}
+              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+            >
+              <div className="w-12 h-12 bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center">
+                <Brain size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Erros Cognitivos</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Análise profunda das dificuldades dos alunos.</p>
+              </div>
+              <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
+                Analisar <ArrowRight size={14} />
+              </div>
+            </motion.button>
           </div>
-          <div>
-            <h3 className="font-bold text-gray-900">Relatórios</h3>
-            <p className="text-xs text-gray-500">Exporte dados e gere relatórios de BI.</p>
-          </div>
-          <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
-            Gerar <ArrowRight size={14} />
-          </div>
-        </motion.button>
+        </div>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/tasks')}
-          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-        >
-          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
-            <CheckSquare size={24} />
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <History size={20} className="text-emerald-600" />
+            Atividade Recente
+          </h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            {loading ? (
+              <div className="p-8 text-center">
+                <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-sm text-gray-500">Carregando atividade...</p>
+              </div>
+            ) : stats.recentActivity.length === 0 ? (
+              <div className="p-8 text-center text-gray-500 italic text-sm">
+                Nenhuma atividade recente encontrada.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {stats.recentActivity.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => navigate(`/aluno/${item.id}`)}
+                    className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left flex items-center justify-between group"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{item.aluno}</p>
+                      <p className="text-[10px] text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-emerald-600">{(item.result?.summary?.acuracia_geral * 100)?.toFixed(1)}%</p>
+                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Acerto</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => navigate('/history')}
+              className="w-full p-3 bg-gray-50 dark:bg-gray-700/50 text-xs font-bold text-gray-500 hover:text-emerald-600 transition-colors border-t border-gray-100 dark:border-gray-700"
+            >
+              Ver Histórico Completo
+            </button>
           </div>
-          <div>
-            <h3 className="font-bold text-gray-900">Minhas Tarefas</h3>
-            <p className="text-xs text-gray-500">Organize suas atividades pedagógicas.</p>
-          </div>
-          <div className="mt-auto flex items-center gap-2 text-indigo-600 text-xs font-bold">
-            Ver Tarefas <ArrowRight size={14} />
-          </div>
-        </motion.button>
+        </div>
       </div>
     </div>
   );
@@ -1996,7 +2195,9 @@ function QuestionsBankView({ user }: { user: User | null }) {
     weight: 1,
     competency: '',
     difficulty: 'médio',
-    explanation: ''
+    explanation: '',
+    note: '',
+    feedback: ''
   });
 
   // States for missing competencies during import
@@ -2064,7 +2265,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
         toast.success("Questão adicionada ao banco!");
       }
       setIsEditing(false);
-      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio', explanation: '' });
+      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio', explanation: '', note: '', feedback: '' });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'questions');
     }
@@ -2585,6 +2786,26 @@ function QuestionsBankView({ user }: { user: User | null }) {
                 rows={3}
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nota Privada (Professor)</label>
+              <textarea 
+                value={currentQuestion.note || ''} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, note: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Anotações privadas sobre esta questão..."
+                rows={2}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Feedback Individual (Aluno)</label>
+              <textarea 
+                value={currentQuestion.feedback || ''} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, feedback: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Feedback que será exibido para o aluno caso ele erre a questão..."
+                rows={2}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -2650,7 +2871,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
                       </select>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competency}</span>
                     </div>
-                    <p className="text-gray-900 font-medium">{q.text}</p>
+                    <p className={cn("text-gray-900 font-medium", !isExpanded && "line-clamp-2")}>{q.text}</p>
                     
                     <button 
                       onClick={() => toggleExpand(q.id)}
@@ -2702,6 +2923,27 @@ function QuestionsBankView({ user }: { user: User | null }) {
                             <Info size={14} /> Explicação da Resposta
                           </p>
                           <p className="text-sm text-gray-600 italic leading-relaxed">{q.explanation}</p>
+                        </div>
+                      )}
+
+                      {(q.note || q.feedback) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {q.note && (
+                            <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 shadow-sm">
+                              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <FileText size={14} /> Nota Privada (Professor)
+                              </p>
+                              <p className="text-sm text-amber-900 leading-relaxed">{q.note}</p>
+                            </div>
+                          )}
+                          {q.feedback && (
+                            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 shadow-sm">
+                              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <MessageSquare size={14} /> Feedback Individual (Aluno)
+                              </p>
+                              <p className="text-sm text-blue-900 leading-relaxed">{q.feedback}</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -6861,6 +7103,18 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
 
         <div className="flex gap-3">
           <button
+            onClick={() => {
+              const shareUrl = `${window.location.origin}/shared-diagnostic/${diagnosticId}`;
+              navigator.clipboard.writeText(shareUrl);
+              toast.success("Link de compartilhamento copiado!");
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-sm"
+          >
+            <Share2 size={14} />
+            Compartilhar
+          </button>
+
+          <button
             onClick={handleGenerateRecoveryPlan}
             disabled={generatingPlan}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
@@ -7288,9 +7542,9 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
               filteredCompetencias.map((comp, idx) => (
                 <motion.div 
                   key={idx}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.1 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: idx * 0.05, duration: 0.5 }}
                   className={cn(
                     "group p-6 bg-white border rounded-2xl shadow-sm hover:shadow-md transition-all",
                     comp.nivel === 'Crítico' ? "border-red-400 ring-2 ring-red-100 bg-red-50/50" : "border-gray-100 hover:border-emerald-100"
@@ -7621,7 +7875,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
                           )}
 
                           {/* Professor Feedback Section */}
-                          {(comp.nivel === 'Crítico' || comp.acertos < comp.total_questoes) && (
+                          {(isProfessor || comp.nivel === 'Crítico' || comp.acertos < comp.total_questoes) && (
                             <div className={cn(
                               "mt-6 pt-6 border-t border-gray-100 space-y-4",
                               comp.nivel === 'Crítico' && "bg-red-50/20 -mx-6 px-6 pb-6 rounded-b-2xl"
@@ -8837,24 +9091,29 @@ function AppContent() {
       return items;
     }
     return [
-      { type: 'header', label: 'Gestão de Dados' },
+      { type: 'header', label: 'Painel Principal' },
+      { id: 'dashboard', label: 'Painel do Professor', icon: LayoutDashboard, path: '/dashboard' },
       { id: 'bi-analysis', label: 'Análise BI', icon: TrendingUp, path: '/bi-analysis', description: 'Insights da Turma' },
+      
+      { type: 'header', label: 'Gestão de Dados' },
       { id: 'data-import', label: 'Importação n8n', icon: Database, path: '/data-import', description: 'Integração SIAC' },
       { id: 'external-forms', label: 'Formulários Externos', icon: ExternalLink, path: '/external-forms', description: 'Sincronização n8n' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
+      
       { type: 'header', label: 'Gestão Pedagógica' },
       { id: 'classes', label: 'Turmas', icon: Users, path: '/classes' },
       { id: 'disciplines', label: 'Disciplinas', icon: BookOpen, path: '/disciplines' },
       { id: 'questions-bank', label: 'Banco de Questões', icon: Database, path: '/questions-bank' },
       { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Avaliação Formal' },
       { id: 'exercises-management', label: 'Exercícios', icon: CheckSquare, path: '/exercises-management', description: 'Prática Dirigida' },
+      
       { type: 'header', label: 'Comunicação e Admin' },
       { id: 'chat', label: 'Chat IA', icon: MessageSquare, path: '/chat' },
       { id: 'admin-users', label: 'Gestão', icon: Users, path: '/admin-users' },
+      
       { type: 'header', label: 'Visão do Aluno' },
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, disabled: !result, path: result && currentDiagnosticId ? `/dashboard/${currentDiagnosticId}` : '/dashboard' },
       { id: 'aluno', label: 'Detalhes', icon: UserCheck, disabled: !result, path: result && currentDiagnosticId ? `/aluno/${currentDiagnosticId}` : '/aluno' },
       { id: 'plan', label: 'Plano', icon: Calendar, disabled: !result, path: '/plan' },
       { id: 'profile', label: 'Perfil', icon: UserIcon, path: '/profile' },
@@ -9201,6 +9460,19 @@ function AppContent() {
     } catch (err) {
       toast.error('Erro ao excluir diagnóstico.');
       handleFirestoreError(err, OperationType.DELETE, path);
+    }
+  };
+
+  const archiveDiagnostic = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'diagnostics', id), {
+        archived: !currentStatus,
+        updatedAt: serverTimestamp()
+      });
+      toast.success(currentStatus ? 'Diagnóstico restaurado com sucesso!' : 'Diagnóstico arquivado com sucesso!');
+    } catch (err) {
+      toast.error('Erro ao alterar status do diagnóstico.');
+      handleFirestoreError(err, OperationType.UPDATE, `diagnostics/${id}`);
     }
   };
 
@@ -10015,6 +10287,7 @@ function AppContent() {
                 <HistoryView 
                   history={history} 
                   deleteDiagnostic={deleteDiagnostic} 
+                  archiveDiagnostic={archiveDiagnostic}
                   setResult={setResult} 
                   navigate={navigate} 
                   setCurrentDiagnosticId={setCurrentDiagnosticId}

@@ -381,6 +381,7 @@ export async function generateRecoveryPlan(studentData: any, modelName: string =
 }
 
 export interface LessonPlanResult {
+  id?: string;
   title: string;
   objectives: string[];
   topicsToReview: string[];
@@ -388,12 +389,13 @@ export interface LessonPlanResult {
     name: string;
     description: string;
     duration: string;
+    professor_notes?: string;
   }>;
   suggestedMaterials: string[];
   aiInsights: string;
 }
 
-export async function generateLessonPlan(classData: any, modelName: string = "gemini-3-flash-preview"): Promise<LessonPlanResult> {
+export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-3-flash-preview"): Promise<LessonPlanResult> {
   const response = await ai.models.generateContent({
     model: modelName,
     contents: [
@@ -401,10 +403,18 @@ export async function generateLessonPlan(classData: any, modelName: string = "ge
         role: "user",
         parts: [
           {
-            text: `Com base nos erros cognitivos da turma, gere um plano de aula focado em remediar as dificuldades mais comuns.
+            text: `Com base nos dados de desempenho da turma e nas análises de erros cognitivos, gere um plano de aula focado em remediar as dificuldades mais comuns.
             
-            DADOS DA TURMA E ERROS COGNITIVOS:
+            DADOS DA TURMA (Desempenho por competência):
             ${JSON.stringify(classData)}
+            
+            ANÁLISES DE ERROS COGNITIVOS DA TURMA:
+            ${JSON.stringify(cognitiveAnalyses)}
+            
+            INSTRUÇÕES ADICIONAIS:
+            1. Agrupe os erros cognitivos por competência.
+            2. Priorize as competências com menor desempenho (identificadas nos dados da turma).
+            3. Gere o plano de aula focado nessas competências críticas.
             
             RETORNE UM JSON COM:
             {
