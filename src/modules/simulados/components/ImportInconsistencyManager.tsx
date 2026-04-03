@@ -30,6 +30,7 @@ export function ImportInconsistencyManager() {
   const [inconsistencies, setInconsistencies] = useState<ImportInconsistency[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [allStudents, setAllStudents] = useState<UserProfile[]>([]);
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedInconsistency, setSelectedInconsistency] = useState<string | null>(null);
@@ -47,46 +48,80 @@ export function ImportInconsistencyManager() {
       handleFirestoreError(error, OperationType.GET, 'import_inconsistencies');
     });
 
+    const fetchStudents = async () => {
+      try {
+        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'aluno'));
+        const snap = await getDocs(studentsQuery);
+        setAllStudents(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      } catch (err) {
+        console.error("Error fetching students for mapping", err);
+      }
+    };
+    fetchStudents();
+
     return () => unsubscribe();
   }, []);
 
-  const handleSearchStudents = async () => {
-    if (!searchTerm.trim()) return;
-    setIsSearching(true);
-    try {
-      const q = query(
-        collection(db, 'users'),
-        where('role', '==', 'aluno')
-      );
-      const snap = await getDocs(q);
-      const allStudents = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
-      
-      const term = searchTerm.toLowerCase();
-      
-      // Calculate relevance score for better ordering
-      const scoredStudents = allStudents
-        .map(s => {
-          let score = 0;
-          const name = s.displayName?.toLowerCase() || '';
-          const email = s.email?.toLowerCase() || '';
-          const mat = s.matricula?.toLowerCase() || '';
-
-          if (name.includes(term)) score += 3;
-          if (email.includes(term)) score += 2;
-          if (mat.includes(term)) score += 1;
-          
-          return { ...s, score };
-        })
-        .filter(s => s.score > 0)
-        .sort((a, b) => b.score - a.score);
-      
-      setStudents(scoredStudents);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.GET, 'users');
-      toast.error("Erro ao buscar alunos.");
-    } finally {
-      setIsSearching(false);
+  useEffect(() => {
+    if (selectedInconsistency) {
+      const inc = inconsistencies.find(i => i.id === selectedInconsistency);
+      if (inc) {
+        updateSuggestions(inc, searchTerm);
+      }
     }
+  }, [selectedInconsistency, searchTerm, allStudents]);
+
+  const updateSuggestions = (inc: ImportInconsistency | null, term: string) => {
+    if (!inc && !term) {
+      setStudents([]);
+      return;
+    }
+
+    const searchTerms = term.toLowerCase().split(/\s+/).filter(Boolean);
+    const incNameTerms = inc?.originalData.alunoNome?.toLowerCase().split(/\s+/).filter(Boolean) || [];
+    const incEmail = inc?.originalData.alunoEmail?.toLowerCase() || '';
+    const incMat = inc?.originalData.alunoMatricula?.toLowerCase() || '';
+
+    const scoredStudents = allStudents
+      .map(s => {
+        let score = 0;
+        const name = s.displayName?.toLowerCase() || '';
+        const email = s.email?.toLowerCase() || '';
+        const mat = s.matricula?.toLowerCase() || '';
+
+        if (searchTerms.length > 0) {
+          // Manual search
+          searchTerms.forEach(t => {
+            if (name.includes(t)) score += 3;
+            if (email.includes(t)) score += 2;
+            if (mat.includes(t)) score += 4;
+          });
+        } else if (inc) {
+          // Auto-suggest based on inconsistency data
+          incNameTerms.forEach(t => {
+            if (t.length > 2 && name.includes(t)) score += 1;
+          });
+          if (email && incEmail && email === incEmail) score += 5;
+          else if (email && incEmail && email.includes(incEmail.split('@')[0])) score += 2;
+          
+          if (mat && incMat && mat === incMat) score += 5;
+          else if (mat && incMat && mat.includes(incMat)) score += 2;
+        }
+        
+        return { ...s, score };
+      })
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10); // Limit to top 10 suggestions
+    
+    setStudents(scoredStudents);
+  };
+
+  const handleSearchStudents = async () => {
+    // Search is now handled automatically by the useEffect
+    // This function is kept for the button click, but it's mostly redundant now
+    const inc = inconsistencies.find(i => i.id === selectedInconsistency);
+    updateSuggestions(inc || null, searchTerm);
   };
 
   const resolveInconsistency = async (inconsistencyId: string, studentId: string) => {

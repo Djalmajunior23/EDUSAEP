@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import OpenAI from "openai";
 
 dotenv.config();
 
@@ -15,9 +16,58 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Initialize APIs
+  const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+  const deepseek = process.env.DEEPSEEK_API_KEY ? new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com/v1' }) : null;
+
   // API routes go here
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Generic AI generation endpoint for OpenAI and DeepSeek
+  app.post("/api/ai/generate", async (req, res) => {
+    try {
+      const { prompt, systemInstruction, responseFormat, provider } = req.body;
+
+      if (provider === 'deepseek') {
+        if (!deepseek) {
+          return res.status(500).json({ error: "DeepSeek API key not configured" });
+        }
+        const completion = await deepseek.chat.completions.create({
+          model: "deepseek-chat",
+          messages: [
+            ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
+            { role: "user" as const, content: prompt }
+          ],
+          response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
+          temperature: 1.0,
+        });
+        const text = completion.choices[0].message.content;
+        return res.json({ text });
+      }
+
+      // Default to OpenAI
+      if (!openai) {
+        return res.status(500).json({ error: "OpenAI API key not configured" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini", // or gpt-4o
+        messages: [
+          ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
+          { role: "user" as const, content: prompt }
+        ],
+        response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
+        temperature: 1.0,
+      });
+
+      const text = completion.choices[0].message.content;
+      res.json({ text });
+    } catch (error: any) {
+      console.error("[AI Generation] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate content" });
+    }
   });
 
   // Webhook for external form responses (n8n integration)

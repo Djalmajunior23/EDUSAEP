@@ -34,9 +34,42 @@ export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamPro
   const [showFeedback, setShowFeedback] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  const STORAGE_KEY = `adaptive_exam_progress_${examId}`;
+
   useEffect(() => {
+    const savedProgress = localStorage.getItem(STORAGE_KEY);
+    if (savedProgress) {
+      try {
+        const parsed = JSON.parse(savedProgress);
+        setHistory(parsed.history || []);
+        setProficiency(parsed.proficiency || 50);
+        setQuestionCount(parsed.questionCount || 0);
+        setSessionId(parsed.sessionId || null);
+        setCurrentQuestion(parsed.currentQuestion || null);
+        setSelectedOption(parsed.selectedOption !== undefined ? parsed.selectedOption : null);
+        setShowFeedback(parsed.showFeedback || false);
+        return; // Don't start a new session if we loaded one
+      } catch (e) {
+        console.error("Failed to parse saved progress", e);
+      }
+    }
     startSession();
-  }, []);
+  }, [examId]);
+
+  useEffect(() => {
+    if (sessionId) {
+      const progress = {
+        history,
+        proficiency,
+        questionCount,
+        sessionId,
+        currentQuestion,
+        selectedOption,
+        showFeedback
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    }
+  }, [history, proficiency, questionCount, sessionId, currentQuestion, selectedOption, showFeedback, examId]);
 
   const startSession = async () => {
     if (!auth.currentUser) return;
@@ -127,6 +160,7 @@ export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamPro
         finalProficiency: proficiency
       });
 
+      localStorage.removeItem(STORAGE_KEY);
       onComplete(score);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'adaptive_sessions/exam_submissions');

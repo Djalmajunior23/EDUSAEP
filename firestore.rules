@@ -5,15 +5,21 @@ service cloud.firestore {
     // ===============================================================
     // Assumed Data Model
     // ===============================================================
+    //
+    // Collection: questions
+    // Document ID: auto-generated
+    // Fields:
+    //   - text: string (required, 1-2000 chars) - The question text.
+    //   - options: list (required, min 2 items) - The answer options.
+    //   - correctOption: int (required, index of options) - The correct option index.
+    //   - competency: string (required) - The competency ID.
+    //   - difficulty: string (required, ['fácil', 'médio', 'difícil']) - The difficulty level.
+    //   - weight: number (optional) - The weight of the question.
+    //   - skill: string (optional) - The specific skill ID.
+    //   - createdBy: string (optional) - The UID of the creator.
+    //   - createdAt: timestamp (optional) - When it was created.
+    //
     // Collection: users
-    // Collection: classes
-    // Collection: disciplines
-    // Collection: competencias
-    // Collection: habilidades
-    // Collection: importacoes
-    // Collection: insights_ia
-    // Collection: recomendacoes_pedagogicas
-    // Collection: alertas_pedagogicos
     // ... (and others)
     // ===============================================================
 
@@ -150,6 +156,11 @@ service cloud.firestore {
     function isValidQuestion(data) {
       return hasRequiredFields(['text', 'options', 'correctOption', 'competency', 'difficulty']) &&
              isValidString('text', 1, 2000) &&
+             data.options is list &&
+             data.options.size() >= 2 &&
+             data.correctOption is int &&
+             data.correctOption >= 0 &&
+             data.correctOption < data.options.size() &&
              data.difficulty in ['fácil', 'médio', 'difícil'];
     }
 

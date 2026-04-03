@@ -15,7 +15,8 @@ import {
   BookOpen,
   Zap,
   X,
-  ArrowRight
+  ArrowRight,
+  Mail
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -154,7 +155,29 @@ export function ProfessorInsights() {
         cognitiveAnalyses = snapshot.docs.map(doc => doc.data());
       }
 
-      const plan = await generateLessonPlan(classData, cognitiveAnalyses);
+      // Group errors by competency and prioritize critical ones
+      const errorsByCompetency: Record<string, { count: number, errors: Set<string> }> = {};
+      cognitiveAnalyses.forEach(analysis => {
+        if (analysis.competency && analysis.errorDescription) {
+          if (!errorsByCompetency[analysis.competency]) {
+            errorsByCompetency[analysis.competency] = { count: 0, errors: new Set() };
+          }
+          errorsByCompetency[analysis.competency].count++;
+          errorsByCompetency[analysis.competency].errors.add(analysis.errorDescription);
+        }
+      });
+
+      const criticalCompetencies = classData
+        .map(c => ({
+          competency: c.name,
+          avgScore: c.avg,
+          errorCount: errorsByCompetency[c.name]?.count || 0,
+          frequentErrors: Array.from(errorsByCompetency[c.name]?.errors || [])
+        }))
+        .sort((a, b) => a.avgScore - b.avgScore) // Sort by lowest score first
+        .slice(0, 3); // Take top 3 most critical
+
+      const plan = await generateLessonPlan(criticalCompetencies, cognitiveAnalyses);
       setLessonPlan(plan);
       
       // Save to Firestore
@@ -195,7 +218,15 @@ export function ProfessorInsights() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Análise de Turmas</h2>
-          <p className="text-sm text-gray-500">Compare o desempenho coletivo e gere intervenções automáticas.</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-gray-500">Compare o desempenho coletivo e gere intervenções automáticas.</p>
+            {auth.currentUser?.email && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700">
+                <Mail size={12} className="text-gray-400" />
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">{auth.currentUser.email}</span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <select 

@@ -71,10 +71,12 @@ import {
   RotateCcw,
   Star,
   Brain,
+  Hexagon,
   Archive,
   ArchiveRestore,
   Eye,
-  EyeOff
+  EyeOff,
+  BarChart2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -155,6 +157,7 @@ import { AdaptiveExam } from './components/student/AdaptiveExam';
 import { Gamification } from './components/student/Gamification';
 import { ProfessorInsights } from './components/professor/ProfessorInsights';
 import { CognitiveErrorAnalysisView } from './components/professor/CognitiveErrorAnalysisView';
+import { ConsolidatedReportView } from './components/professor/ConsolidatedReportView';
 import { handleFirestoreError, OperationType } from './services/errorService';
 
 
@@ -380,6 +383,38 @@ function DarkModeToggle({ darkMode, setDarkMode }: { darkMode: boolean, setDarkM
   );
 }
 
+// AI Provider Toggle Component
+function AIProviderToggle() {
+  const [provider, setProvider] = useState<'gemini' | 'openai' | 'deepseek'>(() => {
+    return (localStorage.getItem('ai_provider') as 'gemini' | 'openai' | 'deepseek') || 'gemini';
+  });
+
+  const toggleProvider = () => {
+    const nextProvider = {
+      'gemini': 'openai',
+      'openai': 'deepseek',
+      'deepseek': 'gemini'
+    }[provider] as 'gemini' | 'openai' | 'deepseek';
+    
+    setProvider(nextProvider);
+    localStorage.setItem('ai_provider', nextProvider);
+    window.dispatchEvent(new Event('ai_provider_changed'));
+    toast.success(`Provedor de IA alterado para ${nextProvider === 'gemini' ? 'Gemini' : nextProvider === 'openai' ? 'ChatGPT' : 'DeepSeek'}`);
+  };
+
+  return (
+    <button
+      onClick={toggleProvider}
+      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all font-bold text-xs"
+      title="Alternar Provedor de IA"
+    >
+      {provider === 'gemini' && <><Sparkles size={16} className="text-blue-500" /> Gemini</>}
+      {provider === 'openai' && <><Brain size={16} className="text-emerald-500" /> ChatGPT</>}
+      {provider === 'deepseek' && <><Hexagon size={16} className="text-indigo-500" /> DeepSeek</>}
+    </button>
+  );
+}
+
 // Protected Route Component
 function ProtectedRoute({ allowedRoles, userProfile, children }: { allowedRoles: string[], userProfile: UserProfile | null, children: React.ReactNode }) {
   if (!userProfile) return null; // Wait for profile to load
@@ -570,7 +605,7 @@ function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, 
   const [isBulkEdit, setIsBulkEdit] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [showArchived, setShowArchived] = useState(false);
+  const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc');
 
   const isStudent = userProfile?.role === 'aluno';
@@ -589,7 +624,7 @@ function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, 
       
       const dateMatch = getDate(item.createdAt).toLocaleDateString().includes(searchLower);
       const matchesSearch = studentMatch || dateMatch;
-      const matchesArchived = showArchived ? true : !item.archived;
+      const matchesArchived = viewMode === 'archived' ? item.archived : !item.archived;
       
       return matchesSearch && matchesArchived;
     });
@@ -605,14 +640,14 @@ function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, 
       }
       return sortOption.endsWith('asc') ? comparison : -comparison;
     });
-  }, [history, searchTerm, showArchived, sortOption]);
+  }, [history, searchTerm, viewMode, sortOption]);
 
   const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
   const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, showArchived]);
+  }, [searchTerm, viewMode]);
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -665,16 +700,26 @@ function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, 
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           {isProfessor && (
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
-                showArchived ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              )}
-            >
-              {showArchived ? <Eye size={14} /> : <EyeOff size={14} />}
-              {showArchived ? 'Ocultar Arquivados' : 'Mostrar Arquivados'}
-            </button>
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setViewMode('active')}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  viewMode === 'active' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                Ativos
+              </button>
+              <button
+                onClick={() => setViewMode('archived')}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  viewMode === 'archived' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                Arquivados
+              </button>
+            </div>
           )}
           {isProfessor && filteredHistory.length > 0 && (
             <button
@@ -1859,6 +1904,24 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
                 Analisar <ArrowRight size={14} />
               </div>
             </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/consolidated-report')}
+              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+            >
+              <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
+                <BarChart2 size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Relatório Consolidado</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Desempenho geral de todos os alunos.</p>
+              </div>
+              <div className="mt-auto flex items-center gap-2 text-indigo-600 text-xs font-bold">
+                Visualizar <ArrowRight size={14} />
+              </div>
+            </motion.button>
           </div>
         </div>
 
@@ -2163,6 +2226,14 @@ function CognitiveAnalysisView() {
   );
 }
 
+function ConsolidatedReportRoute({ history }: { history: any[] }) {
+  return (
+    <div className="py-8">
+      <ConsolidatedReportView history={history} />
+    </div>
+  );
+}
+
 
 function SocraticTutorView() {
   return (
@@ -2207,6 +2278,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const [questionStats, setQuestionStats] = useState<Record<string, { correct: number, incorrect: number }>>({});
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedQuestions);
@@ -2217,6 +2289,49 @@ function QuestionsBankView({ user }: { user: User | null }) {
     }
     setExpandedQuestions(newExpanded);
   };
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchStats = async () => {
+      try {
+        const [examsSnap, submissionsSnap] = await Promise.all([
+          getDocs(collection(db, 'exams')),
+          getDocs(collection(db, 'exam_submissions'))
+        ]);
+
+        const exams = examsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
+        const submissions = submissionsSnap.docs.map(doc => doc.data() as ExamSubmission);
+
+        const stats: Record<string, { correct: number, incorrect: number }> = {};
+
+        submissions.forEach(sub => {
+          const exam = exams.find(e => e.id === sub.resourceId);
+          if (exam && exam.questions) {
+            exam.questions.forEach((q, idx) => {
+              if (q.id) {
+                if (!stats[q.id]) {
+                  stats[q.id] = { correct: 0, incorrect: 0 };
+                }
+                const isCorrect = sub.answers[idx] === q.correctOption;
+                if (isCorrect) {
+                  stats[q.id].correct++;
+                } else {
+                  stats[q.id].incorrect++;
+                }
+              }
+            });
+          }
+        });
+
+        setQuestionStats(stats);
+      } catch (err) {
+        console.error("Error fetching question stats:", err);
+      }
+    };
+
+    fetchStats();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -2870,6 +2985,16 @@ function QuestionsBankView({ user }: { user: User | null }) {
                         <option value="difícil">Difícil</option>
                       </select>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competency}</span>
+                      {questionStats[q.id] && (questionStats[q.id].correct > 0 || questionStats[q.id].incorrect > 0) && (
+                        <div className="flex items-center gap-1 ml-2 text-[10px] font-bold">
+                          <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1" title="Acertos">
+                            <CheckCircle2 size={10} /> {questionStats[q.id].correct}
+                          </span>
+                          <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded-full flex items-center gap-1" title="Erros">
+                            <XCircle size={10} /> {questionStats[q.id].incorrect}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <p className={cn("text-gray-900 font-medium", !isExpanded && "line-clamp-2")}>{q.text}</p>
                     
@@ -8968,12 +9093,12 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <HashRouter>
+    <HashRouter>
+      <ErrorBoundary>
         <Toaster position="top-right" richColors />
         <AppContent />
-      </HashRouter>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </HashRouter>
   );
 }
 
@@ -9099,6 +9224,7 @@ function AppContent() {
       { id: 'data-import', label: 'Importação n8n', icon: Database, path: '/data-import', description: 'Integração SIAC' },
       { id: 'external-forms', label: 'Formulários Externos', icon: ExternalLink, path: '/external-forms', description: 'Sincronização n8n' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
+      { id: 'consolidated-report', label: 'Consolidado', icon: BarChart2, path: '/consolidated-report' },
       { id: 'input', label: 'Entrada', icon: Upload, path: '/input' },
       { id: 'history', label: 'Histórico', icon: History, path: '/history' },
       
@@ -9861,6 +9987,7 @@ function AppContent() {
             
             <div className="flex items-center gap-3">
               {user && <NotificationBell userId={user.uid} />}
+              <AIProviderToggle />
               <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
               {!user && (
                 <button 
@@ -10124,6 +10251,7 @@ function AppContent() {
               <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} /></ProtectedRoute>} />
               <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} /></ProtectedRoute>} />
               <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView /></ProtectedRoute>} />
+              <Route path="/consolidated-report" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ConsolidatedReportRoute history={history} /></ProtectedRoute>} />
               <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView /></ProtectedRoute>} />
               <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView /></ProtectedRoute>} />
             <Route path="/input" element={

@@ -2,6 +2,53 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
+export type AIProvider = 'gemini' | 'openai' | 'deepseek';
+
+export function getAIProvider(): AIProvider {
+  return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
+}
+
+export function setAIProvider(provider: AIProvider) {
+  localStorage.setItem('ai_provider', provider);
+  window.dispatchEvent(new Event('ai_provider_changed'));
+}
+
+async function generateContentWrapper(params: any): Promise<any> {
+  const provider = getAIProvider();
+
+  if (provider === 'openai' || provider === 'deepseek') {
+    let prompt = "";
+    if (typeof params.contents === 'string') {
+      prompt = params.contents;
+    } else if (Array.isArray(params.contents)) {
+      prompt = params.contents.map((c: any) => {
+        if (c.parts) {
+          return c.parts.map((p: any) => p.text).join('\n');
+        }
+        return c.text || "";
+      }).join('\n');
+    }
+
+    const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
+
+    const response = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, responseFormat, provider })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`${provider === 'openai' ? 'OpenAI' : 'DeepSeek'} API error: ${err.error || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { text: data.text };
+  } else {
+    return await ai.models.generateContent(params);
+  }
+}
+
 export const DEFAULT_CONFIG = {
   temperature: 1.2,
   topK: 50,
@@ -78,7 +125,7 @@ export interface DiagnosticResult {
 }
 
 export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview"): Promise<DiagnosticResult[]> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -162,7 +209,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
 }
 
 export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-3-flash-preview"): Promise<string[]> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -195,7 +242,7 @@ export interface PedagogicalAnalysis {
 }
 
 export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-pro-preview"): Promise<PedagogicalAnalysis> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -242,7 +289,7 @@ export interface LearningProfileResult {
 }
 
 export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-3-flash-preview"): Promise<LearningProfileResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -286,7 +333,7 @@ export interface CognitiveErrorResult {
 }
 
 export async function analyzeCognitiveErrors(submissionData: any, modelName: string = "gemini-3-flash-preview"): Promise<CognitiveErrorResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -341,7 +388,7 @@ export interface RecoveryPlanResult {
 }
 
 export async function generateRecoveryPlan(studentData: any, modelName: string = "gemini-3-flash-preview"): Promise<RecoveryPlanResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -396,7 +443,7 @@ export interface LessonPlanResult {
 }
 
 export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-3-flash-preview"): Promise<LessonPlanResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -452,7 +499,7 @@ export interface PerformancePredictionResult {
 }
 
 export async function predictPerformance(historicalData: any, modelName: string = "gemini-3-flash-preview"): Promise<PerformancePredictionResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -485,7 +532,7 @@ export async function predictPerformance(historicalData: any, modelName: string 
 }
 
 export async function suggestCompetencies(questions: any[], modelName: string = "gemini-3-flash-preview"): Promise<string[]> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -526,7 +573,7 @@ export interface GuessDetectionResult {
 }
 
 export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-3-flash-preview"): Promise<GuessDetectionResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -570,7 +617,7 @@ export interface SAEPQuestion {
 }
 
 export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = "gemini-3-flash-preview"): Promise<SAEPQuestion> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -604,6 +651,20 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
     config: {
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING },
+          options: { type: Type.ARRAY, items: { type: Type.STRING } },
+          correctOption: { type: Type.INTEGER },
+          explanation: { type: Type.STRING },
+          competency: { type: Type.STRING },
+          skill: { type: Type.STRING },
+          difficulty: { type: Type.STRING },
+          bloom_level: { type: Type.STRING }
+        },
+        required: ["text", "options", "correctOption", "explanation", "competency", "skill", "difficulty", "bloom_level"]
+      }
     }
   });
 
@@ -617,7 +678,7 @@ export interface BloomAnalysisResult {
 }
 
 export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-3-flash-preview"): Promise<BloomAnalysisResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -655,7 +716,7 @@ export interface OpenQuestionGrade {
 }
 
 export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview"): Promise<OpenQuestionGrade> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
@@ -699,7 +760,7 @@ export interface SIPAResult {
 }
 
 export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Promise<SIPAResult> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: "gemini-3-flash-preview",
     contents: [
       {
@@ -739,7 +800,7 @@ export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Pro
 }
 
 export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview"): Promise<SAEPQuestion> {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWrapper({
     model: modelName,
     contents: [
       {
