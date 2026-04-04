@@ -13,7 +13,7 @@ export function setAIProvider(provider: AIProvider) {
   window.dispatchEvent(new Event('ai_provider_changed'));
 }
 
-async function generateContentWrapper(params: any): Promise<any> {
+export async function generateContentWrapper(params: any): Promise<any> {
   const provider = getAIProvider();
 
   if (provider === 'openai' || provider === 'deepseek') {
@@ -332,7 +332,7 @@ export interface CognitiveErrorResult {
   }>;
 }
 
-export async function analyzeCognitiveErrors(submissionData: any, modelName: string = "gemini-3-flash-preview"): Promise<CognitiveErrorResult> {
+export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = "gemini-3-flash-preview"): Promise<CognitiveErrorResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -348,6 +348,15 @@ export async function analyzeCognitiveErrors(submissionData: any, modelName: str
             
             DADOS DA SUBMISSÃO:
             ${JSON.stringify(submissionData)}
+            
+            DETALHES DAS QUESTÕES:
+            ${JSON.stringify(questions.map(q => ({
+              id: q.id,
+              text: q.text,
+              options: q.options,
+              correctOption: q.correctOption,
+              competency: q.competency
+            })))}
             
             RETORNE UM JSON COM:
             {

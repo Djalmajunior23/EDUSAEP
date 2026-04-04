@@ -143,30 +143,43 @@ export function ProfessorInsights() {
     if (!selectedClassId || classData.length === 0) return;
     setIsGeneratingPlan(true);
     try {
-      // Fetch students in class
+      // 1. Fetch all questions to map questionId -> competency
+      const questionsSnapshot = await getDocs(collection(db, 'questions'));
+      const questionMap: Record<string, string> = {};
+      questionsSnapshot.docs.forEach(doc => {
+        const q = doc.data();
+        if (q.competency) questionMap[doc.id] = q.competency;
+      });
+
+      // 2. Fetch students in class
       const classDoc = classes.find(c => c.id === selectedClassId);
       const studentIds = classDoc?.studentIds || [];
       
-      // Fetch cognitive analyses for these students
+      // 3. Fetch cognitive analyses for these students
       let cognitiveAnalyses: any[] = [];
       if (studentIds.length > 0) {
-        const q = query(collection(db, 'cognitive_error_analyses'), where('userId', 'in', studentIds));
-        const snapshot = await getDocs(q);
+        // Firestore 'in' query limit is 10 (or 30 in newer versions), but let's be safe
+        // If there are many students, we might need multiple queries
+        const snapshot = await getDocs(query(collection(db, 'cognitive_error_analyses'), where('userId', 'in', studentIds.slice(0, 30))));
         cognitiveAnalyses = snapshot.docs.map(doc => doc.data());
       }
 
-      // Group errors by competency and prioritize critical ones
+      // 4. Group errors by competency and prioritize critical ones
       const errorsByCompetency: Record<string, { count: number, errors: Set<string> }> = {};
       cognitiveAnalyses.forEach(analysis => {
-        if (analysis.competency && analysis.errorDescription) {
-          if (!errorsByCompetency[analysis.competency]) {
-            errorsByCompetency[analysis.competency] = { count: 0, errors: new Set() };
-          }
-          errorsByCompetency[analysis.competency].count++;
-          errorsByCompetency[analysis.competency].errors.add(analysis.errorDescription);
+        if (analysis.errors && Array.isArray(analysis.errors)) {
+          analysis.errors.forEach((err: any) => {
+            const competency = questionMap[err.questionId] || 'Geral';
+            if (!errorsByCompetency[competency]) {
+              errorsByCompetency[competency] = { count: 0, errors: new Set() };
+            }
+            errorsByCompetency[competency].count++;
+            if (err.explanation) errorsByCompetency[competency].errors.add(err.explanation);
+          });
         }
       });
 
+      // 5. Prioritize competencies with lowest average scores (from classData)
       const criticalCompetencies = classData
         .map(c => ({
           competency: c.name,
@@ -177,19 +190,21 @@ export function ProfessorInsights() {
         .sort((a, b) => a.avgScore - b.avgScore) // Sort by lowest score first
         .slice(0, 3); // Take top 3 most critical
 
+      // 6. Generate the plan using the AI service
       const plan = await generateLessonPlan(criticalCompetencies, cognitiveAnalyses);
       setLessonPlan(plan);
       
-      // Save to Firestore
+      // 7. Save to Firestore
       if (auth.currentUser) {
         const docRef = await addDoc(collection(db, 'lesson_plans'), {
-          professor_id: auth.currentUser.uid,
+          userId: auth.currentUser.uid, // Matches blueprint
+          professor_id: auth.currentUser.uid, // Keep for backward compatibility if any
           turma_id: selectedClassId,
           ...plan,
-          data_geracao: serverTimestamp()
+          createdAt: serverTimestamp() // Matches blueprint
         });
         
-        // Trigger n8n integration
+        // 8. Trigger n8n integration
         await triggerN8NAlert(null, 'PlanoAulaGerado', {
           planId: docRef.id,
           professor_id: auth.currentUser.uid,

@@ -722,6 +722,10 @@
       "schema": "CognitiveErrorAnalysis",
       "description": "Cognitive error analysis documents."
     },
+    "/lesson_plans/{planId}": {
+      "schema": "LessonPlan",
+      "description": "AI-generated lesson plans for professors."
+    },
     "/performance_predictions/{predictionId}": {
       "schema": "PerformancePrediction",
       "description": "Performance prediction documents."

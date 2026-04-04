@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { DiagnosticResult } from "./geminiService";
+import { DiagnosticResult, generateContentWrapper } from "./geminiService";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -43,8 +43,13 @@ DIRETRIZES:
 
   const lastMessage = messages[messages.length - 1].text;
 
-  const response = await chat.sendMessage({
-    message: lastMessage,
+  const response = await generateContentWrapper({
+    model: "gemini-3-flash-preview",
+    contents: [
+      { role: "user", parts: [{ text: systemInstruction }] },
+      ...history,
+      { role: "user", parts: [{ text: lastMessage }] }
+    ],
   });
 
   return response.text || "Desculpe, não consegui processar sua pergunta.";

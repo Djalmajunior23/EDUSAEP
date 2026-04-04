@@ -98,7 +98,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
-import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan } from './services/geminiService';
+import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan, analyzeCognitiveErrors } from './services/geminiService';
 import { triggerN8NAlert } from './services/n8nService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
 import { clsx, type ClassValue } from 'clsx';
@@ -385,33 +385,79 @@ function DarkModeToggle({ darkMode, setDarkMode }: { darkMode: boolean, setDarkM
 
 // AI Provider Toggle Component
 function AIProviderToggle() {
+  const [isOpen, setIsOpen] = useState(false);
   const [provider, setProvider] = useState<'gemini' | 'openai' | 'deepseek'>(() => {
     return (localStorage.getItem('ai_provider') as 'gemini' | 'openai' | 'deepseek') || 'gemini';
   });
 
-  const toggleProvider = () => {
-    const nextProvider = {
-      'gemini': 'openai',
-      'openai': 'deepseek',
-      'deepseek': 'gemini'
-    }[provider] as 'gemini' | 'openai' | 'deepseek';
-    
-    setProvider(nextProvider);
-    localStorage.setItem('ai_provider', nextProvider);
+  const selectProvider = (p: 'gemini' | 'openai' | 'deepseek') => {
+    setProvider(p);
+    localStorage.setItem('ai_provider', p);
     window.dispatchEvent(new Event('ai_provider_changed'));
-    toast.success(`Provedor de IA alterado para ${nextProvider === 'gemini' ? 'Gemini' : nextProvider === 'openai' ? 'ChatGPT' : 'DeepSeek'}`);
+    setIsOpen(false);
+    toast.success(`Provedor de IA alterado para ${p === 'gemini' ? 'Gemini' : p === 'openai' ? 'ChatGPT' : 'DeepSeek'}`);
   };
 
   return (
-    <button
-      onClick={toggleProvider}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all font-bold text-xs"
-      title="Alternar Provedor de IA"
-    >
-      {provider === 'gemini' && <><Sparkles size={16} className="text-blue-500" /> Gemini</>}
-      {provider === 'openai' && <><Brain size={16} className="text-emerald-500" /> ChatGPT</>}
-      {provider === 'deepseek' && <><Hexagon size={16} className="text-indigo-500" /> DeepSeek</>}
-    </button>
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all font-bold text-xs"
+        title="Alternar Provedor de IA"
+      >
+        {provider === 'gemini' && <><Sparkles size={16} className="text-blue-500" /> <span className="hidden sm:inline">Gemini</span></>}
+        {provider === 'openai' && <><Brain size={16} className="text-emerald-500" /> <span className="hidden sm:inline">ChatGPT</span></>}
+        {provider === 'deepseek' && <><Hexagon size={16} className="text-indigo-500" /> <span className="hidden sm:inline">DeepSeek</span></>}
+        <ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden"
+            >
+              <div className="p-2 space-y-1">
+                <button
+                  onClick={() => selectProvider('gemini')}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-colors",
+                    provider === 'gemini' ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  )}
+                >
+                  <Sparkles size={16} className="text-blue-500" />
+                  Gemini (Google)
+                </button>
+                <button
+                  onClick={() => selectProvider('openai')}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-colors",
+                    provider === 'openai' ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  )}
+                >
+                  <Brain size={16} className="text-emerald-500" />
+                  ChatGPT (OpenAI)
+                </button>
+                <button
+                  onClick={() => selectProvider('deepseek')}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-colors",
+                    provider === 'deepseek' ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  )}
+                >
+                  <Hexagon size={16} className="text-indigo-500" />
+                  DeepSeek (R1)
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -5189,6 +5235,21 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
       };
 
       const docRef = await addDoc(collection(db, 'exam_submissions'), submission);
+      
+      // Cognitive Error Analysis Trigger
+      if (score < maxScore) {
+        // Run analysis in background
+        analyzeCognitiveErrors(submission, exam.questions).then(async (result) => {
+          if (result.errors && result.errors.length > 0) {
+            await addDoc(collection(db, 'cognitive_error_analyses'), {
+              userId: user?.uid || '',
+              submissionId: docRef.id,
+              errors: result.errors,
+              createdAt: serverTimestamp()
+            });
+          }
+        }).catch(err => console.error("Error generating cognitive analysis:", err));
+      }
       
       // Gamification Logic
       if (user?.uid) {
@@ -10061,6 +10122,9 @@ function AppContent() {
                           <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{userProfile.xp || 0} XP</span>
                         </div>
                       )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <AIProviderToggle />
                     </div>
                   </div>
                   <button 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Brain, AlertCircle, Loader2, BarChart3, Users, Filter, Search, FileText, Sparkles, Target, Send, BookOpen, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { db, auth } from '../../firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, getDoc, where, updateDoc, doc } from 'firebase/firestore';
 import { analyzeCognitiveErrors, CognitiveErrorResult, generateRecoveryPlan, RecoveryPlanResult, generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { triggerN8NAlert } from '../../services/n8nService';
@@ -114,18 +114,33 @@ export function CognitiveErrorAnalysisView() {
         return;
       }
 
+      const examCache: Record<string, any> = {};
+
       for (const sub of unanalyzedSubs) {
         // Only analyze if the student got questions wrong
         if (sub.score < sub.maxScore) {
-          const result = await analyzeCognitiveErrors(sub);
-          
-          await addDoc(collection(db, 'cognitive_error_analyses'), {
-            userId: sub.studentId,
-            submissionId: sub.id,
-            errors: result.errors,
-            createdAt: serverTimestamp()
-          });
-          newAnalysesCount++;
+          // Fetch exam/exercise data if not in cache
+          if (!examCache[sub.resourceId]) {
+            const examDoc = await getDoc(doc(db, sub.type === 'exam' ? 'exams' : 'exercises', sub.resourceId));
+            if (examDoc.exists()) {
+              examCache[sub.resourceId] = examDoc.data();
+            }
+          }
+
+          const exam = examCache[sub.resourceId];
+          if (exam && exam.questions) {
+            const result = await analyzeCognitiveErrors(sub, exam.questions);
+            
+            if (result.errors && result.errors.length > 0) {
+              await addDoc(collection(db, 'cognitive_error_analyses'), {
+                userId: sub.studentId,
+                submissionId: sub.id,
+                errors: result.errors,
+                createdAt: serverTimestamp()
+              });
+              newAnalysesCount++;
+            }
+          }
         }
       }
 
