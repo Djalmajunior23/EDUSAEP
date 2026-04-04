@@ -31,20 +31,29 @@ export async function generateContentWrapper(params: any): Promise<any> {
 
     const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
 
+    console.log(`[AI] Using external provider: ${provider} with model: ${params.model || 'default'}`);
     const response = await fetch('/api/ai/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, responseFormat, provider })
+      body: JSON.stringify({ 
+        prompt, 
+        responseFormat, 
+        provider,
+        model: params.model 
+      })
     });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
+      console.error(`[AI] API error (${provider}):`, err);
       throw new Error(`${provider === 'openai' ? 'OpenAI' : 'DeepSeek'} API error: ${err.error || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log(`[AI] Response received from ${provider}`);
     return { text: data.text };
   } else {
+    console.log(`[AI] Using Gemini provider with model: ${params.model || 'default'}`);
     return await ai.models.generateContent(params);
   }
 }
@@ -124,6 +133,25 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
       config: {
         responseMimeType: "application/json",
         ...DEFAULT_CONFIG,
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              text: { type: Type.STRING },
+              options: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING } 
+              },
+              correctOption: { type: Type.INTEGER },
+              weight: { type: Type.NUMBER },
+              competency: { type: Type.STRING },
+              difficulty: { type: Type.STRING },
+              explanation: { type: Type.STRING }
+            },
+            required: ["text", "options", "correctOption"]
+          }
+        }
       }
     });
 
@@ -270,6 +298,27 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
     config: {
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            competencia: { type: Type.STRING },
+            conhecimentos_fracos: { type: Type.ARRAY, items: { type: Type.STRING } },
+            recomendacoes: { type: Type.ARRAY, items: { type: Type.STRING } },
+            acoes_para_o_instrutor: { type: Type.ARRAY, items: { type: Type.STRING } },
+            metricas_para_dashboard: {
+              type: Type.OBJECT,
+              properties: {
+                competencias: { type: Type.ARRAY, items: { type: Type.STRING } },
+                acuracias: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                pesos: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+              }
+            },
+            mensagem_para_o_aluno: { type: Type.STRING }
+          }
+        }
+      }
     }
   });
 

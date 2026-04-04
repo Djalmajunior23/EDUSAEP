@@ -21,9 +21,10 @@ interface AdaptiveExamProps {
   examId: string;
   competency: string;
   onComplete: (score: number) => void;
+  selectedModel?: string;
 }
 
-export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamProps) {
+export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-3-flash-preview" }: AdaptiveExamProps) {
   const [currentQuestion, setCurrentQuestion] = useState<SAEPQuestion | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [proficiency, setProficiency] = useState(50); // Start at medium
@@ -93,7 +94,7 @@ export function AdaptiveExam({ examId, competency, onComplete }: AdaptiveExamPro
   const fetchNextQuestion = async (p: number, h: any[]) => {
     setIsLoading(true);
     try {
-      const question = await getNextAdaptiveQuestion(p, competency, h);
+      const question = await getNextAdaptiveQuestion(p, competency, h, selectedModel);
       setCurrentQuestion(question);
       setQuestionCount(prev => prev + 1);
     } catch (error) {

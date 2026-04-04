@@ -28,14 +28,14 @@ async function startServer() {
   // Generic AI generation endpoint for OpenAI and DeepSeek
   app.post("/api/ai/generate", async (req, res) => {
     try {
-      const { prompt, systemInstruction, responseFormat, provider } = req.body;
+      const { prompt, systemInstruction, responseFormat, provider, model } = req.body;
 
       if (provider === 'deepseek') {
         if (!deepseek) {
           return res.status(500).json({ error: "DeepSeek API key not configured" });
         }
         const completion = await deepseek.chat.completions.create({
-          model: "deepseek-chat",
+          model: model || "deepseek-chat",
           messages: [
             ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
             { role: "user" as const, content: prompt }
@@ -53,7 +53,7 @@ async function startServer() {
       }
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // or gpt-4o
+        model: model || "gpt-4o-mini",
         messages: [
           ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
           { role: "user" as const, content: prompt }

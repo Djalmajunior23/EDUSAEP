@@ -5,6 +5,7 @@ import { db, auth } from '../../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { GoogleGenAI } from "@google/genai";
 import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { generateContentWrapper, DEFAULT_CONFIG } from '../../services/geminiService';
 import Markdown from 'react-markdown';
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -20,9 +21,10 @@ interface SocraticTutorProps {
   questionId?: string;
   questionText?: string;
   onClose?: () => void;
+  selectedModel?: string;
 }
 
-export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida Geral', onClose }: SocraticTutorProps) {
+export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida Geral', onClose, selectedModel = "gemini-3-flash-preview" }: SocraticTutorProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -137,14 +139,12 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
         parts: [{ text: m.text }]
       }));
 
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const response = await generateContentWrapper({
+        model: selectedModel,
         contents: chatHistory,
         config: {
+          ...DEFAULT_CONFIG,
           maxOutputTokens: 500,
-          temperature: 1.0,
-          topK: 64,
-          topP: 0.95,
         }
       });
       

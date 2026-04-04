@@ -15,6 +15,8 @@ import Markdown from 'react-markdown';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
+type AIProvider = 'gemini' | 'openai' | 'deepseek';
+
 import { 
   Upload, 
   FileText, 
@@ -384,18 +386,13 @@ function DarkModeToggle({ darkMode, setDarkMode }: { darkMode: boolean, setDarkM
 }
 
 // AI Provider Toggle Component
-function AIProviderToggle() {
+// AI Provider Toggle Component
+function AIProviderToggle({ provider, onProviderChange }: { provider: AIProvider, onProviderChange: (p: AIProvider) => void }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [provider, setProvider] = useState<'gemini' | 'openai' | 'deepseek'>(() => {
-    return (localStorage.getItem('ai_provider') as 'gemini' | 'openai' | 'deepseek') || 'gemini';
-  });
 
-  const selectProvider = (p: 'gemini' | 'openai' | 'deepseek') => {
-    setProvider(p);
-    localStorage.setItem('ai_provider', p);
-    window.dispatchEvent(new Event('ai_provider_changed'));
+  const selectProvider = (p: AIProvider) => {
+    onProviderChange(p);
     setIsOpen(false);
-    toast.success(`Provedor de IA alterado para ${p === 'gemini' ? 'Gemini' : p === 'openai' ? 'ChatGPT' : 'DeepSeek'}`);
   };
 
   return (
@@ -2231,7 +2228,7 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
   );
 }
 
-function AdaptiveExamView({ user }: { user: User | null }) {
+function AdaptiveExamView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const { competency } = useParams();
   const navigate = useNavigate();
   return (
@@ -2243,31 +2240,32 @@ function AdaptiveExamView({ user }: { user: User | null }) {
           toast.success(`Simulado concluído! Score: ${score}%`);
           navigate('/student-dashboard');
         }} 
+        selectedModel={selectedModel}
       />
     </div>
   );
 }
 
-function StudentInsightsView({ user }: { user: User | null }) {
+function StudentInsightsView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   return (
     <div className="py-8">
-      <StudentInsights studentId={user?.uid || ''} />
+      <StudentInsights studentId={user?.uid || ''} selectedModel={selectedModel} />
     </div>
   );
 }
 
-function ProfessorInsightsView() {
+function ProfessorInsightsView({ selectedModel }: { selectedModel: string }) {
   return (
     <div className="py-8">
-      <ProfessorInsights />
+      <ProfessorInsights selectedModel={selectedModel} />
     </div>
   );
 }
 
-function CognitiveAnalysisView() {
+function CognitiveAnalysisView({ selectedModel }: { selectedModel: string }) {
   return (
     <div className="py-8">
-      <CognitiveErrorAnalysisView />
+      <CognitiveErrorAnalysisView selectedModel={selectedModel} />
     </div>
   );
 }
@@ -2281,10 +2279,10 @@ function ConsolidatedReportRoute({ history }: { history: any[] }) {
 }
 
 
-function SocraticTutorView() {
+function SocraticTutorView({ selectedModel }: { selectedModel: string }) {
   return (
     <div className="py-8">
-      <SocraticTutor />
+      <SocraticTutor selectedModel={selectedModel} />
     </div>
   );
 }
@@ -2599,7 +2597,7 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
         const questionsToSuggest = data.filter(q => !q.competency || q.competency === 'Geral' || q.competency === '');
         if (questionsToSuggest.length > 0) {
           toast.info(`IA sugerindo competências para ${questionsToSuggest.length} questões...`);
-          const suggestions = await suggestCompetencies(questionsToSuggest);
+          const suggestions = await suggestCompetencies(questionsToSuggest, selectedModel);
           questionsToSuggest.forEach((q, idx) => {
             q.competency = suggestions[idx] || 'Geral';
           });
@@ -4016,7 +4014,7 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
   );
 }
 
-function ExercisesView({ user }: { user: User | null }) {
+function ExercisesView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const [exercises, setExercises] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4068,7 +4066,7 @@ function ExercisesView({ user }: { user: User | null }) {
   }, [exercises, searchTerm, selectedSubject]);
 
   if (activeExercise) {
-    return <ExamTakingView user={user} exam={activeExercise} onCancel={() => setActiveExercise(null)} />;
+    return <ExamTakingView user={user} exam={activeExercise} onCancel={() => setActiveExercise(null)} selectedModel={selectedModel} />;
   }
 
   return (
@@ -4180,7 +4178,7 @@ function ExercisesView({ user }: { user: User | null }) {
   );
 }
 
-function StudentExamsView({ user }: { user: User | null }) {
+function StudentExamsView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
   const [forms, setForms] = useState<SimuladoForm[]>([]);
@@ -4252,7 +4250,7 @@ function StudentExamsView({ user }: { user: User | null }) {
       return null;
     }
 
-    return <ExamTakingView exam={takingExam} user={user} onCancel={() => setTakingExam(null)} />;
+    return <ExamTakingView exam={takingExam} user={user} onCancel={() => setTakingExam(null)} selectedModel={selectedModel} />;
   }
 
   return (
@@ -5052,7 +5050,7 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
   );
 }
 
-function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | null, onCancel: () => void }) {
+function ExamTakingView({ exam, user, onCancel, selectedModel }: { exam: Exam, user: User | null, onCancel: () => void, selectedModel: string }) {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>(() => {
     const saved = localStorage.getItem(`exam_progress_${exam.id}`);
@@ -5135,7 +5133,7 @@ function ExamTakingView({ exam, user, onCancel }: { exam: Exam, user: User | nul
       // Cognitive Error Analysis Trigger
       if (score < maxScore) {
         // Run analysis in background
-        analyzeCognitiveErrors(submission, exam.questions).then(async (result) => {
+        analyzeCognitiveErrors(submission, exam.questions, selectedModel).then(async (result) => {
           if (result.errors && result.errors.length > 0) {
             await addDoc(collection(db, 'cognitive_error_analyses'), {
               userId: user?.uid || '',
@@ -6895,7 +6893,7 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
   );
 }
 
-function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history, classAverages }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null, userProfile: UserProfile | null, history: any[], classAverages: Record<string, number> }) {
+function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history, classAverages, selectedModel }: { result: DiagnosticResult | null, onUpdateResult: (newResult: DiagnosticResult) => void, diagnosticId: string | null, userProfile: UserProfile | null, history: any[], classAverages: Record<string, number>, selectedModel: string }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'Todos' | 'Forte' | 'Atenção' | 'Crítico'>('Todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -6931,7 +6929,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
     if (suggestions[comp.competencia]) return;
     setLoadingSuggestions(prev => ({ ...prev, [comp.competencia]: true }));
     try {
-      const newSuggestions = await generateSuggestions(comp.conhecimentos_fracos, comp.recomendacoes);
+      const newSuggestions = await generateSuggestions(comp.conhecimentos_fracos, comp.recomendacoes, selectedModel);
       setSuggestions(prev => ({ ...prev, [comp.competencia]: newSuggestions }));
     } catch (err) {
       toast.error("Erro ao gerar sugestões.");
@@ -7017,7 +7015,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
       };
 
       // 3. Generate Plan
-      const plan = await generateRecoveryPlan(studentData);
+      const plan = await generateRecoveryPlan(studentData, selectedModel);
       
       // 4. Save to Firestore
       await addDoc(collection(db, 'recovery_plans'), {
@@ -9080,7 +9078,32 @@ function AppContent() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
-  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [aiProvider, setAiProvider] = useState<AIProvider>(() => {
+    return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
+  });
+  const [selectedModel, setSelectedModel] = useState(() => {
+    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
+    if (provider === 'openai') return 'gpt-4o-mini';
+    if (provider === 'deepseek') return 'deepseek-chat';
+    return 'gemini-3-flash-preview';
+  });
+
+  const handleProviderChange = (p: AIProvider) => {
+    setAiProvider(p);
+    localStorage.setItem('ai_provider', p);
+    
+    // Set default model for the new provider
+    if (p === 'openai') {
+      setSelectedModel('gpt-4o-mini');
+    } else if (p === 'deepseek') {
+      setSelectedModel('deepseek-chat');
+    } else {
+      setSelectedModel('gemini-3-flash-preview');
+    }
+    
+    window.dispatchEvent(new Event('ai_provider_changed'));
+    toast.success(`Provedor de IA alterado para ${p === 'gemini' ? 'Gemini' : p === 'openai' ? 'ChatGPT' : 'DeepSeek'}`);
+  };
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [classAverages, setClassAverages] = useState<Record<string, number>>({});
   const [darkMode, setDarkMode] = useState(() => {
@@ -9884,7 +9907,7 @@ function AppContent() {
               </div>
             </div>
             <div className="flex items-center justify-between gap-2">
-              {(userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle />}
+              {(userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle provider={aiProvider} onProviderChange={handleProviderChange} />}
               <div className="flex items-center gap-2">
                 <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
                 <button 
@@ -9945,7 +9968,7 @@ function AppContent() {
             
             <div className="flex items-center gap-3">
               {user && <NotificationBell userId={user.uid} />}
-              {userProfile && (userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle />}
+              {userProfile && (userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle provider={aiProvider} onProviderChange={handleProviderChange} />}
               <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
               {!user && (
                 <button 
@@ -10021,7 +10044,7 @@ function AppContent() {
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
-                      {userProfile && (userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle />}
+                      {userProfile && (userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle provider={aiProvider} onProviderChange={handleProviderChange} />}
                     </div>
                   </div>
                   <button 
@@ -10205,16 +10228,16 @@ function AppContent() {
               <Route path="/simulados/inconsistencies" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ImportInconsistencyManager /></ProtectedRoute>} />
               <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} selectedModel={selectedModel} defaultType="exercicio" /></ProtectedRoute>} />
               <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
-              <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
+              <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><StudyPlanView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationDashboardView user={user} userProfile={userProfile} /></ProtectedRoute>} />
-              <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} /></ProtectedRoute>} />
-              <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} /></ProtectedRoute>} />
-              <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView /></ProtectedRoute>} />
+              <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/consolidated-report" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ConsolidatedReportRoute history={history} /></ProtectedRoute>} />
-              <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView /></ProtectedRoute>} />
-              <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView /></ProtectedRoute>} />
+              <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView selectedModel={selectedModel} /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div
@@ -10472,6 +10495,7 @@ function AppContent() {
                   userProfile={userProfile}
                   history={history}
                   classAverages={classAverages}
+                  selectedModel={selectedModel}
                 />
               </ProtectedRoute>
             } />

@@ -45,9 +45,10 @@ import { toast } from 'sonner';
 
 interface StudentInsightsProps {
   studentId: string;
+  selectedModel?: string;
 }
 
-export function StudentInsights({ studentId }: StudentInsightsProps) {
+export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-preview" }: StudentInsightsProps) {
   const [profile, setProfile] = useState<any>(null);
   const [prediction, setPrediction] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
@@ -93,7 +94,7 @@ export function StudentInsights({ studentId }: StudentInsightsProps) {
         competencyPerformance: submissions[0]?.competencyResults || {}
       };
 
-      const result = await classifyLearningProfile(behavioralData);
+      const result = await classifyLearningProfile(behavioralData, selectedModel);
       
       // Save to Firestore
       await addDoc(collection(db, 'learning_profiles'), {
