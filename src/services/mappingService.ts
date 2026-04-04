@@ -1,16 +1,14 @@
 // src/services/mappingService.ts
 import { Discipline } from '../types';
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+import { generateContentWrapper, safeParseJson, DEFAULT_CONFIG } from './geminiService';
 
 export async function mapExternalDiscipline(
   externalName: string,
   availableDisciplines: Discipline[]
 ): Promise<{ disciplineId: string | null; confidence: number; reason: string }> {
   
-  const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+  const response = await generateContentWrapper({
+    model: "gemini-3-flash-preview",
     contents: [
       {
         role: "user",
@@ -34,11 +32,9 @@ export async function mapExternalDiscipline(
     ],
     config: {
       responseMimeType: "application/json",
-      temperature: 1.0,
-      topK: 64,
-      topP: 0.95,
+      ...DEFAULT_CONFIG,
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, { disciplineId: null, confidence: 0, reason: "Erro ao processar" });
 }

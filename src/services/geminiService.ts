@@ -59,7 +59,7 @@ export const DEFAULT_CONFIG = {
  * Utilitário para limpar e parsear JSON retornado pela IA.
  * Remove blocos de código markdown se presentes.
  */
-function safeParseJson(text: string | undefined, fallback: any = {}): any {
+export function safeParseJson(text: string | undefined, fallback: any = {}): any {
   if (!text) return fallback;
   try {
     // Remove ```json ... ``` ou ``` ... ```
@@ -69,6 +69,75 @@ function safeParseJson(text: string | undefined, fallback: any = {}): any {
     console.error("[Gemini] Erro ao parsear JSON:", error, "Texto original:", text);
     return fallback;
   }
+}
+
+export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview"): Promise<any[]> {
+  // Split text into chunks of ~15,000 characters to avoid output token limits
+  const chunkSize = 15000;
+  const chunks: string[] = [];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    chunks.push(text.substring(i, i + chunkSize));
+  }
+
+  const allQuestions: any[] = [];
+  
+  for (const chunk of chunks) {
+    console.log(`[AI] Processing chunk of size ${chunk.length}...`);
+    const response = await generateContentWrapper({
+      model: modelName,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
+              O texto pode vir de um documento (PDF, DOCX, CSV ou Excel) e pode conter ruídos ou formatação irregular.
+              Este é um fragmento de um documento que pode conter centenas de questões.
+              
+              Para cada questão identificada, extraia:
+              1. O enunciado completo.
+              2. Exatamente 4 alternativas (opções).
+              3. O índice da alternativa correta (0 para A, 1 para B, etc.).
+              4. A competência ou assunto da questão (se não houver, use 'Geral').
+              5. O nível de dificuldade ('fácil', 'médio' ou 'difícil').
+              6. Uma explicação detalhada da resposta correta (se disponível no texto).
+
+              Retorne APENAS um array JSON de objetos com a seguinte estrutura:
+              [
+                {
+                  "text": "Enunciado da questão...",
+                  "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
+                  "correctOption": 0,
+                  "weight": 1,
+                  "competency": "Assunto",
+                  "difficulty": "médio",
+                  "explanation": "Explicação da resposta..."
+                }
+              ]
+
+              Texto para análise:
+              ${chunk}`
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        ...DEFAULT_CONFIG,
+      }
+    });
+
+    console.log(`[AI] Response received for chunk.`);
+    const result = safeParseJson(response.text, []);
+    if (Array.isArray(result)) {
+      console.log(`[AI] Extracted ${result.length} questions from chunk.`);
+      allQuestions.push(...result);
+    } else {
+      console.warn(`[AI] Expected array but got:`, result);
+    }
+  }
+  
+  return allQuestions;
 }
 
 export interface DiagnosticResult {

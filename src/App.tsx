@@ -98,7 +98,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
-import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan, analyzeCognitiveErrors } from './services/geminiService';
+import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan, analyzeCognitiveErrors, parseQuestionsFromText, safeParseJson, generateContentWrapper, DEFAULT_CONFIG } from './services/geminiService';
 import { triggerN8NAlert } from './services/n8nService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
 import { clsx, type ClassValue } from 'clsx';
@@ -191,7 +191,7 @@ async function updateXP(userId: string, amount: number) {
   }
 }
 
-function ItemGeneratorView({ user }: { user: User | null }) {
+function ItemGeneratorView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const [competency, setCompetency] = useState('');
   const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -206,7 +206,7 @@ function ItemGeneratorView({ user }: { user: User | null }) {
     setIsGenerating(true);
     try {
       const { generateSAEPQuestion } = await import('./services/geminiService');
-      const question = await generateSAEPQuestion(competency, difficulty);
+      const question = await generateSAEPQuestion(competency, difficulty, selectedModel);
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
     } catch (err) {
@@ -402,12 +402,12 @@ function AIProviderToggle() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all font-bold text-xs"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-bold text-xs shadow-sm"
         title="Alternar Provedor de IA"
       >
-        {provider === 'gemini' && <><Sparkles size={16} className="text-blue-500" /> <span className="hidden sm:inline">Gemini</span></>}
-        {provider === 'openai' && <><Brain size={16} className="text-emerald-500" /> <span className="hidden sm:inline">ChatGPT</span></>}
-        {provider === 'deepseek' && <><Hexagon size={16} className="text-indigo-500" /> <span className="hidden sm:inline">DeepSeek</span></>}
+        {provider === 'gemini' && <><Sparkles size={16} className="text-blue-500" /> <span>Gemini</span></>}
+        {provider === 'openai' && <><Brain size={16} className="text-emerald-500" /> <span>ChatGPT</span></>}
+        {provider === 'deepseek' && <><Hexagon size={16} className="text-indigo-500" /> <span>DeepSeek</span></>}
         <ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} />
       </button>
 
@@ -2297,7 +2297,7 @@ function GamificationDashboardView({ user, userProfile }: { user: User | null, u
   );
 }
 
-function QuestionsBankView({ user }: { user: User | null }) {
+function QuestionsBankView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2454,84 +2454,10 @@ function QuestionsBankView({ user }: { user: User | null }) {
 
   const parseQuestionsWithGemini = async (text: string) => {
     try {
-      // Split text into chunks of ~15,000 characters to avoid output token limits
-      const chunkSize = 15000;
-      const chunks: string[] = [];
-      for (let i = 0; i < text.length; i += chunkSize) {
-        chunks.push(text.substring(i, i + chunkSize));
-      }
-
-      const allQuestions: any[] = [];
-      let currentChunk = 1;
-      
-      for (const chunk of chunks) {
-        if (chunks.length > 1) {
-          toast.info(`Processando parte ${currentChunk} de ${chunks.length}...`, { id: 'import-progress' });
-        }
-        
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
-          O texto pode vir de um documento (PDF, DOCX, CSV ou Excel) e pode conter ruídos ou formatação irregular.
-          Este é um fragmento de um documento que pode conter centenas de questões.
-          
-          Para cada questão identificada, extraia:
-          1. O enunciado completo.
-          2. Exatamente 4 alternativas (opções).
-          3. O índice da alternativa correta (0 para A, 1 para B, etc.).
-          4. A competência ou assunto da questão (se não houver, use 'Geral').
-          5. O nível de dificuldade ('fácil', 'médio' ou 'difícil').
-          6. Uma explicação detalhada da resposta correta (se disponível no texto).
-
-          Retorne APENAS um array JSON de objetos com a seguinte estrutura:
-          [
-            {
-              "text": "Enunciado da questão...",
-              "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
-              "correctOption": 0,
-              "weight": 1,
-              "competency": "Assunto",
-              "difficulty": "médio",
-              "explanation": "Explicação da resposta..."
-            }
-          ]
-
-          Texto para análise:
-          ${chunk}`,
-          config: {
-      responseMimeType: "application/json",
-      temperature: 1.2,
-      topK: 50,
-      topP: 0.9,
-      responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  text: { type: Type.STRING },
-                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  correctOption: { type: Type.INTEGER },
-                  weight: { type: Type.NUMBER },
-                  competency: { type: Type.STRING },
-                  difficulty: { type: Type.STRING, enum: ['fácil', 'médio', 'difícil'] },
-                  explanation: { type: Type.STRING }
-                },
-                required: ["text", "options", "correctOption"]
-              }
-            }
-          }
-        });
-
-        const result = JSON.parse(response.text || '[]');
-        allQuestions.push(...result);
-        currentChunk++;
-      }
-      
-      toast.dismiss('import-progress');
-      return allQuestions;
+      const data = await parseQuestionsFromText(text, selectedModel);
+      return data;
     } catch (err) {
       console.error("Gemini parsing error:", err);
-      toast.dismiss('import-progress');
       throw new Error("Erro ao processar o texto com IA. Verifique se o arquivo não é muito grande ou complexo.");
     }
   };
@@ -2835,7 +2761,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
 
   return (
     <div className="space-y-6">
-      <ItemGeneratorView user={user} />
+      <ItemGeneratorView user={user} selectedModel={selectedModel} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Banco de Questões</h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -3260,7 +3186,7 @@ function QuestionsBankView({ user }: { user: User | null }) {
   );
 }
 
-function ExamsManagementView({ user, userProfile, defaultType = 'simulado' }: { user: User | null, userProfile: UserProfile | null, defaultType?: 'simulado' | 'exercicio' }) {
+function ExamsManagementView({ user, userProfile, selectedModel, defaultType = 'simulado' }: { user: User | null, userProfile: UserProfile | null, selectedModel: string, defaultType?: 'simulado' | 'exercicio' }) {
   const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3617,41 +3543,17 @@ function ExamsManagementView({ user, userProfile, defaultType = 'simulado' }: { 
                   }
 
                   // Send to Gemini to parse
-                  const prompt = `Parse the following text into a list of questions in JSON format.
-                  Each question should have: text, options (array of 4 strings), correctOption (index 0-3), weight (number), competency (string), and explanation (string explaining the correct answer).
-                  Text: ${text}`;
+                  const questions = await parseQuestionsFromText(text, selectedModel);
                   
-                  const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
-                    contents: prompt,
-                    config: {
-      responseMimeType: "application/json",
-      temperature: 1.2,
-      topK: 50,
-      topP: 0.9,
-      responseSchema: {
-                        type: Type.ARRAY,
-                        items: {
-                          type: Type.OBJECT,
-                          properties: {
-                            text: { type: Type.STRING },
-                            options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            correctOption: { type: Type.INTEGER },
-                            weight: { type: Type.INTEGER },
-                            competency: { type: Type.STRING },
-                            explanation: { type: Type.STRING }
-                          }
-                        }
-                      }
-                    }
-                  });
-                  
-                  const questions = JSON.parse(response.text);
+                  if (!questions || questions.length === 0) {
+                    throw new Error("Nenhuma questão pôde ser extraída do arquivo. Verifique a formatação.");
+                  }
+
                   setCurrentExam({ ...currentExam, questions });
                   toast.success("Arquivo processado com sucesso!");
-                } catch (err) {
+                } catch (err: any) {
                   console.error("Error processing file:", err);
-                  toast.error("Erro ao processar arquivo.");
+                  toast.error("Erro ao processar arquivo: " + (err.message || "Erro desconhecido"));
                 } finally {
                   setIsProcessingFile(false);
                 }
@@ -4464,7 +4366,7 @@ function StudentExamsView({ user }: { user: User | null }) {
   );
 }
 
-function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
+function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const navigate = useNavigate();
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -4499,14 +4401,12 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         ]
       }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const response = await generateContentWrapper({
+        model: selectedModel,
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
-          temperature: 1.2,
-          topK: 50,
-          topP: 0.9,
+          ...DEFAULT_CONFIG,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -4528,7 +4428,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         }
       });
 
-      const aiData = JSON.parse(response.text || '{}');
+      const aiData = safeParseJson(response.text, {});
       
       if (aiData.priorityTopics && studyPlan.id) {
         await updateDoc(doc(db, 'study_plans', studyPlan.id), {
@@ -4608,14 +4508,12 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         "recommendations": ["Recomendação 1", "Recomendação 2", "Recomendação 3", "Recomendação 4", "Recomendação 5"]
       }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const response = await generateContentWrapper({
+        model: selectedModel,
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
-          temperature: 1.2,
-          topK: 50,
-          topP: 0.9,
+          ...DEFAULT_CONFIG,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -4629,7 +4527,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         }
       });
 
-      const aiData = JSON.parse(response.text || '{}');
+      const aiData = safeParseJson(response.text, {});
       
       if (aiData.recommendations && studyPlan.id) {
         await updateDoc(doc(db, 'study_plans', studyPlan.id), {
@@ -4757,14 +4655,12 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         "recommendations": ["Recomendação 1", "Recomendação 2", ...]
       }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const response = await generateContentWrapper({
+        model: selectedModel,
         contents: prompt,
         config: { 
           responseMimeType: "application/json",
-          temperature: 1.2,
-          topK: 50,
-          topP: 0.9,
+          ...DEFAULT_CONFIG,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -4802,7 +4698,7 @@ function StudyPlanView({ user, userProfile }: { user: User | null, userProfile: 
         }
       });
 
-      const aiData = JSON.parse(response.text || '{}');
+      const aiData = safeParseJson(response.text, {});
 
       const newPlan: Omit<StudyPlan, 'id'> = {
         userId: user.uid,
@@ -5842,7 +5738,7 @@ function GamificationView({ user, userProfile }: { user: User | null, userProfil
   );
 }
 
-function BIAnalysisView({ user }: { user: User | null }) {
+function BIAnalysisView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -5958,13 +5854,11 @@ Sugestões objetivas de ações pedagógicas ou de gestão.
 
 Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explícito na análise, evitando tirar conclusões fortes sem base suficiente.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+      const response = await generateContentWrapper({
+        model: selectedModel,
         contents: prompt,
         config: {
-          temperature: 1.2,
-          topK: 50,
-          topP: 0.9,
+          ...DEFAULT_CONFIG,
         }
       });
 
@@ -9989,15 +9883,18 @@ function AppContent() {
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-              <button 
-                onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Sair"
-              >
-                <LogOut size={18} />
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              {(userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle />}
+              <div className="flex items-center gap-2">
+                <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                  title="Sair"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
             </div>
           </div>
         </aside>
@@ -10048,7 +9945,7 @@ function AppContent() {
             
             <div className="flex items-center gap-3">
               {user && <NotificationBell userId={user.uid} />}
-              <AIProviderToggle />
+              {userProfile && (userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle />}
               <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
               {!user && (
                 <button 
@@ -10124,7 +10021,7 @@ function AppContent() {
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
-                      <AIProviderToggle />
+                      {userProfile && (userProfile.role === 'admin' || userProfile.role === 'professor') && <AIProviderToggle />}
                     </div>
                   </div>
                   <button 
@@ -10304,13 +10201,13 @@ function AppContent() {
                   userProfile?.role === 'aluno' ? "/student-dashboard" : "/dashboard"
                 } replace />
               } />
-              <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} defaultType="simulado" /></ProtectedRoute>} />
+              <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} selectedModel={selectedModel} defaultType="simulado" /></ProtectedRoute>} />
               <Route path="/simulados/inconsistencies" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ImportInconsistencyManager /></ProtectedRoute>} />
-              <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} defaultType="exercicio" /></ProtectedRoute>} />
-              <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} /></ProtectedRoute>} />
+              <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} selectedModel={selectedModel} defaultType="exercicio" /></ProtectedRoute>} />
+              <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} /></ProtectedRoute>} />
               <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} /></ProtectedRoute>} />
-              <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><StudyPlanView user={user} userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><StudyPlanView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationDashboardView user={user} userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} /></ProtectedRoute>} />
               <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} /></ProtectedRoute>} />
@@ -10514,7 +10411,7 @@ function AppContent() {
 
             <Route path="/exams-management" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
-                <ExamsManagementView user={user} userProfile={userProfile} />
+                <ExamsManagementView user={user} userProfile={userProfile} selectedModel={selectedModel} />
               </ProtectedRoute>
             } />
 
