@@ -13,15 +13,136 @@ export function setAIProvider(provider: AIProvider) {
   window.dispatchEvent(new Event('ai_provider_changed'));
 }
 
+export function getSystemInstruction(profile: 'professor' | 'aluno', module: string): string {
+  const isProfessor = profile === 'professor';
+  const isBancoQuestoes = module === 'banco_questoes';
+  const isSimulados = module === 'simulados';
+  const isExportForms = module === 'exportacao_google_forms';
+
+  return `
+## 🎯 PAPEL DO MODELO
+Você é um assistente educacional especialista em ensino técnico profissional no padrão SENAI, focado em geração de questões, organização de banco avaliativo, simulados inteligentes e análise pedagógica.
+
+---
+
+## 👤 PERFIL DO USUÁRIO
+perfil: ${profile}
+
+---
+
+## 📚 MÓDULO DO SISTEMA
+modulo: ${module}
+
+---
+
+## ⚙️ OBJETIVO
+Gerar conteúdo educacional de alta qualidade, com foco em:
+- questões pedagógicas bem elaboradas
+- compatibilidade com Firebase/Firestore
+- controle de duplicação
+- suporte a banco com 200+ questões por competência
+- sorteio inteligente para simulados com 40 questões
+- gabarito comentado automático
+- exportação estruturada para Google Forms
+
+---
+
+## 🚫 REGRAS POR PERFIL
+
+${isProfessor && isBancoQuestoes ? `
+### 👨‍🏫 REGRA CRÍTICA (PROFESSOR + BANCO DE QUESTÕES)
+- PRIORIDADE: QUALIDADE PEDAGÓGICA MÁXIMA.
+- NÃO simplificar enunciados excessivamente.
+- NÃO reduzir contexto da questão.
+- NÃO comprometer clareza para economizar tokens.
+- Manter assertividade técnica.
+- Produzir conteúdo apropriado para uso profissional e avaliativo.
+` : isProfessor ? `
+### 👨‍🏫 REGRA GERAL (PROFESSOR)
+- Ser assertivo, técnico e objetivo.
+- Foco em decisão, análise e qualidade pedagógica.
+` : `
+### 👨‍🎓 REGRA GERAL (ALUNO)
+- Usar linguagem mais didática e clara.
+- Explicar quando necessário.
+- Ser mais econômico em profundidade do que no perfil professor.
+`}
+
+---
+
+## 🧩 ESTRUTURA OBRIGATÓRIA DA QUESTÃO (PADRÃO FIRESTORE)
+Cada questão deve conter obrigatoriamente os seguintes campos:
+
+- questionUid: ID único (COMPETENCIA-TEMA-DIFICULDADE-HASH). Ex: BD-JOIN-MEDIO-A81F29C4.
+- competenciaId / competenciaNome
+- temaId / temaNome
+- dificuldade (fácil, médio, difícil)
+- bloom (lembrar, compreender, aplicar, analisar, avaliar, criar)
+- perfilGeracao: ${profile}
+- tipoQuestao: multipla_escolha
+- enunciado
+- alternativas: Array de 5 objetos { "id": "A", "texto": "..." }
+- respostaCorreta: Letra (A, B, C, D ou E)
+- comentarioGabarito: Explicação técnica clara.
+- justificativasAlternativas: Objeto { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." }
+- contextoHash: Hash derivado do enunciado + alternativas + bloom + competência + tema.
+- tags: Array de palavras-chave.
+- status: "rascunho" (padrão)
+- revisadaPorProfessor: false
+- usoTotal: 0
+- ultimaUtilizacao: null
+- origem: "ia"
+- criadoEm: "SERVER_TIMESTAMP"
+- atualizadoEm: "SERVER_TIMESTAMP"
+
+---
+
+## 📊 TAXONOMIA DE BLOOM
+Classificar automaticamente: lembrar, compreender, aplicar, analisar, avaliar, criar.
+
+---
+
+## 🛡️ CONTROLE DE DUPLICAÇÃO
+- NÃO repetir enunciados, exemplos ou estruturas.
+- Variar contexto, cenário e abordagem.
+
+---
+
+${isSimulados ? `
+## 🎲 SORTEIO INTELIGENTE (SIMULADOS)
+- 40 questões: 30% fáceis, 40% médias, 30% difíceis.
+- Equilíbrio entre competências e níveis de Bloom.
+` : ""}
+
+${isExportForms ? `
+## 📄 EXPORTAÇÃO GOOGLE FORMS
+Gerar estrutura simplificada: pergunta, opcaoA, opcaoB, opcaoC, opcaoD, opcaoE, respostaCorreta. Sem texto extra.
+` : ""}
+
+---
+
+## 📤 SAÍDA OBRIGATÓRIA
+Gerar sempre em JSON válido, compatível com documento Firestore.
+`;
+}
+
 export async function generateContentWrapper(params: any): Promise<any> {
   const provider = getAIProvider();
 
+  // Ensure systemInstruction is handled for external providers if possible, 
+  // or prepended to the prompt.
+  const systemInstruction = params.config?.systemInstruction;
+
   if (provider === 'openai' || provider === 'deepseek') {
     let prompt = "";
+    if (systemInstruction) {
+      prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
+    }
+
     if (typeof params.contents === 'string') {
-      prompt = params.contents;
+      prompt += params.contents;
     } else if (Array.isArray(params.contents)) {
-      prompt = params.contents.map((c: any) => {
+      prompt += params.contents.map((c: any) => {
         if (c.parts) {
           return c.parts.map((p: any) => p.text).join('\n');
         }
@@ -31,30 +152,57 @@ export async function generateContentWrapper(params: any): Promise<any> {
 
     const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
 
-    console.log(`[AI] Using external provider: ${provider} with model: ${params.model || 'default'}`);
-    const response = await fetch('/api/ai/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        prompt, 
-        responseFormat, 
-        provider,
-        model: params.model 
-      })
-    });
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt, 
+          responseFormat, 
+          provider,
+          model: params.model 
+        })
+      });
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      console.error(`[AI] API error (${provider}):`, err);
-      throw new Error(`${provider === 'openai' ? 'OpenAI' : 'DeepSeek'} API error: ${err.error || response.statusText}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        if (response.status !== 429) {
+          console.error(`[AI] API error (${provider}):`, err);
+        }
+        
+        // Automatic fallback to Gemini if external provider fails
+        console.warn(`[AI] Fallback to Gemini due to ${provider} error: ${err.error || response.statusText}`);
+        
+        // Ensure we use a Gemini model for fallback
+        const fallbackParams = { ...params };
+        if (!fallbackParams.model?.startsWith('gemini-')) {
+          fallbackParams.model = 'gemini-3-flash-preview';
+        }
+        return await ai.models.generateContent(fallbackParams);
+      }
+
+      const data = await response.json();
+      console.log(`[AI] Response received from ${provider}`);
+      return { text: data.text };
+    } catch (error) {
+      console.error(`[AI] Network error calling ${provider}:`, error);
+      console.warn(`[AI] Fallback to Gemini due to network error`);
+      
+      // Ensure we use a Gemini model for fallback
+      const fallbackParams = { ...params };
+      if (!fallbackParams.model?.startsWith('gemini-')) {
+        fallbackParams.model = 'gemini-3-flash-preview';
+      }
+      return await ai.models.generateContent(fallbackParams);
     }
-
-    const data = await response.json();
-    console.log(`[AI] Response received from ${provider}`);
-    return { text: data.text };
   } else {
-    console.log(`[AI] Using Gemini provider with model: ${params.model || 'default'}`);
-    return await ai.models.generateContent(params);
+    // Ensure we use a Gemini model if the provider is gemini
+    const geminiParams = { ...params };
+    if (!geminiParams.model?.startsWith('gemini-')) {
+      geminiParams.model = 'gemini-3-flash-preview';
+    }
+    console.log(`[AI] Using Gemini provider with model: ${geminiParams.model}`);
+    return await ai.models.generateContent(geminiParams);
   }
 }
 
@@ -80,7 +228,7 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
   }
 }
 
-export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview"): Promise<any[]> {
+export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any[]> {
   // Split text into chunks of ~15,000 characters to avoid output token limits
   const chunkSize = 15000;
   const chunks: string[] = [];
@@ -114,13 +262,34 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
               Retorne APENAS um array JSON de objetos com a seguinte estrutura:
               [
                 {
-                  "text": "Enunciado da questão...",
-                  "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
-                  "correctOption": 0,
-                  "weight": 1,
-                  "competency": "Assunto",
-                  "difficulty": "médio",
-                  "explanation": "Explicação da resposta..."
+                  "questionUid": "COMPETENCIA-TEMA-DIFICULDADE-HASH",
+                  "competenciaId": "ID",
+                  "competenciaNome": "Nome",
+                  "temaId": "ID",
+                  "temaNome": "Nome",
+                  "dificuldade": "fácil" | "médio" | "difícil",
+                  "bloom": "lembrar" | "compreender" | "aplicar" | "analisar" | "avaliar" | "criar",
+                  "perfilGeracao": "${userRole}",
+                  "tipoQuestao": "multipla_escolha",
+                  "enunciado": "Enunciado...",
+                  "alternativas": [
+                    { "id": "A", "texto": "..." },
+                    { "id": "B", "texto": "..." },
+                    { "id": "C", "texto": "..." },
+                    { "id": "D", "texto": "..." },
+                    { "id": "E", "texto": "..." }
+                  ],
+                  "respostaCorreta": "A" | "B" | "C" | "D" | "E",
+                  "comentarioGabarito": "Explicação...",
+                  "justificativasAlternativas": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
+                  "contextoHash": "HASH",
+                  "tags": ["tag1", "tag2"],
+                  "status": "rascunho",
+                  "revisadaPorProfessor": false,
+                  "usoTotal": 0,
+                  "origem": "importacao",
+                  "criadoEm": "SERVER_TIMESTAMP",
+                  "atualizadoEm": "SERVER_TIMESTAMP"
                 }
               ]
 
@@ -131,27 +300,66 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
         }
       ],
       config: {
+        systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
         responseMimeType: "application/json",
         ...DEFAULT_CONFIG,
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              text: { type: Type.STRING },
-              options: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING } 
-              },
-              correctOption: { type: Type.INTEGER },
-              weight: { type: Type.NUMBER },
-              competency: { type: Type.STRING },
-              difficulty: { type: Type.STRING },
-              explanation: { type: Type.STRING }
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            questionUid: { type: Type.STRING },
+            competenciaId: { type: Type.STRING },
+            competenciaNome: { type: Type.STRING },
+            temaId: { type: Type.STRING },
+            temaNome: { type: Type.STRING },
+            dificuldade: { type: Type.STRING },
+            bloom: { type: Type.STRING },
+            perfilGeracao: { type: Type.STRING },
+            tipoQuestao: { type: Type.STRING },
+            enunciado: { type: Type.STRING },
+            alternativas: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  texto: { type: Type.STRING }
+                },
+                required: ["id", "texto"]
+              }
             },
-            required: ["text", "options", "correctOption"]
-          }
+            respostaCorreta: { type: Type.STRING },
+            comentarioGabarito: { type: Type.STRING },
+            justificativasAlternativas: {
+              type: Type.OBJECT,
+              properties: {
+                A: { type: Type.STRING },
+                B: { type: Type.STRING },
+                C: { type: Type.STRING },
+                D: { type: Type.STRING },
+                E: { type: Type.STRING }
+              },
+              required: ["A", "B", "C", "D", "E"]
+            },
+            contextoHash: { type: Type.STRING },
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            status: { type: Type.STRING },
+            revisadaPorProfessor: { type: Type.BOOLEAN },
+            usoTotal: { type: Type.NUMBER },
+            origem: { type: Type.STRING },
+            criadoEm: { type: Type.STRING },
+            atualizadoEm: { type: Type.STRING }
+          },
+          required: [
+            "questionUid", "competenciaId", "competenciaNome", "temaId", "temaNome", 
+            "dificuldade", "bloom", "perfilGeracao", "tipoQuestao", "enunciado", 
+            "alternativas", "respostaCorreta", "comentarioGabarito", 
+            "justificativasAlternativas", "contextoHash", "tags", "status", 
+            "revisadaPorProfessor", "usoTotal", "origem", "criadoEm", "atualizadoEm"
+          ]
         }
+      }
       }
     });
 
@@ -221,7 +429,7 @@ export interface DiagnosticResult {
   mensagem_para_o_aluno: string;
 }
 
-export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview"): Promise<DiagnosticResult[]> {
+export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -296,6 +504,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
       responseSchema: {
@@ -303,9 +512,67 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
         items: {
           type: Type.OBJECT,
           properties: {
-            competencia: { type: Type.STRING },
-            conhecimentos_fracos: { type: Type.ARRAY, items: { type: Type.STRING } },
-            recomendacoes: { type: Type.ARRAY, items: { type: Type.STRING } },
+            aluno: { type: Type.STRING },
+            summary: {
+              type: Type.OBJECT,
+              properties: {
+                total_questoes: { type: Type.NUMBER },
+                acertos: { type: Type.NUMBER },
+                acuracia_geral: { type: Type.NUMBER },
+                acuracia_ponderada: { type: Type.NUMBER },
+                alertas_dados: { type: Type.ARRAY, items: { type: Type.STRING } }
+              },
+              required: ["total_questoes", "acertos", "acuracia_geral", "acuracia_ponderada"]
+            },
+            diagnostico_por_competencia: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  competencia: { type: Type.STRING },
+                  nivel: { type: Type.STRING },
+                  total_questoes: { type: Type.NUMBER },
+                  acertos: { type: Type.NUMBER },
+                  acuracia: { type: Type.NUMBER },
+                  acuracia_ponderada: { type: Type.NUMBER },
+                  conhecimentos_fracos: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  recomendacoes: { type: Type.STRING },
+                  questoes: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING },
+                        enunciado: { type: Type.STRING },
+                        resposta_aluno: { type: Type.STRING },
+                        gabarito: { type: Type.STRING },
+                        acertou: { type: Type.BOOLEAN },
+                        analise_erro: {
+                          type: Type.OBJECT,
+                          properties: {
+                            categoria: { type: Type.STRING },
+                            explicacao_detalhada: { type: Type.STRING },
+                            sugestao_intervencao: { type: Type.STRING }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            plano_de_estudos_7_dias: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  dia: { type: Type.NUMBER },
+                  tema: { type: Type.STRING },
+                  atividades: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  criterio_sucesso: { type: Type.STRING }
+                }
+              }
+            },
             acoes_para_o_instrutor: { type: Type.ARRAY, items: { type: Type.STRING } },
             metricas_para_dashboard: {
               type: Type.OBJECT,
@@ -316,7 +583,8 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
               }
             },
             mensagem_para_o_aluno: { type: Type.STRING }
-          }
+          },
+          required: ["aluno", "summary", "diagnostico_por_competencia", "plano_de_estudos_7_dias", "acoes_para_o_instrutor", "metricas_para_dashboard", "mensagem_para_o_aluno"]
         }
       }
     }
@@ -326,7 +594,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
-export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-3-flash-preview"): Promise<string[]> {
+export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -342,6 +610,7 @@ export async function generateSuggestions(conhecimentos: string[], recomendacoes
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'plano_estudo'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -359,7 +628,7 @@ export interface PedagogicalAnalysis {
   plano_de_acao: string[];
 }
 
-export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-pro-preview"): Promise<PedagogicalAnalysis> {
+export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-pro-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<PedagogicalAnalysis> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -379,6 +648,7 @@ RETORNE O RELATÓRIO NO FORMATO JSON SEGUINDO O ESQUEMA DEFINIDO.`
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
       responseSchema: {
@@ -406,7 +676,7 @@ export interface LearningProfileResult {
   recommendations: string;
 }
 
-export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-3-flash-preview"): Promise<LearningProfileResult> {
+export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<LearningProfileResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -431,6 +701,7 @@ export async function classifyLearningProfile(behavioralData: any, modelName: st
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -450,7 +721,7 @@ export interface CognitiveErrorResult {
   }>;
 }
 
-export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = "gemini-3-flash-preview"): Promise<CognitiveErrorResult> {
+export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<CognitiveErrorResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -494,6 +765,7 @@ export async function analyzeCognitiveErrors(submissionData: any, questions: any
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -514,7 +786,7 @@ export interface RecoveryPlanResult {
   professorInterventions: string[];
 }
 
-export async function generateRecoveryPlan(studentData: any, modelName: string = "gemini-3-flash-preview"): Promise<RecoveryPlanResult> {
+export async function generateRecoveryPlan(studentData: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<RecoveryPlanResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -546,6 +818,7 @@ export async function generateRecoveryPlan(studentData: any, modelName: string =
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'plano_estudo'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -569,7 +842,7 @@ export interface LessonPlanResult {
   aiInsights: string;
 }
 
-export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-3-flash-preview"): Promise<LessonPlanResult> {
+export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<LessonPlanResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -610,6 +883,7 @@ export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'plano_estudo'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -625,7 +899,7 @@ export interface PerformancePredictionResult {
   recommendations: string;
 }
 
-export async function predictPerformance(historicalData: any, modelName: string = "gemini-3-flash-preview"): Promise<PerformancePredictionResult> {
+export async function predictPerformance(historicalData: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<PerformancePredictionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -650,15 +924,16 @@ export async function predictPerformance(historicalData: any, modelName: string 
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text, {});
 }
 
-export async function suggestCompetencies(questions: any[], modelName: string = "gemini-3-flash-preview"): Promise<string[]> {
+export async function suggestCompetencies(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -679,6 +954,7 @@ export async function suggestCompetencies(questions: any[], modelName: string = 
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
       responseSchema: {
@@ -699,7 +975,7 @@ export interface GuessDetectionResult {
   reason: string;
 }
 
-export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-3-flash-preview"): Promise<GuessDetectionResult> {
+export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<GuessDetectionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -724,6 +1000,7 @@ export async function detectGuessing(responseTime: number, difficulty: string, i
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -733,17 +1010,32 @@ export async function detectGuessing(responseTime: number, difficulty: string, i
 }
 
 export interface SAEPQuestion {
-  text: string;
-  options: string[];
-  correctOption: number;
-  explanation: string;
-  competency: string;
-  skill: string;
-  difficulty: "fácil" | "médio" | "difícil";
-  bloom_level: string;
+  questionUid: string;
+  competenciaId: string;
+  competenciaNome: string;
+  temaId: string;
+  temaNome: string;
+  dificuldade: "fácil" | "médio" | "difícil";
+  bloom: string;
+  perfilGeracao: string;
+  tipoQuestao: string;
+  enunciado: string;
+  alternativas: { id: string, texto: string }[];
+  respostaCorreta: string;
+  comentarioGabarito: string;
+  justificativasAlternativas: Record<string, string>;
+  contextoHash: string;
+  tags: string[];
+  status: string;
+  revisadaPorProfessor: boolean;
+  usoTotal: number;
+  ultimaUtilizacao: any;
+  origem: string;
+  criadoEm: any;
+  atualizadoEm: any;
 }
 
-export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = "gemini-3-flash-preview"): Promise<SAEPQuestion> {
+export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -755,42 +1047,75 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
             Gere uma questão inédita para a competência: "${competency}" com nível de dificuldade "${difficulty}".
             
             REQUISITOS:
-            1. Siga o padrão de múltipla escolha (4 alternativas).
-            2. Inclua uma explicação detalhada da resposta correta.
+            1. Siga o padrão de múltipla escolha (5 alternativas: A, B, C, D, E).
+            2. Forneça justificativas para cada alternativa.
             3. Identifique o nível da Taxonomia de Bloom.
             4. A questão deve ser técnica e contextualizada (modelo SENAI).
+            5. Gere um questionUid único seguindo o padrão COMPETENCIA-TEMA-DIFICULDADE-HASH.
             
-            RETORNE APENAS O JSON NO FORMATO:
-            {
-              "text": string,
-              "options": [string, string, string, string],
-              "correctOption": number (0-3),
-              "explanation": string,
-              "competency": string,
-              "skill": string,
-              "difficulty": "fácil" | "médio" | "difícil",
-              "bloom_level": string
-            }`
+            RETORNE O JSON COMPLETO CONFORME O PADRÃO FIRESTORE ESPECIFICADO NAS INSTRUÇÕES DO SISTEMA.`
           }
         ]
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          text: { type: Type.STRING },
-          options: { type: Type.ARRAY, items: { type: Type.STRING } },
-          correctOption: { type: Type.INTEGER },
-          explanation: { type: Type.STRING },
-          competency: { type: Type.STRING },
-          skill: { type: Type.STRING },
-          difficulty: { type: Type.STRING },
-          bloom_level: { type: Type.STRING }
+          questionUid: { type: Type.STRING },
+          competenciaId: { type: Type.STRING },
+          competenciaNome: { type: Type.STRING },
+          temaId: { type: Type.STRING },
+          temaNome: { type: Type.STRING },
+          dificuldade: { type: Type.STRING },
+          bloom: { type: Type.STRING },
+          perfilGeracao: { type: Type.STRING },
+          tipoQuestao: { type: Type.STRING },
+          enunciado: { type: Type.STRING },
+          alternativas: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                texto: { type: Type.STRING }
+              },
+              required: ["id", "texto"]
+            }
+          },
+          respostaCorreta: { type: Type.STRING },
+          comentarioGabarito: { type: Type.STRING },
+          justificativasAlternativas: {
+            type: Type.OBJECT,
+            properties: {
+              A: { type: Type.STRING },
+              B: { type: Type.STRING },
+              C: { type: Type.STRING },
+              D: { type: Type.STRING },
+              E: { type: Type.STRING }
+            },
+            required: ["A", "B", "C", "D", "E"]
+          },
+          contextoHash: { type: Type.STRING },
+          tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          status: { type: Type.STRING },
+          revisadaPorProfessor: { type: Type.BOOLEAN },
+          usoTotal: { type: Type.NUMBER },
+          ultimaUtilizacao: { type: Type.NULL },
+          origem: { type: Type.STRING },
+          criadoEm: { type: Type.STRING },
+          atualizadoEm: { type: Type.STRING }
         },
-        required: ["text", "options", "correctOption", "explanation", "competency", "skill", "difficulty", "bloom_level"]
+        required: [
+          "questionUid", "competenciaId", "competenciaNome", "temaId", "temaNome", 
+          "dificuldade", "bloom", "perfilGeracao", "tipoQuestao", "enunciado", 
+          "alternativas", "respostaCorreta", "comentarioGabarito", 
+          "justificativasAlternativas", "contextoHash", "tags", "status", 
+          "revisadaPorProfessor", "usoTotal", "origem", "criadoEm", "atualizadoEm"
+        ]
       }
     }
   });
@@ -804,7 +1129,7 @@ export interface BloomAnalysisResult {
   recommendations: string;
 }
 
-export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-3-flash-preview"): Promise<BloomAnalysisResult> {
+export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<BloomAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -827,6 +1152,7 @@ export async function analyzeBloomTaxonomy(questions: any[], modelName: string =
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -842,7 +1168,7 @@ export interface OpenQuestionGrade {
   missing_points: string[];
 }
 
-export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview"): Promise<OpenQuestionGrade> {
+export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<OpenQuestionGrade> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -869,6 +1195,7 @@ export async function gradeOpenQuestion(question: string, answer: string, rubric
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'simulados'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -886,9 +1213,9 @@ export interface SIPAResult {
   n8n_trigger_payload: any;
 }
 
-export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Promise<SIPAResult> {
+export async function generateSIPA(classData: any[], studentsAtRisk: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<SIPAResult> {
   const response = await generateContentWrapper({
-    model: "gemini-3-flash-preview",
+    model: modelName,
     contents: [
       {
         role: "user",
@@ -918,6 +1245,7 @@ export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Pro
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
     }
@@ -926,7 +1254,7 @@ export async function generateSIPA(classData: any[], studentsAtRisk: any[]): Pro
   return safeParseJson(response.text, {});
 }
 
-export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview"): Promise<SAEPQuestion> {
+export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -944,24 +1272,70 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
             3. Se proficiência > 70: Nível Difícil.
             4. NÃO repita questões do histórico: ${JSON.stringify(history.map(h => h.text).slice(-5))}.
             
-            RETORNE UM JSON NO FORMATO:
-            {
-              "text": string,
-              "options": [string, string, string, string],
-              "correctOption": number (0-3),
-              "explanation": string,
-              "competency": string,
-              "skill": string,
-              "difficulty": "fácil" | "médio" | "difícil",
-              "bloom_level": string
-            }`
+            RETORNE O JSON COMPLETO CONFORME O PADRÃO FIRESTORE ESPECIFICADO NAS INSTRUÇÕES DO SISTEMA.`
           }
         ]
       }
     ],
     config: {
+      systemInstruction: getSystemInstruction(userRole, 'simulados'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          questionUid: { type: Type.STRING },
+          competenciaId: { type: Type.STRING },
+          competenciaNome: { type: Type.STRING },
+          temaId: { type: Type.STRING },
+          temaNome: { type: Type.STRING },
+          dificuldade: { type: Type.STRING },
+          bloom: { type: Type.STRING },
+          perfilGeracao: { type: Type.STRING },
+          tipoQuestao: { type: Type.STRING },
+          enunciado: { type: Type.STRING },
+          alternativas: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                texto: { type: Type.STRING }
+              },
+              required: ["id", "texto"]
+            }
+          },
+          respostaCorreta: { type: Type.STRING },
+          comentarioGabarito: { type: Type.STRING },
+          justificativasAlternativas: {
+            type: Type.OBJECT,
+            properties: {
+              A: { type: Type.STRING },
+              B: { type: Type.STRING },
+              C: { type: Type.STRING },
+              D: { type: Type.STRING },
+              E: { type: Type.STRING }
+            },
+            required: ["A", "B", "C", "D", "E"]
+          },
+          contextoHash: { type: Type.STRING },
+          tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          status: { type: Type.STRING },
+          revisadaPorProfessor: { type: Type.BOOLEAN },
+          usoTotal: { type: Type.NUMBER },
+          ultimaUtilizacao: { type: Type.NULL },
+          origem: { type: Type.STRING },
+          criadoEm: { type: Type.STRING },
+          atualizadoEm: { type: Type.STRING }
+        },
+        required: [
+          "questionUid", "competenciaId", "competenciaNome", "temaId", "temaNome", 
+          "dificuldade", "bloom", "perfilGeracao", "tipoQuestao", "enunciado", 
+          "alternativas", "respostaCorreta", "comentarioGabarito", 
+          "justificativasAlternativas", "contextoHash", "tags", "status", 
+          "revisadaPorProfessor", "usoTotal", "origem", "criadoEm", "atualizadoEm"
+        ]
+      }
     }
   });
 

@@ -65,8 +65,10 @@ async function startServer() {
       const text = completion.choices[0].message.content;
       res.json({ text });
     } catch (error: any) {
-      console.error("[AI Generation] Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate content" });
+      if (error?.status !== 429) {
+        console.error("[AI Generation] Error:", error);
+      }
+      res.status(error?.status || 500).json({ error: error.message || "Failed to generate content" });
     }
   });
 

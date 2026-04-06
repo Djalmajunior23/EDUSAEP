@@ -22,16 +22,17 @@ interface AdaptiveExamProps {
   competency: string;
   onComplete: (score: number) => void;
   selectedModel?: string;
+  userRole?: 'professor' | 'aluno';
 }
 
-export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-3-flash-preview" }: AdaptiveExamProps) {
+export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-3-flash-preview", userRole = 'aluno' }: AdaptiveExamProps) {
   const [currentQuestion, setCurrentQuestion] = useState<SAEPQuestion | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [proficiency, setProficiency] = useState(50); // Start at medium
   const [questionCount, setQuestionCount] = useState(0);
   const [maxQuestions] = useState(10); // Adaptive exams are usually shorter
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -94,7 +95,7 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
   const fetchNextQuestion = async (p: number, h: any[]) => {
     setIsLoading(true);
     try {
-      const question = await getNextAdaptiveQuestion(p, competency, h, selectedModel);
+      const question = await getNextAdaptiveQuestion(p, competency, h, selectedModel, userRole);
       setCurrentQuestion(question);
       setQuestionCount(prev => prev + 1);
     } catch (error) {
@@ -107,7 +108,7 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
   const handleAnswer = async () => {
     if (selectedOption === null || !currentQuestion || !sessionId) return;
 
-    const isCorrect = selectedOption === currentQuestion.correctOption;
+    const isCorrect = selectedOption === currentQuestion.respostaCorreta;
     const newHistory = [...history, { ...currentQuestion, selectedOption, isCorrect }];
     setHistory(newHistory);
     setShowFeedback(true);
@@ -115,9 +116,9 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
     // Simple TRI-like adjustment
     let newProficiency = proficiency;
     if (isCorrect) {
-      newProficiency = Math.min(100, proficiency + (currentQuestion.difficulty === 'difícil' ? 15 : 10));
+      newProficiency = Math.min(100, proficiency + (currentQuestion.dificuldade === 'difícil' ? 15 : 10));
     } else {
-      newProficiency = Math.max(0, proficiency - (currentQuestion.difficulty === 'fácil' ? 15 : 10));
+      newProficiency = Math.max(0, proficiency - (currentQuestion.dificuldade === 'fácil' ? 15 : 10));
     }
     setProficiency(newProficiency);
 
@@ -216,43 +217,43 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">
                 <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${
-                  currentQuestion.difficulty === 'fácil' ? 'bg-emerald-100 text-emerald-600' :
-                  currentQuestion.difficulty === 'médio' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                  currentQuestion.dificuldade === 'fácil' ? 'bg-emerald-100 text-emerald-600' :
+                  currentQuestion.dificuldade === 'médio' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
                 }`}>
-                  {currentQuestion.difficulty}
+                  {currentQuestion.dificuldade}
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono">{currentQuestion.skill}</span>
+                <span className="text-[10px] text-gray-400 font-mono">{currentQuestion.temaNome}</span>
               </div>
               <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 leading-relaxed">
-                {currentQuestion.text}
+                {currentQuestion.enunciado}
               </h3>
             </div>
 
             <div className="space-y-3 mb-8">
-              {currentQuestion.options.map((option, idx) => (
+              {currentQuestion.alternativas.map((option, idx) => (
                 <button
-                  key={idx}
-                  onClick={() => !showFeedback && setSelectedOption(idx)}
+                  key={option.id}
+                  onClick={() => !showFeedback && setSelectedOption(option.id)}
                   disabled={showFeedback}
                   className={`w-full p-4 rounded-2xl text-left transition-all flex items-center justify-between group ${
-                    selectedOption === idx
+                    selectedOption === option.id
                       ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none'
                       : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   } ${
-                    showFeedback && idx === currentQuestion.correctOption
+                    showFeedback && option.id === currentQuestion.respostaCorreta
                       ? 'ring-2 ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
                       : ''
                   } ${
-                    showFeedback && selectedOption === idx && idx !== currentQuestion.correctOption
+                    showFeedback && selectedOption === option.id && option.id !== currentQuestion.respostaCorreta
                       ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
                       : ''
                   }`}
                 >
-                  <span className="text-sm">{option}</span>
-                  {showFeedback && idx === currentQuestion.correctOption && (
+                  <span className="text-sm"><span className="font-bold mr-2">{option.id})</span> {option.texto}</span>
+                  {showFeedback && option.id === currentQuestion.respostaCorreta && (
                     <CheckCircle2 size={20} />
                   )}
-                  {showFeedback && selectedOption === idx && idx !== currentQuestion.correctOption && (
+                  {showFeedback && selectedOption === option.id && option.id !== currentQuestion.respostaCorreta && (
                     <XCircle size={20} />
                   )}
                 </button>
@@ -270,8 +271,14 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
                   Explicação da IA
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-                  {currentQuestion.explanation}
+                  {currentQuestion.comentarioGabarito}
                 </p>
+                {selectedOption && currentQuestion.justificativasAlternativas[selectedOption] && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Por que esta alternativa?</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{currentQuestion.justificativasAlternativas[selectedOption]}</p>
+                  </div>
+                )}
               </motion.div>
             ) : null}
 

@@ -193,7 +193,7 @@ async function updateXP(userId: string, amount: number) {
   }
 }
 
-function ItemGeneratorView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
+function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const [competency, setCompetency] = useState('');
   const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -208,7 +208,7 @@ function ItemGeneratorView({ user, selectedModel }: { user: User | null, selecte
     setIsGenerating(true);
     try {
       const { generateSAEPQuestion } = await import('./services/geminiService');
-      const question = await generateSAEPQuestion(competency, difficulty, selectedModel);
+      const question = await generateSAEPQuestion(competency, difficulty, selectedModel, userProfile?.role as any || 'professor');
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
     } catch (err) {
@@ -293,10 +293,10 @@ function ItemGeneratorView({ user, selectedModel }: { user: User | null, selecte
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  {generatedQuestion.difficulty}
+                  {generatedQuestion.dificuldade}
                 </span>
                 <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  Bloom: {generatedQuestion.bloom_level}
+                  Bloom: {generatedQuestion.bloom}
                 </span>
               </div>
               <button 
@@ -309,21 +309,21 @@ function ItemGeneratorView({ user, selectedModel }: { user: User | null, selecte
 
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-gray-900 leading-relaxed">
-                {generatedQuestion.text}
+                {generatedQuestion.enunciado}
               </h3>
               <div className="grid grid-cols-1 gap-3">
-                {generatedQuestion.options.map((opt: string, idx: number) => (
+                {generatedQuestion.alternativas.map((opt: { id: string, texto: string }, idx: number) => (
                   <div 
-                    key={idx}
+                    key={opt.id}
                     className={cn(
                       "p-4 rounded-xl border transition-all text-sm",
-                      idx === generatedQuestion.correctOption 
+                      opt.id === generatedQuestion.respostaCorreta 
                         ? "bg-emerald-50 border-emerald-200 text-emerald-700 font-medium" 
                         : "bg-gray-50 border-gray-100 text-gray-600"
                     )}
                   >
-                    <span className="font-bold mr-2">{String.fromCharCode(65 + idx)})</span>
-                    {opt}
+                    <span className="font-bold mr-2">{opt.id})</span>
+                    {opt.texto}
                   </div>
                 ))}
               </div>
@@ -335,7 +335,7 @@ function ItemGeneratorView({ user, selectedModel }: { user: User | null, selecte
                 <p className="text-xs font-bold uppercase tracking-wider">Justificativa Pedagógica</p>
               </div>
               <p className="text-sm text-blue-800 leading-relaxed italic">
-                {generatedQuestion.explanation}
+                {generatedQuestion.comentarioGabarito}
               </p>
             </div>
 
@@ -506,19 +506,34 @@ export interface Discipline {
 }
 
 export interface Question {
-  id: string;
-  text: string;
-  options: string[];
-  correctOption: number;
-  weight: number;
-  competency: string;
-  skill?: string;
-  difficulty: 'fácil' | 'médio' | 'difícil';
-  explanation?: string;
+  id?: string;
+  questionUid: string;
+  competenciaId: string;
+  competenciaNome: string;
+  temaId: string;
+  temaNome: string;
+  dificuldade: string;
+  bloom: string;
+  perfilGeracao: string;
+  tipoQuestao: string;
+  enunciado: string;
+  alternativas: Array<{ id: string; texto: string }>;
+  respostaCorreta: string;
+  comentarioGabarito: string;
+  justificativasAlternativas: Record<string, string>;
+  contextoHash: string;
+  tags: string[];
+  status: string;
+  revisadaPorProfessor: boolean;
+  usoTotal: number;
+  ultimaUtilizacao?: any;
+  origem: string;
+  criadoEm: any;
+  atualizadoEm: any;
+  createdBy?: string;
+  createdAt?: any;
   note?: string;
   feedback?: string;
-  createdAt?: any;
-  createdBy?: string;
 }
 
 export interface Exam {
@@ -2228,7 +2243,7 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
   );
 }
 
-function AdaptiveExamView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
+function AdaptiveExamView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const { competency } = useParams();
   const navigate = useNavigate();
   return (
@@ -2241,12 +2256,13 @@ function AdaptiveExamView({ user, selectedModel }: { user: User | null, selected
           navigate('/student-dashboard');
         }} 
         selectedModel={selectedModel}
+        userRole={userProfile?.role as any || 'aluno'}
       />
     </div>
   );
 }
 
-function StudentInsightsView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
+function StudentInsightsView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   return (
     <div className="py-8">
       <StudentInsights studentId={user?.uid || ''} selectedModel={selectedModel} />
@@ -2254,18 +2270,18 @@ function StudentInsightsView({ user, selectedModel }: { user: User | null, selec
   );
 }
 
-function ProfessorInsightsView({ selectedModel }: { selectedModel: string }) {
+function ProfessorInsightsView({ userProfile, selectedModel }: { userProfile: UserProfile | null, selectedModel: string }) {
   return (
     <div className="py-8">
-      <ProfessorInsights selectedModel={selectedModel} />
+      <ProfessorInsights userProfile={userProfile} selectedModel={selectedModel} />
     </div>
   );
 }
 
-function CognitiveAnalysisView({ selectedModel }: { selectedModel: string }) {
+function CognitiveAnalysisView({ userProfile, selectedModel }: { userProfile: UserProfile | null, selectedModel: string }) {
   return (
     <div className="py-8">
-      <CognitiveErrorAnalysisView selectedModel={selectedModel} />
+      <CognitiveErrorAnalysisView userProfile={userProfile} selectedModel={selectedModel} />
     </div>
   );
 }
@@ -2279,10 +2295,10 @@ function ConsolidatedReportRoute({ history }: { history: any[] }) {
 }
 
 
-function SocraticTutorView({ selectedModel }: { selectedModel: string }) {
+function SocraticTutorView({ userProfile, selectedModel }: { userProfile: UserProfile | null, selectedModel: string }) {
   return (
     <div className="py-8">
-      <SocraticTutor selectedModel={selectedModel} />
+      <SocraticTutor selectedModel={selectedModel} userRole={userProfile?.role as any || 'aluno'} />
     </div>
   );
 }
@@ -2295,7 +2311,7 @@ function GamificationDashboardView({ user, userProfile }: { user: User | null, u
   );
 }
 
-function QuestionsBankView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
+function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2304,15 +2320,34 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
   const [competencySearch, setCompetencySearch] = useState('');
   const [competencyFilter, setCompetencyFilter] = useState('all');
   const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({
-    text: '',
-    options: ['', '', '', ''],
-    correctOption: 0,
-    weight: 1,
-    competency: '',
-    difficulty: 'médio',
-    explanation: '',
-    note: '',
-    feedback: ''
+    questionUid: '',
+    competenciaId: '',
+    competenciaNome: '',
+    temaId: '',
+    temaNome: '',
+    dificuldade: 'médio',
+    bloom: 'compreender',
+    perfilGeracao: 'professor',
+    tipoQuestao: 'multipla_escolha',
+    enunciado: '',
+    alternativas: [
+      { id: 'A', texto: '' },
+      { id: 'B', texto: '' },
+      { id: 'C', texto: '' },
+      { id: 'D', texto: '' },
+      { id: 'E', texto: '' }
+    ],
+    respostaCorreta: 'A',
+    comentarioGabarito: '',
+    justificativasAlternativas: { A: '', B: '', C: '', D: '', E: '' },
+    contextoHash: '',
+    tags: [],
+    status: 'rascunho',
+    revisadaPorProfessor: false,
+    usoTotal: 0,
+    origem: 'manual',
+    criadoEm: '',
+    atualizadoEm: ''
   });
 
   // States for missing competencies during import
@@ -2357,7 +2392,8 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
                 if (!stats[q.id]) {
                   stats[q.id] = { correct: 0, incorrect: 0 };
                 }
-                const isCorrect = sub.answers[idx] === q.correctOption;
+                const correctIdx = q.alternativas.findIndex(a => a.id === q.respostaCorreta);
+                const isCorrect = sub.answers[idx] === (correctIdx !== -1 ? correctIdx : 0);
                 if (isCorrect) {
                   stats[q.id].correct++;
                 } else {
@@ -2403,17 +2439,20 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
   }, [user]);
 
   const uniqueCompetencies = useMemo(() => {
-    const comps = new Set(questions.map(q => q.competency).filter(Boolean));
+    const comps = new Set(questions.map(q => q.competenciaNome).filter(Boolean));
     return Array.from(comps).sort();
   }, [questions]);
 
   const handleSaveQuestion = async () => {
     if (!user) return;
     try {
+      const now = new Date().toISOString();
       const questionData = {
         ...currentQuestion,
         createdBy: user.uid,
         createdAt: currentQuestion.id ? currentQuestion.createdAt : serverTimestamp(),
+        atualizadoEm: now,
+        criadoEm: currentQuestion.id ? currentQuestion.criadoEm : now
       };
 
       if (currentQuestion.id) {
@@ -2424,7 +2463,36 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
         toast.success("Questão adicionada ao banco!");
       }
       setIsEditing(false);
-      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio', explanation: '', note: '', feedback: '' });
+      setCurrentQuestion({
+        questionUid: '',
+        competenciaId: '',
+        competenciaNome: '',
+        temaId: '',
+        temaNome: '',
+        dificuldade: 'médio',
+        bloom: 'compreender',
+        perfilGeracao: 'professor',
+        tipoQuestao: 'multipla_escolha',
+        enunciado: '',
+        alternativas: [
+          { id: 'A', texto: '' },
+          { id: 'B', texto: '' },
+          { id: 'C', texto: '' },
+          { id: 'D', texto: '' },
+          { id: 'E', texto: '' }
+        ],
+        respostaCorreta: 'A',
+        comentarioGabarito: '',
+        justificativasAlternativas: { A: '', B: '', C: '', D: '', E: '' },
+        contextoHash: '',
+        tags: [],
+        status: 'rascunho',
+        revisadaPorProfessor: false,
+        usoTotal: 0,
+        origem: 'manual',
+        criadoEm: '',
+        atualizadoEm: ''
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'questions');
     }
@@ -2441,9 +2509,9 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
     }
   };
 
-  const handleUpdateQuestionDifficulty = async (id: string, difficulty: 'fácil' | 'médio' | 'difícil') => {
+  const handleUpdateQuestionDifficulty = async (id: string, dificuldade: string) => {
     try {
-      await updateDoc(doc(db, 'questions', id), { difficulty });
+      await updateDoc(doc(db, 'questions', id), { dificuldade });
       toast.success("Dificuldade atualizada!");
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `questions/${id}`);
@@ -2452,7 +2520,7 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
 
   const parseQuestionsWithGemini = async (text: string) => {
     try {
-      const data = await parseQuestionsFromText(text, selectedModel);
+      const data = await parseQuestionsFromText(text, selectedModel, userProfile?.role as any || 'professor');
       return data;
     } catch (err) {
       console.error("Gemini parsing error:", err);
@@ -2491,44 +2559,57 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
         const batch = writeBatch(db);
         
         for (const row of chunk) {
-          const text = row.text || row.enunciado || row.pergunta;
-          if (!text) continue;
+          const enunciado = row.enunciado || row.text || row.pergunta;
+          if (!enunciado) continue;
 
-          const options = row.options || [
-            row.optionA || row.opcaoA || row.a || '',
-            row.optionB || row.opcaoB || row.b || '',
-            row.optionC || row.opcaoC || row.c || '',
-            row.optionD || row.opcaoD || row.d || ''
+          const alternativas = row.alternativas || [
+            { id: 'A', texto: row.optionA || row.opcaoA || row.a || '' },
+            { id: 'B', texto: row.optionB || row.opcaoB || row.b || '' },
+            { id: 'C', texto: row.optionC || row.opcaoC || row.c || '' },
+            { id: 'D', texto: row.optionD || row.opcaoD || row.d || '' },
+            { id: 'E', texto: row.optionE || row.opcaoE || row.e || '' }
           ];
 
-          let correctOption = 0;
-          if (typeof row.correctOption === 'number') {
-            correctOption = row.correctOption;
-          } else {
-            const correct = String(row.correctOption || row.gabarito || row.resposta || '0').toUpperCase();
-            if (correct === 'A' || correct === '0') correctOption = 0;
-            else if (correct === 'B' || correct === '1') correctOption = 1;
-            else if (correct === 'C' || correct === '2') correctOption = 2;
-            else if (correct === 'D' || correct === '3') correctOption = 3;
-            else if (!isNaN(parseInt(correct))) correctOption = parseInt(correct);
+          let respostaCorreta = 'A';
+          const rawCorrect = String(row.respostaCorreta || row.correctOption || row.gabarito || row.resposta || 'A').toUpperCase();
+          if (['A', 'B', 'C', 'D', 'E'].includes(rawCorrect)) {
+            respostaCorreta = rawCorrect;
+          } else if (['0', '1', '2', '3', '4'].includes(rawCorrect)) {
+            respostaCorreta = ['A', 'B', 'C', 'D', 'E'][parseInt(rawCorrect)];
           }
 
-          let competency = (row.competency || row.competencia || 'Geral').trim();
-          if (mapping[competency]) {
-            if (mapping[competency].action === 'ignore') continue;
-            if (mapping[competency].action === 'map' && mapping[competency].target) {
-              competency = mapping[competency].target;
+          let competenciaNome = (row.competenciaNome || row.competency || row.competencia || 'Geral').trim();
+          if (mapping[competenciaNome]) {
+            if (mapping[competenciaNome].action === 'ignore') continue;
+            if (mapping[competenciaNome].action === 'map' && mapping[competenciaNome].target) {
+              competenciaNome = mapping[competenciaNome].target;
             }
           }
 
+          const now = new Date().toISOString();
           const questionData = {
-            text,
-            options,
-            correctOption,
-            weight: parseFloat(row.weight || row.peso || '1'),
-            competency,
-            difficulty: (row.difficulty || row.dificuldade || 'médio').toLowerCase(),
-            explanation: row.explanation || row.explicacao || '',
+            questionUid: row.questionUid || `IMP-${Math.random().toString(36).substr(2, 9)}`,
+            competenciaId: row.competenciaId || 'Geral',
+            competenciaNome,
+            temaId: row.temaId || 'Geral',
+            temaNome: row.temaNome || 'Geral',
+            dificuldade: (row.dificuldade || row.difficulty || 'médio').toLowerCase(),
+            bloom: row.bloom || 'compreender',
+            perfilGeracao: row.perfilGeracao || 'importacao',
+            tipoQuestao: row.tipoQuestao || 'multipla_escolha',
+            enunciado,
+            alternativas,
+            respostaCorreta,
+            comentarioGabarito: row.comentarioGabarito || row.explanation || row.explicacao || '',
+            justificativasAlternativas: row.justificativasAlternativas || { A: '', B: '', C: '', D: '', E: '' },
+            contextoHash: row.contextoHash || '',
+            tags: row.tags || [],
+            status: 'publicada',
+            revisadaPorProfessor: true,
+            usoTotal: 0,
+            origem: 'importacao',
+            criadoEm: now,
+            atualizadoEm: now,
             createdBy: user.uid,
             createdAt: serverTimestamp()
           };
@@ -2594,20 +2675,20 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
           return;
         }
         // 1. Identify questions with missing/generic competencies and suggest them
-        const questionsToSuggest = data.filter(q => !q.competency || q.competency === 'Geral' || q.competency === '');
+        const questionsToSuggest = data.filter(q => !q.competenciaNome || q.competenciaNome === 'Geral' || q.competenciaNome === '');
         if (questionsToSuggest.length > 0) {
           toast.info(`IA sugerindo competências para ${questionsToSuggest.length} questões...`);
-          const suggestions = await suggestCompetencies(questionsToSuggest, selectedModel);
+          const suggestions = await suggestCompetencies(questionsToSuggest, selectedModel, userProfile?.role as any || 'professor');
           questionsToSuggest.forEach((q, idx) => {
-            q.competency = suggestions[idx] || 'Geral';
+            q.competenciaNome = suggestions[idx] || 'Geral';
           });
         }
 
         // 2. Identify unique competencies in the imported data
         const importedComps = new Set<string>();
         data.forEach(row => {
-          const comp = (row.competency || row.competencia || 'Geral').trim();
-          row.competency = comp; // Ensure it's set
+          const comp = (row.competenciaNome || row.competencia || 'Geral').trim();
+          row.competenciaNome = comp; // Ensure it's set
           importedComps.add(comp);
         });
 
@@ -2751,15 +2832,15 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
   };
 
   const filteredQuestions = questions.filter(q => {
-    const matchesSearch = q.text.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCompSearch = q.competency.toLowerCase().includes(competencySearch.toLowerCase());
-    const matchesCompetency = competencyFilter === 'all' || q.competency === competencyFilter;
+    const matchesSearch = (q.enunciado || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCompSearch = (q.competenciaNome || '').toLowerCase().includes(competencySearch.toLowerCase());
+    const matchesCompetency = competencyFilter === 'all' || q.competenciaNome === competencyFilter;
     return matchesSearch && matchesCompSearch && matchesCompetency;
   });
 
   return (
     <div className="space-y-6">
-      <ItemGeneratorView user={user} selectedModel={selectedModel} />
+      <ItemGeneratorView user={user} userProfile={userProfile} selectedModel={selectedModel} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Banco de Questões</h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -2817,7 +2898,36 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
 
             <button 
               onClick={() => {
-                setCurrentQuestion({ text: '', options: ['', '', '', ''], correctOption: 0, weight: 1, competency: '', difficulty: 'médio' });
+                setCurrentQuestion({
+                  questionUid: '',
+                  competenciaId: '',
+                  competenciaNome: '',
+                  temaId: '',
+                  temaNome: '',
+                  dificuldade: 'médio',
+                  bloom: 'compreender',
+                  perfilGeracao: 'professor',
+                  tipoQuestao: 'multipla_escolha',
+                  enunciado: '',
+                  alternativas: [
+                    { id: 'A', texto: '' },
+                    { id: 'B', texto: '' },
+                    { id: 'C', texto: '' },
+                    { id: 'D', texto: '' },
+                    { id: 'E', texto: '' }
+                  ],
+                  respostaCorreta: 'A',
+                  comentarioGabarito: '',
+                  justificativasAlternativas: { A: '', B: '', C: '', D: '', E: '' },
+                  contextoHash: '',
+                  tags: [],
+                  status: 'rascunho',
+                  revisadaPorProfessor: false,
+                  usoTotal: 0,
+                  origem: 'manual',
+                  criadoEm: '',
+                  atualizadoEm: ''
+                });
                 setIsEditing(true);
               }}
               className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 whitespace-nowrap"
@@ -2834,8 +2944,8 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
             <div className="md:col-span-2 space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enunciado</label>
               <textarea 
-                value={currentQuestion.text} 
-                onChange={(e) => setCurrentQuestion({ ...currentQuestion, text: e.target.value })}
+                value={currentQuestion.enunciado} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, enunciado: e.target.value })}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="Digite o enunciado da questão..."
               />
@@ -2844,16 +2954,16 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Competência</label>
               <input 
                 type="text" 
-                value={currentQuestion.competency} 
-                onChange={(e) => setCurrentQuestion({ ...currentQuestion, competency: e.target.value })}
+                value={currentQuestion.competenciaNome} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, competenciaNome: e.target.value })}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dificuldade</label>
               <select 
-                value={currentQuestion.difficulty} 
-                onChange={(e) => setCurrentQuestion({ ...currentQuestion, difficulty: e.target.value as any })}
+                value={currentQuestion.dificuldade} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, dificuldade: e.target.value })}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="fácil">Fácil</option>
@@ -2862,10 +2972,10 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
               </select>
             </div>
             <div className="md:col-span-2 space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Explicação da Resposta (Opcional)</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Comentário do Gabarito</label>
               <textarea 
-                value={currentQuestion.explanation || ''} 
-                onChange={(e) => setCurrentQuestion({ ...currentQuestion, explanation: e.target.value })}
+                value={currentQuestion.comentarioGabarito || ''} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, comentarioGabarito: e.target.value })}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="Explique por que esta é a resposta correta..."
                 rows={3}
@@ -2894,26 +3004,26 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Opções</label>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Alternativas</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {currentQuestion.options?.map((opt, oIdx) => (
-                <div key={oIdx} className="flex items-center gap-3">
+              {currentQuestion.alternativas?.map((opt, oIdx) => (
+                <div key={opt.id} className="flex items-center gap-3">
                   <input 
                     type="radio" 
                     name="correct-bank" 
-                    checked={currentQuestion.correctOption === oIdx} 
-                    onChange={() => setCurrentQuestion({ ...currentQuestion, correctOption: oIdx })}
+                    checked={currentQuestion.respostaCorreta === opt.id} 
+                    onChange={() => setCurrentQuestion({ ...currentQuestion, respostaCorreta: opt.id })}
                   />
                   <input 
                     type="text" 
-                    value={opt} 
+                    value={opt.texto} 
                     onChange={(e) => {
-                      const newOpts = [...(currentQuestion.options || [])];
-                      newOpts[oIdx] = e.target.value;
-                      setCurrentQuestion({ ...currentQuestion, options: newOpts });
+                      const newOpts = [...(currentQuestion.alternativas || [])];
+                      newOpts[oIdx] = { ...newOpts[oIdx], texto: e.target.value };
+                      setCurrentQuestion({ ...currentQuestion, alternativas: newOpts });
                     }}
                     className="flex-1 p-2 text-sm bg-gray-50 border border-gray-200 rounded-lg"
-                    placeholder={`Opção ${String.fromCharCode(65 + oIdx)}`}
+                    placeholder={`Opção ${opt.id}`}
                   />
                 </div>
               ))}
@@ -2942,20 +3052,20 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <select
-                        value={q.difficulty}
-                        onChange={(e) => handleUpdateQuestionDifficulty(q.id, e.target.value as any)}
+                        value={q.dificuldade}
+                        onChange={(e) => handleUpdateQuestionDifficulty(q.id!, e.target.value)}
                         className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border-none focus:ring-0 cursor-pointer outline-none appearance-none text-center",
-                          q.difficulty === 'fácil' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" :
-                          q.difficulty === 'médio' ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-red-100 text-red-700 hover:bg-red-200"
+                          q.dificuldade === 'fácil' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" :
+                          q.dificuldade === 'médio' ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-red-100 text-red-700 hover:bg-red-200"
                         )}
                       >
                         <option value="fácil">Fácil</option>
                         <option value="médio">Médio</option>
                         <option value="difícil">Difícil</option>
                       </select>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competency}</span>
-                      {questionStats[q.id] && (questionStats[q.id].correct > 0 || questionStats[q.id].incorrect > 0) && (
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{q.competenciaNome}</span>
+                      {q.id && questionStats[q.id] && (questionStats[q.id].correct > 0 || questionStats[q.id].incorrect > 0) && (
                         <div className="flex items-center gap-1 ml-2 text-[10px] font-bold">
                           <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1" title="Acertos">
                             <CheckCircle2 size={10} /> {questionStats[q.id].correct}
@@ -2966,7 +3076,7 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
                         </div>
                       )}
                     </div>
-                    <p className={cn("text-gray-900 font-medium", !isExpanded && "line-clamp-2")}>{q.text}</p>
+                    <p className={cn("text-gray-900 font-medium", !isExpanded && "line-clamp-2")}>{q.enunciado}</p>
                     
                     <button 
                       onClick={() => toggleExpand(q.id)}
@@ -2990,34 +3100,34 @@ function QuestionsBankView({ user, selectedModel }: { user: User | null, selecte
                   >
                     <div className="pt-4 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {q.options.map((opt, oIdx) => (
+                        {q.alternativas.map((opt) => (
                           <div 
-                            key={oIdx} 
+                            key={opt.id} 
                             className={cn(
                               "p-3 rounded-xl border text-sm flex items-center gap-3",
-                              q.correctOption === oIdx 
+                              q.respostaCorreta === opt.id 
                                 ? "bg-emerald-50 border-emerald-200 text-emerald-900" 
                                 : "bg-white border-gray-100 text-gray-600"
                             )}
                           >
                             <div className={cn(
                               "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
-                              q.correctOption === oIdx ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
+                              q.respostaCorreta === opt.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
                             )}>
-                              {String.fromCharCode(65 + oIdx)}
+                              {opt.id}
                             </div>
-                            {opt}
-                            {q.correctOption === oIdx && <CheckCircle2 size={14} className="ml-auto text-emerald-600" />}
+                            {opt.texto}
+                            {q.respostaCorreta === opt.id && <CheckCircle2 size={14} className="ml-auto text-emerald-600" />}
                           </div>
                         ))}
                       </div>
 
-                      {q.explanation && (
+                      {q.comentarioGabarito && (
                         <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
                           <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <Info size={14} /> Explicação da Resposta
+                            <Info size={14} /> Comentário do Gabarito
                           </p>
-                          <p className="text-sm text-gray-600 italic leading-relaxed">{q.explanation}</p>
+                          <p className="text-sm text-gray-600 italic leading-relaxed">{q.comentarioGabarito}</p>
                         </div>
                       )}
 
@@ -3267,7 +3377,7 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
     if (statusFilter !== 'all' && exam.status !== statusFilter) return false;
     if (competencyFilter) {
       const hasCompetency = exam.questions?.some(q => 
-        q.competency?.toLowerCase().includes(competencyFilter.toLowerCase())
+        q.competenciaNome?.toLowerCase().includes(competencyFilter.toLowerCase())
       );
       if (!hasCompetency) return false;
     }
@@ -3378,13 +3488,33 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
 
   const addQuestion = () => {
     const newQuestion: Question = {
-      id: Math.random().toString(36).substr(2, 9),
-      text: '',
-      options: ['', '', '', ''],
-      correctOption: 0,
-      weight: 1,
-      competency: '',
-      difficulty: 'médio'
+      questionUid: `MAN-${Math.random().toString(36).substr(2, 9)}`,
+      competenciaId: '',
+      competenciaNome: '',
+      temaId: '',
+      temaNome: '',
+      dificuldade: 'médio',
+      bloom: 'compreender',
+      perfilGeracao: 'professor',
+      tipoQuestao: 'multipla_escolha',
+      enunciado: '',
+      alternativas: [
+        { id: 'A', texto: '' },
+        { id: 'B', texto: '' },
+        { id: 'C', texto: '' },
+        { id: 'D', texto: '' }
+      ],
+      respostaCorreta: 'A',
+      comentarioGabarito: '',
+      justificativasAlternativas: { A: '', B: '', C: '', D: '', E: '' },
+      contextoHash: '',
+      tags: [],
+      status: 'rascunho',
+      revisadaPorProfessor: false,
+      usoTotal: 0,
+      origem: 'manual',
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
     };
     setCurrentExam({
       ...currentExam,
@@ -3400,9 +3530,9 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
 
   const updateOption = (qIndex: number, oIndex: number, value: string) => {
     const updatedQuestions = [...(currentExam.questions || [])];
-    const updatedOptions = [...updatedQuestions[qIndex].options];
-    updatedOptions[oIndex] = value;
-    updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], options: updatedOptions };
+    const updatedOptions = [...updatedQuestions[qIndex].alternativas];
+    updatedOptions[oIndex] = { ...updatedOptions[oIndex], texto: value };
+    updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], alternativas: updatedOptions };
     setCurrentExam({ ...currentExam, questions: updatedQuestions });
   };
 
@@ -3541,7 +3671,7 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
                   }
 
                   // Send to Gemini to parse
-                  const questions = await parseQuestionsFromText(text, selectedModel);
+                  const questions = await parseQuestionsFromText(text, selectedModel, userProfile?.role as any || 'professor');
                   
                   if (!questions || questions.length === 0) {
                     throw new Error("Nenhuma questão pôde ser extraída do arquivo. Verifique a formatação.");
@@ -3714,8 +3844,8 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
                 <div className="md:col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enunciado da Questão {qIdx + 1}</label>
                   <textarea 
-                    value={q.text} 
-                    onChange={(e) => updateQuestion(qIdx, 'text', e.target.value)}
+                    value={q.enunciado} 
+                    onChange={(e) => updateQuestion(qIdx, 'enunciado', e.target.value)}
                     className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="Digite o enunciado da questão..."
                   />
@@ -3725,26 +3855,29 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Competência Relacionada</label>
                     <input 
                       type="text" 
-                      value={q.competency} 
-                      onChange={(e) => updateQuestion(qIdx, 'competency', e.target.value)}
+                      value={q.competenciaNome} 
+                      onChange={(e) => updateQuestion(qIdx, 'competenciaNome', e.target.value)}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                       placeholder="Ex: Álgebra"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Peso/Valor</label>
-                    <input 
-                      type="number" 
-                      value={q.weight} 
-                      onChange={(e) => updateQuestion(qIdx, 'weight', parseFloat(e.target.value))}
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dificuldade</label>
+                    <select 
+                      value={q.dificuldade} 
+                      onChange={(e) => updateQuestion(qIdx, 'dificuldade', e.target.value)}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
+                    >
+                      <option value="fácil">Fácil</option>
+                      <option value="médio">Médio</option>
+                      <option value="difícil">Difícil</option>
+                    </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Explicação (Correção Comentada)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Comentário do Gabarito</label>
                     <textarea 
-                      value={q.explanation || ''} 
-                      onChange={(e) => updateQuestion(qIdx, 'explanation', e.target.value)}
+                      value={q.comentarioGabarito || ''} 
+                      onChange={(e) => updateQuestion(qIdx, 'comentarioGabarito', e.target.value)}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
                       placeholder="Explique a resposta correta..."
                     />
@@ -3755,24 +3888,24 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
               <div className="space-y-3">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Opções de Resposta</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {q.options.map((opt, oIdx) => (
+                  {q.alternativas.map((opt, oIdx) => (
                     <div key={oIdx} className="flex items-center gap-3">
                       <input 
                         type="radio" 
-                        name={`correct-${q.id}`} 
-                        checked={q.correctOption === oIdx} 
-                        onChange={() => updateQuestion(qIdx, 'correctOption', oIdx)}
+                        name={`correct-${q.id || q.questionUid}`} 
+                        checked={q.respostaCorreta === opt.id} 
+                        onChange={() => updateQuestion(qIdx, 'respostaCorreta', opt.id)}
                         className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
                       />
                       <input 
                         type="text" 
-                        value={opt} 
+                        value={opt.texto} 
                         onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
                         className={cn(
                           "flex-1 p-2 text-sm bg-gray-50 border rounded-lg outline-none transition-all",
-                          q.correctOption === oIdx ? "border-emerald-500 bg-emerald-50" : "border-gray-200 focus:border-emerald-500"
+                          q.respostaCorreta === opt.id ? "border-emerald-500 bg-emerald-50" : "border-gray-200 focus:border-emerald-500"
                         )}
-                        placeholder={`Opção ${String.fromCharCode(65 + oIdx)}`}
+                        placeholder={`Opção ${opt.id}`}
                       />
                     </div>
                   ))}
@@ -4014,7 +4147,7 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
   );
 }
 
-function ExercisesView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
+function ExercisesView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const [exercises, setExercises] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4066,7 +4199,7 @@ function ExercisesView({ user, selectedModel }: { user: User | null, selectedMod
   }, [exercises, searchTerm, selectedSubject]);
 
   if (activeExercise) {
-    return <ExamTakingView user={user} exam={activeExercise} onCancel={() => setActiveExercise(null)} selectedModel={selectedModel} />;
+    return <ExamTakingView user={user} userProfile={userProfile} exam={activeExercise} onCancel={() => setActiveExercise(null)} selectedModel={selectedModel} />;
   }
 
   return (
@@ -4178,7 +4311,7 @@ function ExercisesView({ user, selectedModel }: { user: User | null, selectedMod
   );
 }
 
-function StudentExamsView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
+function StudentExamsView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
   const [forms, setForms] = useState<SimuladoForm[]>([]);
@@ -4250,7 +4383,7 @@ function StudentExamsView({ user, selectedModel }: { user: User | null, selected
       return null;
     }
 
-    return <ExamTakingView exam={takingExam} user={user} onCancel={() => setTakingExam(null)} selectedModel={selectedModel} />;
+    return <ExamTakingView exam={takingExam} user={user} userProfile={userProfile} onCancel={() => setTakingExam(null)} selectedModel={selectedModel} />;
   }
 
   return (
@@ -4634,7 +4767,7 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
       - Análise Detalhada: ${JSON.stringify(competencyAnalysis)}
       
       CONTEÚDO DISPONÍVEL:
-      - Questões: ${availableQuestions.map(q => `- ID: ${q.id}, Competência: ${q.competency}, Texto: ${q.text.substring(0, 30)}`).join('\n')}
+      - Questões: ${availableQuestions.map(q => `- ID: ${q.id}, Competência: ${q.competenciaNome}, Texto: ${q.enunciado.substring(0, 30)}`).join('\n')}
       - Simulados/Exercícios: ${availableExams.map(e => `- ID: ${e.id}, Título: ${e.title}, Tipo: ${e.type}`).join('\n')}
       
       OBJETIVO:
@@ -5050,7 +5183,7 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
   );
 }
 
-function ExamTakingView({ exam, user, onCancel, selectedModel }: { exam: Exam, user: User | null, onCancel: () => void, selectedModel: string }) {
+function ExamTakingView({ exam, user, userProfile, onCancel, selectedModel }: { exam: Exam, user: User | null, userProfile: UserProfile | null, onCancel: () => void, selectedModel: string }) {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>(() => {
     const saved = localStorage.getItem(`exam_progress_${exam.id}`);
@@ -5102,17 +5235,18 @@ function ExamTakingView({ exam, user, onCancel, selectedModel }: { exam: Exam, u
       const competencyResults: { [key: string]: { correct: number, total: number } } = {};
 
       exam.questions.forEach((q, idx) => {
-        const isCorrect = answers[idx] === q.correctOption;
-        const weight = q.weight || 1;
+        const correctIdx = q.alternativas.findIndex(a => a.id === q.respostaCorreta);
+        const isCorrect = answers[idx] === (correctIdx !== -1 ? correctIdx : 0);
+        const weight = 1; // Default weight
         maxScore += weight;
         if (isCorrect) score += weight;
 
-        if (q.competency) {
-          if (!competencyResults[q.competency]) {
-            competencyResults[q.competency] = { correct: 0, total: 0 };
+        if (q.competenciaNome) {
+          if (!competencyResults[q.competenciaNome]) {
+            competencyResults[q.competenciaNome] = { correct: 0, total: 0 };
           }
-          competencyResults[q.competency].total += weight;
-          if (isCorrect) competencyResults[q.competency].correct += weight;
+          competencyResults[q.competenciaNome].total += weight;
+          if (isCorrect) competencyResults[q.competenciaNome].correct += weight;
         }
       });
 
@@ -5133,7 +5267,7 @@ function ExamTakingView({ exam, user, onCancel, selectedModel }: { exam: Exam, u
       // Cognitive Error Analysis Trigger
       if (score < maxScore) {
         // Run analysis in background
-        analyzeCognitiveErrors(submission, exam.questions, selectedModel).then(async (result) => {
+        analyzeCognitiveErrors(submission, exam.questions, selectedModel, userProfile?.role as any || 'professor').then(async (result) => {
           if (result.errors && result.errors.length > 0) {
             await addDoc(collection(db, 'cognitive_error_analyses'), {
               userId: user?.uid || '',
@@ -5305,68 +5439,73 @@ function ExamTakingView({ exam, user, onCancel, selectedModel }: { exam: Exam, u
       >
         <div className="space-y-4">
           <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-            {currentQuestion.competency || 'Geral'}
+            {currentQuestion.competenciaNome || 'Geral'}
           </span>
           <h3 className="text-xl font-medium text-gray-900 leading-relaxed">
-            {currentQuestion.text}
+            {currentQuestion.enunciado}
           </h3>
         </div>
 
         <div className="space-y-3">
-          {currentQuestion.options.map((opt, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleAnswer(idx)}
-              disabled={exam.type === 'exercicio' && isAnswerChecked}
-              className={cn(
-                "w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 group",
-                answers[currentQuestionIdx] === idx 
-                  ? (exam.type === 'exercicio' && isAnswerChecked 
-                      ? (idx === currentQuestion.correctOption ? "bg-emerald-50 border-emerald-500 shadow-sm" : "bg-red-50 border-red-500 shadow-sm")
-                      : "bg-emerald-50 border-emerald-500 shadow-sm")
-                  : (exam.type === 'exercicio' && isAnswerChecked && idx === currentQuestion.correctOption
-                      ? "bg-emerald-50 border-emerald-500 shadow-sm"
-                      : "bg-gray-50 border-gray-100 hover:border-emerald-200 hover:bg-white")
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all",
-                answers[currentQuestionIdx] === idx 
-                  ? (exam.type === 'exercicio' && isAnswerChecked
-                      ? (idx === currentQuestion.correctOption ? "bg-emerald-500 text-white" : "bg-red-500 text-white")
-                      : "bg-emerald-500 text-white")
-                  : (exam.type === 'exercicio' && isAnswerChecked && idx === currentQuestion.correctOption
-                      ? "bg-emerald-500 text-white"
-                      : "bg-white text-gray-400 group-hover:text-emerald-600")
-              )}>
-                {String.fromCharCode(65 + idx)}
-              </div>
-              <div className="flex-1 flex items-center justify-between">
-                <span className={cn(
-                  "text-sm font-medium",
+          {currentQuestion.alternativas.map((opt, idx) => {
+            const correctIdx = currentQuestion.alternativas.findIndex(a => a.id === currentQuestion.respostaCorreta);
+            const isCorrectOption = idx === (correctIdx !== -1 ? correctIdx : 0);
+            
+            return (
+              <button
+                key={idx}
+                onClick={() => handleAnswer(idx)}
+                disabled={exam.type === 'exercicio' && isAnswerChecked}
+                className={cn(
+                  "w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 group",
+                  answers[currentQuestionIdx] === idx 
+                    ? (exam.type === 'exercicio' && isAnswerChecked 
+                        ? (isCorrectOption ? "bg-emerald-50 border-emerald-500 shadow-sm" : "bg-red-50 border-red-500 shadow-sm")
+                        : "bg-emerald-50 border-emerald-500 shadow-sm")
+                    : (exam.type === 'exercicio' && isAnswerChecked && isCorrectOption
+                        ? "bg-emerald-50 border-emerald-500 shadow-sm"
+                        : "bg-gray-50 border-gray-100 hover:border-emerald-200 hover:bg-white")
+                )}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all",
                   answers[currentQuestionIdx] === idx 
                     ? (exam.type === 'exercicio' && isAnswerChecked
-                        ? (idx === currentQuestion.correctOption ? "text-emerald-900" : "text-red-900")
-                        : "text-emerald-900")
-                    : (exam.type === 'exercicio' && isAnswerChecked && idx === currentQuestion.correctOption
-                        ? "text-emerald-900"
-                        : "text-gray-600")
+                        ? (isCorrectOption ? "bg-emerald-500 text-white" : "bg-red-500 text-white")
+                        : "bg-emerald-500 text-white")
+                    : (exam.type === 'exercicio' && isAnswerChecked && isCorrectOption
+                        ? "bg-emerald-500 text-white"
+                        : "bg-white text-gray-400 group-hover:text-emerald-600")
                 )}>
-                  {opt}
-                </span>
-                {exam.type === 'exercicio' && isAnswerChecked && (
-                  idx === currentQuestion.correctOption ? (
-                    <CheckCircle2 className="text-emerald-500" size={18} />
-                  ) : (
-                    answers[currentQuestionIdx] === idx && <XCircle className="text-red-500" size={18} />
-                  )
-                )}
-              </div>
-            </button>
-          ))}
+                  {opt.id}
+                </div>
+                <div className="flex-1 flex items-center justify-between">
+                  <span className={cn(
+                    "text-sm font-medium",
+                    answers[currentQuestionIdx] === idx 
+                      ? (exam.type === 'exercicio' && isAnswerChecked
+                          ? (isCorrectOption ? "text-emerald-900" : "text-red-900")
+                          : "text-emerald-900")
+                      : (exam.type === 'exercicio' && isAnswerChecked && isCorrectOption
+                          ? "text-emerald-900"
+                          : "text-gray-600")
+                  )}>
+                    {opt.texto}
+                  </span>
+                  {exam.type === 'exercicio' && isAnswerChecked && (
+                    isCorrectOption ? (
+                      <CheckCircle2 className="text-emerald-500" size={18} />
+                    ) : (
+                      answers[currentQuestionIdx] === idx && <XCircle className="text-red-500" size={18} />
+                    )
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
-        {exam.type === 'exercicio' && isAnswerChecked && currentQuestion.explanation && (
+        {exam.type === 'exercicio' && isAnswerChecked && currentQuestion.comentarioGabarito && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -5376,7 +5515,7 @@ function ExamTakingView({ exam, user, onCancel, selectedModel }: { exam: Exam, u
               <HelpCircle size={14} /> Correção Comentada
             </div>
             <p className="text-sm text-blue-900 leading-relaxed">
-              {currentQuestion.explanation}
+              {currentQuestion.comentarioGabarito}
             </p>
           </motion.div>
         )}
@@ -6929,7 +7068,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
     if (suggestions[comp.competencia]) return;
     setLoadingSuggestions(prev => ({ ...prev, [comp.competencia]: true }));
     try {
-      const newSuggestions = await generateSuggestions(comp.conhecimentos_fracos, comp.recomendacoes, selectedModel);
+      const newSuggestions = await generateSuggestions(comp.conhecimentos_fracos, comp.recomendacoes, selectedModel, userProfile?.role as any || 'aluno');
       setSuggestions(prev => ({ ...prev, [comp.competencia]: newSuggestions }));
     } catch (err) {
       toast.error("Erro ao gerar sugestões.");
@@ -7015,7 +7154,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
       };
 
       // 3. Generate Plan
-      const plan = await generateRecoveryPlan(studentData, selectedModel);
+      const plan = await generateRecoveryPlan(studentData, selectedModel, userProfile?.role as any || 'aluno');
       
       // 4. Save to Firestore
       await addDoc(collection(db, 'recovery_plans'), {
@@ -9694,7 +9833,7 @@ function AppContent() {
       for (const name of studentNames) {
         try {
           const studentInfo = studentsData[name];
-          const results = await generateDiagnostic(studentInfo.rows, selectedModel);
+          const results = await generateDiagnostic(studentInfo.rows, selectedModel, userProfile?.role as any || 'professor');
           
           if (results && results.length > 0) {
             const res = results[0]; 
@@ -10227,17 +10366,17 @@ function AppContent() {
               <Route path="/exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} selectedModel={selectedModel} defaultType="simulado" /></ProtectedRoute>} />
               <Route path="/simulados/inconsistencies" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ImportInconsistencyManager /></ProtectedRoute>} />
               <Route path="/exercises-management" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExamsManagementView user={user} userProfile={userProfile} selectedModel={selectedModel} defaultType="exercicio" /></ProtectedRoute>} />
-              <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/questions-bank" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><QuestionsBankView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/student-exams" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentExamsView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ExercisesView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/study-plan" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><StudyPlanView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><GamificationDashboardView user={user} userProfile={userProfile} /></ProtectedRoute>} />
-              <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/consolidated-report" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ConsolidatedReportRoute history={history} /></ProtectedRoute>} />
-              <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div
@@ -10440,7 +10579,7 @@ function AppContent() {
 
             <Route path="/student-exams" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}>
-                <StudentExamsView user={user} />
+                <StudentExamsView user={user} userProfile={userProfile} selectedModel={selectedModel} />
               </ProtectedRoute>
             } />
 

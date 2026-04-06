@@ -32,10 +32,11 @@ import {
 import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '../../services/geminiService';
+import { UserProfile } from '../../types';
 import { triggerN8NAlert } from '../../services/n8nService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 
-export function ProfessorInsights() {
+export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classData, setClassData] = useState<any[]>([]);
@@ -61,8 +62,6 @@ export function ProfessorInsights() {
     }
   };
 
-  // ... (rest of the component logic)
-
   const handleGenerateSIPA = async () => {
     if (!selectedClassId || classData.length === 0) return;
     setIsGeneratingSIPA(true);
@@ -72,7 +71,7 @@ export function ProfessorInsights() {
         { name: 'João Silva', level: 'Crítico', score: 35 },
         { name: 'Maria Oliveira', level: 'Atenção', score: 52 }
       ];
-      const result = await generateSIPA(classData, studentsAtRisk);
+      const result = await generateSIPA(classData, studentsAtRisk, selectedModel, userProfile?.role as any || 'professor');
       setSipaResult(result);
       
       // Save to Firestore
@@ -191,7 +190,7 @@ export function ProfessorInsights() {
         .slice(0, 3); // Take top 3 most critical
 
       // 6. Generate the plan using the AI service
-      const plan = await generateLessonPlan(criticalCompetencies, cognitiveAnalyses);
+      const plan = await generateLessonPlan(criticalCompetencies, cognitiveAnalyses, selectedModel, userProfile?.role as any || 'professor');
       setLessonPlan(plan);
       
       // 7. Save to Firestore

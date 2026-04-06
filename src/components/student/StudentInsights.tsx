@@ -94,7 +94,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
         competencyPerformance: submissions[0]?.competencyResults || {}
       };
 
-      const result = await classifyLearningProfile(behavioralData, selectedModel);
+      const result = await classifyLearningProfile(behavioralData, selectedModel, 'aluno');
       
       // Save to Firestore
       await addDoc(collection(db, 'learning_profiles'), {

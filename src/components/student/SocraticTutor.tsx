@@ -5,10 +5,8 @@ import { db, auth } from '../../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { GoogleGenAI } from "@google/genai";
 import { handleFirestoreError, OperationType } from '../../services/errorService';
-import { generateContentWrapper, DEFAULT_CONFIG } from '../../services/geminiService';
+import { generateContentWrapper, DEFAULT_CONFIG, getSystemInstruction } from '../../services/geminiService';
 import Markdown from 'react-markdown';
-
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 interface Message {
   id?: string;
@@ -22,9 +20,16 @@ interface SocraticTutorProps {
   questionText?: string;
   onClose?: () => void;
   selectedModel?: string;
+  userRole?: 'professor' | 'aluno';
 }
 
-export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida Geral', onClose, selectedModel = "gemini-3-flash-preview" }: SocraticTutorProps) {
+export function SocraticTutor({ 
+  questionId = 'general', 
+  questionText = 'Dúvida Geral', 
+  onClose, 
+  selectedModel = "gemini-3-flash-preview",
+  userRole = 'aluno'
+}: SocraticTutorProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +81,7 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
       const initialPrompt = `Você é um Tutor Socrático especializado no modelo SAEP/SENAI. 
       O aluno está com dúvida na seguinte questão: "${questionText}".
       
-      REGRAS:
+      REGRAS ESPECÍFICAS DO TUTOR:
       1. NUNCA dê a resposta diretamente.
       2. Faça perguntas que guiem o aluno a descobrir a lógica por trás da questão.
       3. Use uma linguagem encorajadora e técnica (padrão SENAI).
@@ -84,13 +89,12 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
       
       Inicie a conversa cumprimentando o aluno e fazendo uma pergunta inicial sobre o que ele entendeu da questão ou qual parte está sendo mais difícil.`;
 
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const response = await generateContentWrapper({
+        model: selectedModel,
         contents: [{ role: 'user', parts: [{ text: initialPrompt }] }],
         config: {
-          temperature: 1.0,
-          topK: 64,
-          topP: 0.95,
+          systemInstruction: getSystemInstruction(userRole, 'simulados'),
+          ...DEFAULT_CONFIG,
         }
       });
       const initialMessage = response.text;
@@ -143,6 +147,7 @@ export function SocraticTutor({ questionId = 'general', questionText = 'Dúvida 
         model: selectedModel,
         contents: chatHistory,
         config: {
+          systemInstruction: getSystemInstruction(userRole, 'simulados'),
           ...DEFAULT_CONFIG,
           maxOutputTokens: 500,
         }

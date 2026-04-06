@@ -4,12 +4,13 @@ import { Brain, AlertCircle, Loader2, BarChart3, Users, Filter, Search, FileText
 import { db, auth } from '../../firebase';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, getDoc, where, updateDoc, doc } from 'firebase/firestore';
 import { analyzeCognitiveErrors, CognitiveErrorResult, generateRecoveryPlan, RecoveryPlanResult, generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
+import { UserProfile } from '../../types';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { triggerN8NAlert } from '../../services/n8nService';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 
-export function CognitiveErrorAnalysisView() {
+export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +130,7 @@ export function CognitiveErrorAnalysisView() {
 
           const exam = examCache[sub.resourceId];
           if (exam && exam.questions) {
-            const result = await analyzeCognitiveErrors(sub, exam.questions);
+            const result = await analyzeCognitiveErrors(sub, exam.questions, selectedModel, userProfile?.role as any || 'professor');
             
             if (result.errors && result.errors.length > 0) {
               await addDoc(collection(db, 'cognitive_error_analyses'), {
@@ -201,7 +202,7 @@ export function CognitiveErrorAnalysisView() {
         errors: aggregatedErrors
       };
 
-      const plan = await generateRecoveryPlan(studentData);
+      const plan = await generateRecoveryPlan(studentData, selectedModel, userProfile?.role as any || 'professor');
       setRecoveryPlan(plan);
       
       // Save the plan to Firestore
@@ -251,7 +252,7 @@ export function CognitiveErrorAnalysisView() {
         errors: aggregatedErrors
       };
 
-      const plan = await generateLessonPlan(classData);
+      const plan = await generateLessonPlan(classData, [], selectedModel, userProfile?.role as any || 'professor');
       setLessonPlan(plan);
       
       // Save the plan to Firestore
