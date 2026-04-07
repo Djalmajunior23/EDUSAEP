@@ -3,31 +3,14 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: questions
-    // Document ID: auto-generated
-    // Fields:
-    //   - text: string (required, 1-2000 chars) - The question text.
-    //   - options: list (required, min 2 items) - The answer options.
-    //   - correctOption: int (required, index of options) - The correct option index.
-    //   - competency: string (required) - The competency ID.
-    //   - difficulty: string (required, ['fácil', 'médio', 'difícil']) - The difficulty level.
-    //   - weight: number (optional) - The weight of the question.
-    //   - skill: string (optional) - The specific skill ID.
-    //   - createdBy: string (optional) - The UID of the creator.
-    //   - createdAt: timestamp (optional) - When it was created.
-    //
-    // Collection: users
-    // ... (and others)
-    // ===============================================================
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
@@ -35,8 +18,20 @@ service cloud.firestore {
         (
           request.auth.token.email == "djalmabatistajunior@gmail.com" ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+           getUserData().role == 'admin')
         );
+    }
+
+    function isProfessor() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'professor';
+    }
+
+    function isAluno() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'aluno';
     }
 
     function isOwner(userId) {
@@ -53,239 +48,73 @@ service cloud.firestore {
         request.resource.data[field].size() <= maxLen;
     }
 
-    function isProfessor() {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor';
-    }
-
     // ===============================================================
     // Domain Validators
     // ===============================================================
-    function isValidDiscipline(data) {
-      return hasRequiredFields(['name', 'code', 'status']) &&
-             isValidString('name', 1, 100) &&
-             isValidString('code', 1, 20) &&
-             data.status in ['active', 'inactive'];
-    }
-
-    function isValidClass(data) {
-      return hasRequiredFields(['name', 'period', 'status']) &&
-             isValidString('name', 1, 100) &&
-             isValidString('period', 1, 50) &&
-             data.status in ['active', 'inactive'];
+    
+    function isValidQuestion(data) {
+      // Validating the new SAEPQuestion structure
+      return hasRequiredFields(['enunciado', 'alternativas', 'respostaCorreta', 'dificuldade']) &&
+             isValidString('enunciado', 1, 5000) &&
+             data.alternativas is list &&
+             data.alternativas.size() >= 2 &&
+             data.respostaCorreta is string &&
+             data.dificuldade in ['fácil', 'médio', 'difícil'];
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
-    match /classes/{classId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidClass(request.resource.data);
-      allow update: if isAdmin() && isValidClass(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /disciplines/{disciplineId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidDiscipline(request.resource.data);
-      allow update: if isAdmin() && isValidDiscipline(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /competencias/{competenciaId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /habilidades/{habilidadeId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /importacoes/{importacaoId} {
-      allow read: if isAdmin();
-      allow create: if isAdmin();
-    }
-
-    match /insights_ia/{insightId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-    }
-
-    match /recomendacoes_pedagogicas/{recomendacaoId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-    }
-
-    match /alertas_pedagogicos/{alertaId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin();
-    }
-
-    match /intervencoes_pedagogicas/{intervencaoId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /bloom_analyses/{analysisId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /socratic_sessions/{sessionId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /settings/global {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /tasks/{taskId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isOwner(resource.data.userId);
-    }
-
-    match /chat_messages/{messageId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    function isValidQuestion(data) {
-      return hasRequiredFields(['text', 'options', 'correctOption', 'competency', 'difficulty']) &&
-             isValidString('text', 1, 2000) &&
-             data.options is list &&
-             data.options.size() >= 2 &&
-             data.correctOption is int &&
-             data.correctOption >= 0 &&
-             data.correctOption < data.options.size() &&
-             data.difficulty in ['fácil', 'médio', 'difícil'];
-    }
-
-    match /questions/{questionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidQuestion(request.resource.data);
-      allow update: if isAdmin() && isValidQuestion(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /exams/{examId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /exam_submissions/{submissionId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /study_plans/{planId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /student_exams/{studentExamId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /diagnostics/{diagnosticId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /learning_profiles/{profileId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /adaptive_sessions/{sessionId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /cognitive_error_analyses/{analysisId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /recovery_plans/{planId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /lesson_plans/{planId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /performance_predictions/{predictionId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /engagement_logs/{logId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /learning_dna/{dnaId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /content_recommendations/{recId} {
-      allow read: if isOwner(resource.data.studentId);
-      allow write: if isAdmin();
-    }
-
-    match /smart_goals/{goalId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /educational_missions/{missionId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /career_matches/{matchId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /smart_alerts/{alertId} {
-      allow read: if isOwner(resource.data.userId);
-      allow write: if isAdmin();
-    }
-
-    match /system_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isAuthenticated(); // Permite que o sistema registre erros
-    }
-
-    match /simulado_forms/{formId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isProfessor();
-    }
-
-    match /imported_responses/{responseId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isProfessor();
-    }
-
-    match /response_items/{itemId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isProfessor();
-    }
-
-    match /import_logs/{logId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isProfessor();
-    }
-
-    match /import_inconsistencies/{inconsistencyId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isProfessor();
-    }
-
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || (isProfessor() && resource.data.role == 'aluno');
+      allow read: if isOwner(userId) || isAdmin() || isProfessor();
       allow create: if isOwner(userId) && 
         (request.resource.data.role in ['professor', 'aluno'] || request.auth.token.email == "djalmabatistajunior@gmail.com");
       allow update: if isAdmin() || (isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role));
     }
 
-    match /notifications/{notificationId} {
-      allow read: if isAdmin() || isOwner(resource.data.userId);
-      allow write: if isAdmin() || isOwner(resource.data.userId);
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isProfessor()) && isValidQuestion(request.resource.data);
+      allow update: if (isAdmin() || isProfessor()) && isValidQuestion(request.resource.data);
+      allow delete: if isAdmin() || isProfessor();
+    }
+
+    match /simulados/{simuladoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /resultados/{resultadoId} {
+      allow read: if isOwner(resource.data.studentId) || isAdmin() || isProfessor();
+      allow create: if isOwner(request.resource.data.studentId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /desempenho/{desempenhoId} {
+      allow read: if isOwner(resource.data.studentId) || isAdmin() || isProfessor();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    // Legacy/Other collections
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    match /exams/{examId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /exam_submissions/{submissionId} {
+      allow read: if isOwner(resource.data.studentId) || isAdmin() || isProfessor();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+    
+    match /disciplines/{disciplineId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
     }
   }
 }

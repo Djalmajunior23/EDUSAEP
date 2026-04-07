@@ -3006,7 +3006,7 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
           <div className="space-y-3">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Alternativas</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {currentQuestion.alternativas?.map((opt, oIdx) => (
+              {(currentQuestion.alternativas || []).map((opt, oIdx) => (
                 <div key={opt.id} className="flex items-center gap-3">
                   <input 
                     type="radio" 
@@ -3100,7 +3100,7 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
                   >
                     <div className="pt-4 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {q.alternativas.map((opt) => (
+                        {(q.alternativas || []).map((opt) => (
                           <div 
                             key={opt.id} 
                             className={cn(
