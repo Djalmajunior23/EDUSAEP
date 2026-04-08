@@ -14,12 +14,36 @@
           msg.includes('chrome-extension') || 
           msg.includes('pinComponent.js') || 
           msg.includes('Empty token!') ||
-          msg.includes('PIN Company Discounts')
+          msg.includes('PIN Company Discounts') ||
+          msg.includes('[vite]') ||
+          msg.includes('WebSocket')
         ) {
           return;
         }
         originalError.apply(console, args);
       };
+
+      const originalWarn = console.warn;
+      console.warn = (...args) => {
+        const msg = args[0] ? String(args[0]) : '';
+        if (msg.includes('blacklist and siteRules') || msg.includes('WebChannelConnection')) {
+          return;
+        }
+        originalWarn.apply(console, args);
+      };
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        if (
+          reason === 'WebSocket closed without opened.' ||
+          (reason && typeof reason === 'string' && reason.toLowerCase().includes('websocket')) ||
+          (reason && reason.message && reason.message.toLowerCase().includes('websocket'))
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+        }
+      }, true);
     </script>
   </head>
   <body>

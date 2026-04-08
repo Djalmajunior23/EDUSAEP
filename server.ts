@@ -19,6 +19,7 @@ async function startServer() {
   // Initialize APIs
   const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const deepseek = process.env.DEEPSEEK_API_KEY ? new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com/v1' }) : null;
+  const groq = process.env.GROQ_API_KEY ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' }) : null;
 
   // API routes go here
   app.get("/api/health", (req, res) => {
@@ -30,21 +31,43 @@ async function startServer() {
     try {
       const { prompt, systemInstruction, responseFormat, provider, model } = req.body;
 
+      const messages = [
+        ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
+        { role: "user" as const, content: prompt }
+      ];
+
+      const tryGroq = async () => {
+        if (!groq) throw new Error("Groq API key not configured");
+        console.log("[AI] Using Groq fallback");
+        const completion = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages,
+          response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
+          temperature: 1.0,
+        });
+        return completion.choices[0].message.content;
+      };
+
       if (provider === 'deepseek') {
         if (!deepseek) {
           return res.status(500).json({ error: "DeepSeek API key not configured" });
         }
-        const completion = await deepseek.chat.completions.create({
-          model: model || "deepseek-chat",
-          messages: [
-            ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
-            { role: "user" as const, content: prompt }
-          ],
-          response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
-          temperature: 1.0,
-        });
-        const text = completion.choices[0].message.content;
-        return res.json({ text });
+        try {
+          const completion = await deepseek.chat.completions.create({
+            model: model || "deepseek-chat",
+            messages,
+            response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
+            temperature: 1.0,
+          });
+          return res.json({ text: completion.choices[0].message.content });
+        } catch (err: any) {
+          if (err?.status === 402 || err?.status === 429) {
+            console.warn(`[AI] DeepSeek quota exceeded, falling back to Groq`);
+            const text = await tryGroq();
+            return res.json({ text });
+          }
+          throw err;
+        }
       }
 
       // Default to OpenAI
@@ -52,20 +75,25 @@ async function startServer() {
         return res.status(500).json({ error: "OpenAI API key not configured" });
       }
 
-      const completion = await openai.chat.completions.create({
-        model: model || "gpt-4o-mini",
-        messages: [
-          ...(systemInstruction ? [{ role: "system" as const, content: systemInstruction }] : []),
-          { role: "user" as const, content: prompt }
-        ],
-        response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
-        temperature: 1.0,
-      });
+      try {
+        const completion = await openai.chat.completions.create({
+          model: model || "gpt-4o-mini",
+          messages,
+          response_format: responseFormat === "json" ? { type: "json_object" } : undefined,
+          temperature: 1.0,
+        });
+        return res.json({ text: completion.choices[0].message.content });
+      } catch (err: any) {
+        if (err?.status === 429) {
+          console.warn(`[AI] OpenAI quota exceeded, falling back to Groq`);
+          const text = await tryGroq();
+          return res.json({ text });
+        }
+        throw err;
+      }
 
-      const text = completion.choices[0].message.content;
-      res.json({ text });
     } catch (error: any) {
-      if (error?.status !== 429) {
+      if (error?.status !== 429 && error?.status !== 402) {
         console.error("[AI Generation] Error:", error);
       }
       res.status(error?.status || 500).json({ error: error.message || "Failed to generate content" });

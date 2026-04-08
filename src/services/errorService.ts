@@ -29,8 +29,18 @@ interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  // If the user is not authenticated and we get a permission denied error,
+  // it's likely because they just logged out and an onSnapshot listener fired.
+  // We should ignore this to prevent crashing the app during logout.
+  if (!auth.currentUser && errorMessage.includes('Missing or insufficient permissions')) {
+    console.debug('Ignored permission error during logout for path:', path);
+    return;
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,

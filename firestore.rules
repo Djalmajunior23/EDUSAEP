@@ -101,6 +101,31 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
     
+    match /settings/global {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || !('userId' in resource.data));
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /diagnostics/{diagnosticId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /student_exams/{studentExamId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated(); // Allow students to write their exams
+    }
+
+    match /simulado_forms/{formId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
     match /exams/{examId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin() || isProfessor();

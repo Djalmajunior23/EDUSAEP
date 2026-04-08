@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 export type AIProvider = 'gemini' | 'openai' | 'deepseek';
 
 export function getAIProvider(): AIProvider {
-  return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
+  return (localStorage.getItem('ai_provider') as AIProvider) || 'deepseek';
 }
 
 export function setAIProvider(provider: AIProvider) {
@@ -152,8 +152,10 @@ export async function generateContentWrapper(params: any): Promise<any> {
 
     const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
 
+    let fetchResponse;
+    let fetchError;
     try {
-      const response = await fetch('/api/ai/generate', {
+      fetchResponse = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -163,46 +165,89 @@ export async function generateContentWrapper(params: any): Promise<any> {
           model: params.model 
         })
       });
+    } catch (err) {
+      fetchError = err;
+    }
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        if (response.status !== 429) {
-          console.error(`[AI] API error (${provider}):`, err);
+    if (fetchError || !fetchResponse?.ok) {
+      if (fetchError) {
+        // Only log if it's not a quota/rate limit error
+        if (!fetchError.message?.includes('429') && !fetchError.message?.includes('quota')) {
+          console.error(`[AI] Network error calling ${provider}:`, fetchError);
         }
-        
-        // Automatic fallback to Gemini if external provider fails
-        console.warn(`[AI] Fallback to Gemini due to ${provider} error: ${err.error || response.statusText}`);
-        
-        // Ensure we use a Gemini model for fallback
-        const fallbackParams = { ...params };
-        if (!fallbackParams.model?.startsWith('gemini-')) {
-          fallbackParams.model = 'gemini-3-flash-preview';
+      } else if (fetchResponse) {
+        const errData = await fetchResponse.json().catch(() => ({}));
+        if (fetchResponse.status !== 429) {
+          console.error(`[AI] API error (${provider}):`, errData);
+          console.warn(`[AI] Fallback to Gemini due to ${provider} error: ${errData.error || fetchResponse.statusText}`);
         }
-        return await ai.models.generateContent(fallbackParams);
       }
 
-      const data = await response.json();
-      console.log(`[AI] Response received from ${provider}`);
-      return { text: data.text };
-    } catch (error) {
-      console.error(`[AI] Network error calling ${provider}:`, error);
-      console.warn(`[AI] Fallback to Gemini due to network error`);
-      
       // Ensure we use a Gemini model for fallback
       const fallbackParams = { ...params };
       if (!fallbackParams.model?.startsWith('gemini-')) {
         fallbackParams.model = 'gemini-3-flash-preview';
       }
+      
+      // If this fallback call throws an error (e.g., Gemini is also out of quota), 
+      // it will propagate up to AIService and be handled cleanly there.
       return await ai.models.generateContent(fallbackParams);
     }
+
+    const data = await fetchResponse.json();
+    return { text: data.text };
   } else {
     // Ensure we use a Gemini model if the provider is gemini
     const geminiParams = { ...params };
     if (!geminiParams.model?.startsWith('gemini-')) {
       geminiParams.model = 'gemini-3-flash-preview';
     }
-    console.log(`[AI] Using Gemini provider with model: ${geminiParams.model}`);
-    return await ai.models.generateContent(geminiParams);
+    try {
+      console.log(`[AI] Using Gemini provider with model: ${geminiParams.model}`);
+      return await ai.models.generateContent(geminiParams);
+    } catch (err: any) {
+      if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('quota')) {
+        console.warn(`[AI] Gemini quota exceeded, falling back to backend (DeepSeek/Groq)`);
+        
+        let prompt = "";
+        const systemInstruction = params.config?.systemInstruction;
+        if (systemInstruction) {
+          prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
+        }
+
+        if (typeof params.contents === 'string') {
+          prompt += params.contents;
+        } else if (Array.isArray(params.contents)) {
+          prompt += params.contents.map((c: any) => {
+            if (c.parts) {
+              return c.parts.map((p: any) => p.text).join('\n');
+            }
+            return c.text || "";
+          }).join('\n');
+        }
+
+        const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
+
+        const fetchResponse = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            prompt, 
+            responseFormat, 
+            provider: 'deepseek',
+            model: 'deepseek-chat' 
+          })
+        });
+
+        if (!fetchResponse.ok) {
+          throw new Error(`Backend fallback failed with status ${fetchResponse.status}`);
+        }
+
+        const data = await fetchResponse.json();
+        return { text: data.text };
+      }
+      throw err;
+    }
   }
 }
 

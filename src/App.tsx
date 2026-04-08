@@ -2445,6 +2445,23 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
 
   const handleSaveQuestion = async () => {
     if (!user) return;
+
+    if (!currentQuestion.enunciado?.trim()) {
+      toast.error("O enunciado da questão é obrigatório.");
+      return;
+    }
+
+    const filledAlternatives = (currentQuestion.alternativas || []).filter(a => a.texto.trim().length > 0);
+    if (filledAlternatives.length < 2) {
+      toast.error("A questão deve ter pelo menos duas alternativas preenchidas.");
+      return;
+    }
+
+    if (!currentQuestion.respostaCorreta) {
+      toast.error("Selecione a alternativa correta.");
+      return;
+    }
+
     try {
       const now = new Date().toISOString();
       const questionData = {
@@ -3004,27 +3021,79 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Alternativas</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Alternativas</label>
+              <button 
+                onClick={() => {
+                  const newOpts = [...(currentQuestion.alternativas || [])];
+                  const nextId = String.fromCharCode(65 + newOpts.length); // A, B, C...
+                  newOpts.push({ id: nextId, texto: '' });
+                  setCurrentQuestion({ ...currentQuestion, alternativas: newOpts });
+                }}
+                className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md"
+              >
+                <Plus size={14} /> Adicionar Alternativa
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
               {(currentQuestion.alternativas || []).map((opt, oIdx) => (
-                <div key={opt.id} className="flex items-center gap-3">
-                  <input 
-                    type="radio" 
-                    name="correct-bank" 
-                    checked={currentQuestion.respostaCorreta === opt.id} 
-                    onChange={() => setCurrentQuestion({ ...currentQuestion, respostaCorreta: opt.id })}
-                  />
-                  <input 
-                    type="text" 
-                    value={opt.texto} 
-                    onChange={(e) => {
-                      const newOpts = [...(currentQuestion.alternativas || [])];
-                      newOpts[oIdx] = { ...newOpts[oIdx], texto: e.target.value };
-                      setCurrentQuestion({ ...currentQuestion, alternativas: newOpts });
-                    }}
-                    className="flex-1 p-2 text-sm bg-gray-50 border border-gray-200 rounded-lg"
-                    placeholder={`Opção ${opt.id}`}
-                  />
+                <div key={opt.id} className={cn("flex items-start gap-3 p-3 rounded-xl border transition-colors", currentQuestion.respostaCorreta === opt.id ? "border-emerald-500 bg-emerald-50/50" : "border-gray-200 bg-gray-50")}>
+                  <div className="pt-2 flex flex-col items-center gap-2">
+                    <input 
+                      type="radio" 
+                      name="correct-bank" 
+                      checked={currentQuestion.respostaCorreta === opt.id} 
+                      onChange={() => setCurrentQuestion({ ...currentQuestion, respostaCorreta: opt.id })}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      title="Marcar como resposta correta"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-xs font-bold", currentQuestion.respostaCorreta === opt.id ? "text-emerald-700" : "text-gray-500")}>
+                        Alternativa {opt.id} {currentQuestion.respostaCorreta === opt.id && "(Correta)"}
+                      </span>
+                      {(currentQuestion.alternativas || []).length > 2 && (
+                        <button 
+                          onClick={() => {
+                            const newOpts = (currentQuestion.alternativas || []).filter((_, i) => i !== oIdx);
+                            // Re-index IDs to A, B, C...
+                            const reindexedOpts = newOpts.map((o, i) => ({ ...o, id: String.fromCharCode(65 + i) }));
+                            // If the deleted option was the correct one, reset it
+                            let newCorrect = currentQuestion.respostaCorreta;
+                            if (currentQuestion.respostaCorreta === opt.id) {
+                              newCorrect = reindexedOpts[0]?.id || '';
+                            } else {
+                              // Find the new ID of the previously correct option
+                              const oldCorrectIndex = (currentQuestion.alternativas || []).findIndex(o => o.id === currentQuestion.respostaCorreta);
+                              if (oldCorrectIndex > oIdx) {
+                                newCorrect = String.fromCharCode(65 + oldCorrectIndex - 1);
+                              }
+                            }
+                            setCurrentQuestion({ ...currentQuestion, alternativas: reindexedOpts, respostaCorreta: newCorrect });
+                          }}
+                          className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
+                          title="Remover alternativa"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <textarea 
+                      value={opt.texto} 
+                      onChange={(e) => {
+                        const newOpts = [...(currentQuestion.alternativas || [])];
+                        newOpts[oIdx] = { ...newOpts[oIdx], texto: e.target.value };
+                        setCurrentQuestion({ ...currentQuestion, alternativas: newOpts });
+                      }}
+                      className={cn(
+                        "w-full p-2 text-sm bg-white border rounded-lg outline-none focus:ring-2 resize-none transition-colors",
+                        currentQuestion.respostaCorreta === opt.id ? "border-emerald-200 focus:ring-emerald-500" : "border-gray-200 focus:ring-emerald-500"
+                      )}
+                      placeholder={`Digite o texto da alternativa ${opt.id}...`}
+                      rows={2}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
