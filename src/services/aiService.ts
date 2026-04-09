@@ -17,8 +17,17 @@ export class AIService {
 
       // generateContentWrapper already handles the fallback logic from OpenAI to Gemini internally
       // when a 429 error occurs.
-      const response = await generateContentWrapper(enhancedPrompt, isJson);
-      return response;
+      const response = await generateContentWrapper({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: enhancedPrompt }]
+          }
+        ],
+        config: isJson ? { responseMimeType: "application/json" } : undefined
+      });
+      return response.text;
     } catch (error: any) {
       console.error("AIService Error:", error);
       

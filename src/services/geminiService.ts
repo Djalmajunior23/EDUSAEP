@@ -189,9 +189,16 @@ export async function generateContentWrapper(params: any): Promise<any> {
         fallbackParams.model = 'gemini-3-flash-preview';
       }
       
-      // If this fallback call throws an error (e.g., Gemini is also out of quota), 
-      // it will propagate up to AIService and be handled cleanly there.
-      return await ai.models.generateContent(fallbackParams);
+      try {
+        console.warn(`[AI] Fallback to Gemini...`);
+        return await ai.models.generateContent(fallbackParams);
+      } catch (geminiErr: any) {
+        if (geminiErr?.status === 429 || geminiErr?.message?.includes('429') || geminiErr?.message?.includes('quota')) {
+          console.error(`[AI] Gemini fallback also failed due to quota.`);
+          throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
+        }
+        throw geminiErr;
+      }
     }
 
     const data = await fetchResponse.json();
@@ -203,7 +210,6 @@ export async function generateContentWrapper(params: any): Promise<any> {
       geminiParams.model = 'gemini-3-flash-preview';
     }
     try {
-      console.log(`[AI] Using Gemini provider with model: ${geminiParams.model}`);
       return await ai.models.generateContent(geminiParams);
     } catch (err: any) {
       if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('quota')) {
@@ -228,19 +234,28 @@ export async function generateContentWrapper(params: any): Promise<any> {
 
         const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
 
-        const fetchResponse = await fetch('/api/ai/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            prompt, 
-            responseFormat, 
-            provider: 'deepseek',
-            model: 'deepseek-chat' 
-          })
-        });
+        let fetchResponse;
+        try {
+          fetchResponse = await fetch('/api/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              prompt, 
+              responseFormat, 
+              provider: 'deepseek',
+              model: 'deepseek-chat' 
+            })
+          });
+        } catch (fetchErr) {
+          console.error(`[AI] Backend fallback failed:`, fetchErr);
+          throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
+        }
 
         if (!fetchResponse.ok) {
-          throw new Error(`Backend fallback failed with status ${fetchResponse.status}`);
+          if (fetchResponse.status === 429) {
+            throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
+          }
+          throw new Error(`Backend fallback failed com status ${fetchResponse.status}`);
         }
 
         const data = await fetchResponse.json();
@@ -266,7 +281,24 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
   try {
     // Remove ```json ... ``` ou ``` ... ```
     const cleanJson = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleanJson);
+    const parsed = JSON.parse(cleanJson);
+    
+    // Handle the case where the AI returns an object with a 'questoes' array
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.questoes)) {
+      return parsed.questoes;
+    }
+    
+    // Handle the case where the AI returns a single question wrapped in 'questao' or 'question'
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (parsed.questao && typeof parsed.questao === 'object') {
+        return parsed.questao;
+      }
+      if (parsed.question && typeof parsed.question === 'object') {
+        return parsed.question;
+      }
+    }
+    
+    return parsed;
   } catch (error) {
     console.error("[Gemini] Erro ao parsear JSON:", error, "Texto original:", text);
     return fallback;
@@ -284,7 +316,6 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
   const allQuestions: any[] = [];
   
   for (const chunk of chunks) {
-    console.log(`[AI] Processing chunk of size ${chunk.length}...`);
     const response = await generateContentWrapper({
       model: modelName,
       contents: [
@@ -408,11 +439,11 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
       }
     });
 
-    console.log(`[AI] Response received for chunk.`);
     const result = safeParseJson(response.text, []);
     if (Array.isArray(result)) {
-      console.log(`[AI] Extracted ${result.length} questions from chunk.`);
       allQuestions.push(...result);
+    } else if (result && typeof result === 'object' && result.enunciado) {
+      allQuestions.push(result);
     } else {
       console.warn(`[AI] Expected array but got:`, result);
     }
@@ -1165,7 +1196,14 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
     }
   });
 
-  return safeParseJson(response.text, {});
+  const parsed = safeParseJson(response.text, {});
+  
+  if (!parsed || !parsed.enunciado || !Array.isArray(parsed.alternativas) || parsed.alternativas.length < 2) {
+    console.error("[Gemini] Invalid question generated:", parsed);
+    throw new Error("A IA gerou uma questão em um formato inválido. Tente novamente.");
+  }
+  
+  return parsed;
 }
 
 export interface BloomAnalysisResult {
@@ -1384,5 +1422,12 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
     }
   });
 
-  return safeParseJson(response.text, {});
+  const parsed = safeParseJson(response.text, {});
+  
+  if (!parsed || !parsed.enunciado || !Array.isArray(parsed.alternativas) || parsed.alternativas.length < 2) {
+    console.error("[Gemini] Invalid question generated:", parsed);
+    throw new Error("A IA gerou uma questão em um formato inválido. Tente novamente.");
+  }
+  
+  return parsed;
 }

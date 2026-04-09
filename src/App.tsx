@@ -41,6 +41,7 @@ import {
   CheckSquare,
   Plus,
   Pencil,
+  Save,
   Lock,
   Sun,
   Moon,
@@ -120,7 +121,9 @@ import { SimuladoForm } from './modules/simulados/types';
 import { simuladoService } from './modules/simulados/services/simuladoService';
 import { pdfExportService } from './modules/simulados/services/pdfExportService';
 import { NotificationBell } from './components/notifications/NotificationBell';
-import { auth, db, googleProvider } from './firebase';
+import { initializeApp } from 'firebase/app';
+import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
+import { auth, db, googleProvider, firebaseConfig } from './firebase';
 import { 
   signInWithPopup, 
   signOut, 
@@ -211,8 +214,9 @@ function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | 
       const question = await generateSAEPQuestion(competency, difficulty, selectedModel, userProfile?.role as any || 'professor');
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
-    } catch (err) {
-      toast.error("Erro ao gerar questão.");
+    } catch (err: any) {
+      console.error("Erro ao gerar questão:", err);
+      toast.error(`Erro ao gerar questão: ${err.message || "Erro desconhecido"}`);
     } finally {
       setIsGenerating(false);
     }
@@ -458,18 +462,7 @@ function AIProviderToggle({ provider, onProviderChange }: { provider: AIProvider
   );
 }
 
-// Protected Route Component
-function ProtectedRoute({ allowedRoles, userProfile, children }: { allowedRoles: string[], userProfile: UserProfile | null, children: React.ReactNode }) {
-  if (!userProfile) return null; // Wait for profile to load
-  
-  // Admin is a superuser who can access everything
-  if (userProfile.role === 'admin') return <>{children}</>;
-  
-  if (!allowedRoles.includes(userProfile.role)) {
-    return <Navigate to="/" replace />;
-  }
-  return <>{children}</>;
-}
+// Protected Route Component removed, using from components/ProtectedRoute.tsx
 
 
 export interface UserProfile {
@@ -1788,9 +1781,7 @@ function TasksView({ user }: { user: User | null }) {
   );
 }
 
-import { initializeApp } from 'firebase/app';
-import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
-import { firebaseConfig } from './firebase';
+
 
 function ProfessorDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const navigate = useNavigate();
@@ -2315,6 +2306,7 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [competencySearch, setCompetencySearch] = useState('');
@@ -2444,28 +2436,64 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
   }, [questions]);
 
   const handleSaveQuestion = async () => {
-    if (!user) return;
+    if (!user || isSaving) return;
 
-    if (!currentQuestion.enunciado?.trim()) {
+    // 1. Validate Enunciado
+    if (!currentQuestion.enunciado || typeof currentQuestion.enunciado !== 'string' || currentQuestion.enunciado.trim().length === 0) {
       toast.error("O enunciado da questão é obrigatório.");
       return;
     }
+    if (currentQuestion.enunciado.length > 5000) {
+      toast.error("O enunciado é muito longo (máximo 5000 caracteres).");
+      return;
+    }
 
-    const filledAlternatives = (currentQuestion.alternativas || []).filter(a => a.texto.trim().length > 0);
+    // 2. Validate Competência
+    if (!currentQuestion.competenciaNome || typeof currentQuestion.competenciaNome !== 'string' || currentQuestion.competenciaNome.trim().length === 0) {
+      toast.error("A competência é obrigatória.");
+      return;
+    }
+
+    // 3. Validate Alternativas
+    if (!Array.isArray(currentQuestion.alternativas)) {
+      toast.error("Formato de alternativas inválido.");
+      return;
+    }
+    const filledAlternatives = currentQuestion.alternativas.filter(a => a && typeof a.texto === 'string' && a.texto.trim().length > 0);
     if (filledAlternatives.length < 2) {
       toast.error("A questão deve ter pelo menos duas alternativas preenchidas.");
       return;
     }
+    if (filledAlternatives.length > 10) {
+      toast.error("A questão não pode ter mais de 10 alternativas.");
+      return;
+    }
 
-    if (!currentQuestion.respostaCorreta) {
+    // 4. Validate Resposta Correta
+    if (!currentQuestion.respostaCorreta || typeof currentQuestion.respostaCorreta !== 'string') {
       toast.error("Selecione a alternativa correta.");
+      return;
+    }
+    const validIds = filledAlternatives.map(a => a.id);
+    if (!validIds.includes(currentQuestion.respostaCorreta)) {
+      toast.error("A resposta correta selecionada não corresponde a uma alternativa válida.");
+      return;
+    }
+
+    // 5. Validate Dificuldade
+    const validDifficulties = ['fácil', 'médio', 'difícil'];
+    if (!currentQuestion.dificuldade || !validDifficulties.includes(currentQuestion.dificuldade)) {
+      toast.error("Nível de dificuldade inválido.");
       return;
     }
 
     try {
+      setIsSaving(true);
       const now = new Date().toISOString();
       const questionData = {
         ...currentQuestion,
+        // Ensure we only save the filled alternatives
+        alternativas: filledAlternatives,
         createdBy: user.uid,
         createdAt: currentQuestion.id ? currentQuestion.createdAt : serverTimestamp(),
         atualizadoEm: now,
@@ -2512,6 +2540,8 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'questions');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2539,8 +2569,11 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
     try {
       const data = await parseQuestionsFromText(text, selectedModel, userProfile?.role as any || 'professor');
       return data;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gemini parsing error:", err);
+      if (err?.message?.includes('Quota Exceeded') || err?.message?.includes('Limite de uso')) {
+        throw new Error("Limite de uso da Inteligência Artificial excedido. Por favor, aguarde alguns instantes e tente novamente.");
+      }
       throw new Error("Erro ao processar o texto com IA. Verifique se o arquivo não é muito grande ou complexo.");
     }
   };
@@ -2579,13 +2612,19 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
           const enunciado = row.enunciado || row.text || row.pergunta;
           if (!enunciado) continue;
 
-          const alternativas = row.alternativas || [
+          let alternativas = row.alternativas || [
             { id: 'A', texto: row.optionA || row.opcaoA || row.a || '' },
             { id: 'B', texto: row.optionB || row.opcaoB || row.b || '' },
             { id: 'C', texto: row.optionC || row.opcaoC || row.c || '' },
             { id: 'D', texto: row.optionD || row.opcaoD || row.d || '' },
             { id: 'E', texto: row.optionE || row.opcaoE || row.e || '' }
           ];
+          
+          // Filter out empty alternatives
+          alternativas = alternativas.filter((a: any) => a && typeof a.texto === 'string' && a.texto.trim().length > 0);
+          
+          // Skip if less than 2 alternatives
+          if (alternativas.length < 2) continue;
 
           let respostaCorreta = 'A';
           const rawCorrect = String(row.respostaCorreta || row.correctOption || row.gabarito || row.resposta || 'A').toUpperCase();
@@ -2593,6 +2632,12 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
             respostaCorreta = rawCorrect;
           } else if (['0', '1', '2', '3', '4'].includes(rawCorrect)) {
             respostaCorreta = ['A', 'B', 'C', 'D', 'E'][parseInt(rawCorrect)];
+          }
+          
+          // Ensure respostaCorreta is valid
+          const validIds = alternativas.map((a: any) => a.id);
+          if (!validIds.includes(respostaCorreta)) {
+            respostaCorreta = validIds[0]; // Fallback to first valid alternative
           }
 
           let competenciaNome = (row.competenciaNome || row.competency || row.competencia || 'Geral').trim();
@@ -2977,6 +3022,16 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
               />
             </div>
             <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tema</label>
+              <input 
+                type="text" 
+                value={currentQuestion.temaNome || ''} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, temaNome: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Ex: Matemática"
+              />
+            </div>
+            <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dificuldade</label>
               <select 
                 value={currentQuestion.dificuldade} 
@@ -2986,6 +3041,21 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
                 <option value="fácil">Fácil</option>
                 <option value="médio">Médio</option>
                 <option value="difícil">Difícil</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Taxonomia de Bloom</label>
+              <select 
+                value={currentQuestion.bloom || 'compreender'} 
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, bloom: e.target.value })}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="lembrar">Lembrar</option>
+                <option value="compreender">Compreender</option>
+                <option value="aplicar">Aplicar</option>
+                <option value="analisar">Analisar</option>
+                <option value="avaliar">Avaliar</option>
+                <option value="criar">Criar</option>
               </select>
             </div>
             <div className="md:col-span-2 space-y-1">
@@ -3070,7 +3140,15 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
                                 newCorrect = String.fromCharCode(65 + oldCorrectIndex - 1);
                               }
                             }
-                            setCurrentQuestion({ ...currentQuestion, alternativas: reindexedOpts, respostaCorreta: newCorrect });
+                            
+                            // Rebuild justificativas
+                            const newJustificativas: Record<string, string> = {};
+                            reindexedOpts.forEach((o, i) => {
+                              const oldId = newOpts[i].id;
+                              newJustificativas[o.id] = currentQuestion.justificativasAlternativas?.[oldId] || '';
+                            });
+
+                            setCurrentQuestion({ ...currentQuestion, alternativas: reindexedOpts, respostaCorreta: newCorrect, justificativasAlternativas: newJustificativas });
                           }}
                           className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
                           title="Remover alternativa"
@@ -3093,6 +3171,17 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
                       placeholder={`Digite o texto da alternativa ${opt.id}...`}
                       rows={2}
                     />
+                    <input 
+                      type="text"
+                      value={currentQuestion.justificativasAlternativas?.[opt.id] || ''}
+                      onChange={(e) => {
+                        const newJustificativas = { ...(currentQuestion.justificativasAlternativas || {}) };
+                        newJustificativas[opt.id] = e.target.value;
+                        setCurrentQuestion({ ...currentQuestion, justificativasAlternativas: newJustificativas });
+                      }}
+                      className="w-full p-2 text-xs bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder={`Justificativa para a alternativa ${opt.id} (opcional)...`}
+                    />
                   </div>
                 </div>
               ))}
@@ -3100,8 +3189,11 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 font-bold">Cancelar</button>
-            <button onClick={handleSaveQuestion} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Salvar Questão</button>
+            <button disabled={isSaving} onClick={() => setIsEditing(false)} className="px-4 py-2 text-gray-600 font-bold disabled:opacity-50">Cancelar</button>
+            <button disabled={isSaving} onClick={handleSaveQuestion} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center gap-2 disabled:opacity-50">
+              {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              {isSaving ? "Salvando..." : "Salvar Questão"}
+            </button>
           </div>
         </motion.div>
       )}
@@ -3605,6 +3697,47 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
     setCurrentExam({ ...currentExam, questions: updatedQuestions });
   };
 
+  const addOption = (qIndex: number) => {
+    const updatedQuestions = [...(currentExam.questions || [])];
+    const currentOptions = updatedQuestions[qIndex].alternativas || [];
+    const nextId = String.fromCharCode(65 + currentOptions.length); // A, B, C...
+    const updatedOptions = [...currentOptions, { id: nextId, texto: '' }];
+    updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], alternativas: updatedOptions };
+    setCurrentExam({ ...currentExam, questions: updatedQuestions });
+  };
+
+  const removeOption = (qIndex: number, oIndex: number) => {
+    const updatedQuestions = [...(currentExam.questions || [])];
+    const currentOptions = updatedQuestions[qIndex].alternativas || [];
+    if (currentOptions.length <= 2) {
+      toast.error("A questão deve ter pelo menos duas alternativas.");
+      return;
+    }
+    
+    const newOpts = currentOptions.filter((_, i) => i !== oIndex);
+    // Re-index IDs to A, B, C...
+    const reindexedOpts = newOpts.map((o, i) => ({ ...o, id: String.fromCharCode(65 + i) }));
+    
+    let newCorrect = updatedQuestions[qIndex].respostaCorreta;
+    const removedId = currentOptions[oIndex].id;
+    
+    if (newCorrect === removedId) {
+      newCorrect = reindexedOpts[0]?.id || '';
+    } else {
+      const oldCorrectIndex = currentOptions.findIndex(o => o.id === newCorrect);
+      if (oldCorrectIndex > oIndex) {
+        newCorrect = String.fromCharCode(65 + oldCorrectIndex - 1);
+      }
+    }
+
+    updatedQuestions[qIndex] = { 
+      ...updatedQuestions[qIndex], 
+      alternativas: reindexedOpts,
+      respostaCorreta: newCorrect
+    };
+    setCurrentExam({ ...currentExam, questions: updatedQuestions });
+  };
+
   const removeQuestion = (index: number) => {
     const updatedQuestions = [...(currentExam.questions || [])];
     updatedQuestions.splice(index, 1);
@@ -3955,27 +4088,54 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Opções de Resposta</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Opções de Resposta</label>
+                  <button 
+                    onClick={() => addOption(qIdx)}
+                    className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md"
+                  >
+                    <Plus size={14} /> Adicionar Alternativa
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
                   {q.alternativas.map((opt, oIdx) => (
-                    <div key={oIdx} className="flex items-center gap-3">
-                      <input 
-                        type="radio" 
-                        name={`correct-${q.id || q.questionUid}`} 
-                        checked={q.respostaCorreta === opt.id} 
-                        onChange={() => updateQuestion(qIdx, 'respostaCorreta', opt.id)}
-                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <input 
-                        type="text" 
-                        value={opt.texto} 
-                        onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
-                        className={cn(
-                          "flex-1 p-2 text-sm bg-gray-50 border rounded-lg outline-none transition-all",
-                          q.respostaCorreta === opt.id ? "border-emerald-500 bg-emerald-50" : "border-gray-200 focus:border-emerald-500"
-                        )}
-                        placeholder={`Opção ${opt.id}`}
-                      />
+                    <div key={oIdx} className={cn("flex items-start gap-3 p-3 rounded-xl border transition-colors", q.respostaCorreta === opt.id ? "border-emerald-500 bg-emerald-50/50" : "border-gray-200 bg-gray-50")}>
+                      <div className="pt-2 flex flex-col items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name={`correct-${q.id || q.questionUid}`} 
+                          checked={q.respostaCorreta === opt.id} 
+                          onChange={() => updateQuestion(qIdx, 'respostaCorreta', opt.id)}
+                          className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          title="Marcar como resposta correta"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className={cn("text-xs font-bold", q.respostaCorreta === opt.id ? "text-emerald-700" : "text-gray-500")}>
+                            Alternativa {opt.id} {q.respostaCorreta === opt.id && "(Correta)"}
+                          </span>
+                          {q.alternativas.length > 2 && (
+                            <button 
+                              onClick={() => removeOption(qIdx, oIdx)}
+                              className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
+                              title="Remover alternativa"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <textarea 
+                          value={opt.texto} 
+                          onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
+                          className={cn(
+                            "w-full p-2 text-sm bg-white border rounded-lg outline-none focus:ring-2 resize-none transition-colors",
+                            q.respostaCorreta === opt.id ? "border-emerald-200 focus:ring-emerald-500" : "border-gray-200 focus:ring-emerald-500"
+                          )}
+                          placeholder={`Digite o texto da alternativa ${opt.id}...`}
+                          rows={2}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -9252,12 +9412,17 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
   );
 }
 
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+
 export default function App() {
   return (
     <HashRouter>
       <ErrorBoundary>
-        <Toaster position="top-right" richColors />
-        <AppContent />
+        <AuthProvider>
+          <Toaster position="top-right" richColors />
+          <AppContent />
+        </AuthProvider>
       </ErrorBoundary>
     </HashRouter>
   );
@@ -9266,8 +9431,7 @@ export default function App() {
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const { user, userProfile, isAuthReady, loginWithGoogle, logout } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticResult | null>(null);
@@ -9283,7 +9447,6 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
   const [aiProvider, setAiProvider] = useState<AIProvider>(() => {
@@ -9486,15 +9649,6 @@ function AppContent() {
     return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat' | 'profile' | 'aluno' | 'admin-users' | 'student-dashboard' | 'student-exams' | 'external-forms';
   }, [location]);
 
-  // Auth Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
   // History Listener
   useEffect(() => {
     if (!user || !userProfile) {
@@ -9530,52 +9684,6 @@ function AppContent() {
 
     return () => unsubscribe();
   }, [user, userProfile]);
-
-  // Profile Listener
-  useEffect(() => {
-    if (!user) {
-      setUserProfile(null);
-      return;
-    }
-
-    const path = `users/${user.uid}`;
-    const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data() as UserProfile;
-        // Ensure Djalma is always an admin in the frontend, even if the DB hasn't updated yet
-        if (user.email === 'djalmabatistajunior@gmail.com') {
-          data.role = 'admin';
-        }
-        // Auto-populate matricula if missing
-        if (!data.matricula && user.email) {
-          data.matricula = user.email.substring(0, 10);
-        }
-        setUserProfile(data);
-      } else if (user.email === 'djalmabatistajunior@gmail.com') {
-        // Fallback for Djalma if profile doesn't exist yet
-        setUserProfile({
-          uid: user.uid,
-          email: user.email,
-          role: 'admin',
-          matricula: user.email.substring(0, 10),
-          displayName: user.displayName || 'Djalma'
-        } as UserProfile);
-      } else if (user) {
-        // Fallback for any user if profile doesn't exist yet
-        setUserProfile({
-          uid: user.uid,
-          email: user.email || '',
-          role: 'aluno',
-          matricula: user.email?.substring(0, 10),
-          displayName: user.displayName || user.email?.split('@')[0] || 'Aluno'
-        } as UserProfile);
-      }
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, path);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
 
   // Global Settings Listener
   useEffect(() => {
@@ -9723,7 +9831,6 @@ function AppContent() {
       if (updatedUser.emailVerified) {
         const userRef = doc(db, 'users', updatedUser.uid);
         await updateDoc(userRef, { emailVerified: true });
-        setUser(updatedUser);
         toast.success('E-mail verificado com sucesso!');
       } else {
         setError("E-mail ainda não verificado. Verifique sua caixa de entrada.");
@@ -9871,14 +9978,9 @@ function AppContent() {
     setError(null);
     try {
       // Group data by student
-      console.log("Data to process:", data);
-      if (data.length > 0) {
-        console.log("Keys in first row:", Object.keys(data[0]));
-      }
       const studentsData: Record<string, { rows: any[], email: string, matricula: string }> = {};
       data.forEach(row => {
         const studentName = row.aluno || row.Aluno || row.nome || row.Nome || row['Nome do Aluno'] || row['Nome do aluno'] || row['Nome Aluno'] || 'Estudante Sem Nome';
-        console.log("Processing row for student:", studentName, row);
         const studentEmail = row.email || row.Email || row.correio || row.Correio || '';
         const studentMatricula = row.matricula || row.Matricula || row.id || row.ID || '';
         
@@ -9889,7 +9991,6 @@ function AppContent() {
         if (!studentsData[studentName].email && studentEmail) studentsData[studentName].email = studentEmail;
         if (!studentsData[studentName].matricula && studentMatricula) studentsData[studentName].matricula = studentMatricula;
       });
-      console.log("Grouped studentsData:", studentsData);
 
       const studentNames = Object.keys(studentsData);
       const allResults: DiagnosticResult[] = [];

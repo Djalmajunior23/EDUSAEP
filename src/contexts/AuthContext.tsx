@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { UserProfile } from '../types';
+import { handleFirestoreError, OperationType } from '../services/errorService';
 
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
-  loading: boolean;
+  isAuthReady: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
@@ -20,54 +21,72 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      
-      if (currentUser) {
-        try {
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            setUserProfile({ uid: userDoc.id, ...userDoc.data() } as UserProfile);
-          } else {
-            // Create default profile for new users
-            // Defaulting to 'aluno' for safety. Admin must manually upgrade roles.
-            const isFirstUser = currentUser.email === 'djalmabatistajunior@gmail.com';
-            const newProfile: Partial<UserProfile> = {
-              uid: currentUser.uid,
-              email: currentUser.email || '',
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
-              emailVerified: currentUser.emailVerified,
-              role: isFirstUser ? 'admin' : 'aluno',
-              createdAt: new Date().toISOString(),
-              active: true
-            };
-            
-            await setDoc(userDocRef, {
-              ...newProfile,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp()
-            });
-            
-            setUserProfile(newProfile as UserProfile);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-        }
-      } else {
+      if (!currentUser) {
         setUserProfile(null);
+        setIsAuthReady(true);
       }
-      
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setUserProfile(null);
+      return;
+    }
+
+    const path = `users/${user.uid}`;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.uid), async (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as UserProfile;
+        // Ensure Djalma is always an admin in the frontend, even if the DB hasn't updated yet
+        if (user.email === 'djalmabatistajunior@gmail.com') {
+          data.role = 'admin';
+        }
+        // Auto-populate matricula if missing
+        if (!data.matricula && user.email) {
+          data.matricula = user.email.substring(0, 10);
+        }
+        setUserProfile(data);
+        setIsAuthReady(true);
+      } else {
+        // Create profile if it doesn't exist
+        const isFirstUser = user.email === 'djalmabatistajunior@gmail.com';
+        const newProfile: Partial<UserProfile> = {
+          uid: user.uid,
+          email: user.email || '',
+          role: isFirstUser ? 'admin' : 'aluno',
+          matricula: user.email?.substring(0, 10) || '',
+          displayName: user.displayName || user.email?.split('@')[0] || 'Aluno',
+          createdAt: new Date().toISOString(),
+          xp: 0,
+          level: 1,
+          badges: []
+        };
+
+        try {
+          await setDoc(doc(db, 'users', user.uid), newProfile);
+          // The onSnapshot will trigger again and set the profile
+        } catch (err) {
+          console.error("Error creating user profile:", err);
+          // Fallback in case of error (e.g. permission denied before rules are updated)
+          setUserProfile(newProfile as UserProfile);
+          setIsAuthReady(true);
+        }
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, path);
+      setIsAuthReady(true); // Ensure app doesn't hang on error
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -89,14 +108,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAdmin = userProfile?.role === 'admin';
-  const isProfessor = userProfile?.role === 'professor';
+  const isProfessor = userProfile?.role === 'professor' || isAdmin;
   const isAluno = userProfile?.role === 'aluno';
 
   return (
     <AuthContext.Provider value={{ 
       user, 
       userProfile, 
-      loading, 
+      isAuthReady, 
       loginWithGoogle, 
       logout,
       isAdmin,

@@ -52,14 +52,12 @@ export async function triggerN8NAlert(webhookUrl: string | null, type: string, d
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    console.log(`[n8n] Alerta ${type} enviado com sucesso na tentativa ${attempt}.`);
     return true;
   } catch (error) {
     console.error(`[n8n] Falha na tentativa ${attempt}:`, error);
 
     if (attempt < MAX_RETRIES) {
       const waitTime = RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
-      console.log(`[n8n] Aguardando ${waitTime}ms para nova tentativa...`);
       await delay(waitTime);
       return triggerN8NAlert(type, data, attempt + 1);
     }

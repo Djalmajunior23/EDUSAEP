@@ -58,6 +58,7 @@ service cloud.firestore {
              isValidString('enunciado', 1, 5000) &&
              data.alternativas is list &&
              data.alternativas.size() >= 2 &&
+             data.alternativas.size() <= 10 &&
              data.respostaCorreta is string &&
              data.dificuldade in ['fácil', 'médio', 'difícil'];
     }

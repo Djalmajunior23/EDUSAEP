@@ -6,13 +6,14 @@ import { Loader2 } from 'lucide-react';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: ('admin' | 'professor' | 'aluno')[];
+  userProfile?: any; // For backwards compatibility with App.tsx
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, isAuthReady } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4">

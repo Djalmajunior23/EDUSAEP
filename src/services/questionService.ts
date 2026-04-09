@@ -5,18 +5,64 @@ import { Question } from '../types';
 export class QuestionService {
   private static collectionName = 'questions';
 
+  private static validateQuestionPayload(data: Partial<Question>, isUpdate: boolean = false) {
+    // Enunciado
+    if (!isUpdate || data.enunciado !== undefined) {
+      if (!data.enunciado || typeof data.enunciado !== 'string' || data.enunciado.trim() === '') {
+        throw new Error("O campo 'enunciado' é obrigatório e não pode estar vazio.");
+      }
+    }
+
+    // Alternativas
+    if (!isUpdate || data.alternativas !== undefined) {
+      if (!data.alternativas || !Array.isArray(data.alternativas) || data.alternativas.length < 2) {
+        throw new Error("A questão deve ter pelo menos duas alternativas válidas.");
+      }
+      data.alternativas.forEach((alt, index) => {
+        if (!alt.id || typeof alt.id !== 'string' || alt.id.trim() === '') {
+          throw new Error(`A alternativa na posição ${index + 1} deve ter um 'id' válido.`);
+        }
+        if (!alt.texto || typeof alt.texto !== 'string' || alt.texto.trim() === '') {
+          throw new Error(`A alternativa '${alt.id}' deve ter um 'texto' não vazio.`);
+        }
+      });
+    }
+
+    // Resposta Correta
+    if (!isUpdate || data.respostaCorreta !== undefined) {
+      if (!data.respostaCorreta || typeof data.respostaCorreta !== 'string' || data.respostaCorreta.trim() === '') {
+        throw new Error("O campo 'respostaCorreta' é obrigatório.");
+      }
+      
+      if (data.alternativas && data.respostaCorreta) {
+        const validAlternativeIds = data.alternativas.map(a => a.id);
+        if (!validAlternativeIds.includes(data.respostaCorreta)) {
+          throw new Error(`A 'respostaCorreta' (${data.respostaCorreta}) deve corresponder a uma das alternativas fornecidas.`);
+        }
+      }
+    }
+
+    // Dificuldade
+    if (!isUpdate || data.dificuldade !== undefined) {
+      if (!data.dificuldade || typeof data.dificuldade !== 'string' || data.dificuldade.trim() === '') {
+        throw new Error("O campo 'dificuldade' é obrigatório.");
+      }
+      const allowedDifficulties = ['fácil', 'médio', 'difícil'];
+      if (!allowedDifficulties.includes(data.dificuldade.toLowerCase().trim())) {
+        throw new Error("O campo 'dificuldade' deve ser 'fácil', 'médio' ou 'difícil'.");
+      }
+    }
+  }
+
   static async createQuestion(questionData: Partial<Question>, userId: string, userRole: string): Promise<string> {
     if (userRole !== 'admin' && userRole !== 'professor') {
       throw new Error("Permissão negada: Apenas professores e administradores podem criar questões.");
     }
 
-    // Basic validation
-    if (!questionData.enunciado || !questionData.alternativas || questionData.alternativas.length < 2) {
-      throw new Error("Dados inválidos: A questão deve ter um enunciado e pelo menos duas alternativas.");
-    }
+    this.validateQuestionPayload(questionData, false);
 
     const now = new Date().toISOString();
-    const uniqueHash = this.generateHash(questionData.enunciado);
+    const uniqueHash = this.generateHash(questionData.enunciado!);
 
     const newQuestion = {
       ...questionData,
@@ -51,14 +97,19 @@ export class QuestionService {
         throw new Error("Questão não encontrada.");
       }
 
+      const existingData = docSnap.data() as Question;
+      const mergedData = { ...existingData, ...questionData };
+      
+      this.validateQuestionPayload(mergedData, false);
+
       await updateDoc(docRef, {
         ...questionData,
         atualizadoEm: new Date().toISOString(),
         updatedAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao atualizar questão:", error);
-      throw new Error("Falha ao atualizar a questão no banco de dados.");
+      throw new Error(error.message || "Falha ao atualizar a questão no banco de dados.");
     }
   }
 
