@@ -199,8 +199,20 @@ async function updateXP(userId: string, amount: number) {
 function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const [competency, setCompetency] = useState('');
   const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
+  const [localModel, setLocalModel] = useState(selectedModel || 'gemini-3-flash-preview');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (selectedModel) {
+      setLocalModel(selectedModel);
+    }
+  }, [selectedModel]);
+
+  const handleFillExample = () => {
+    setCompetency('Introdução ao Desenvolvimento de Sistemas');
+    setDifficulty('médio');
+  };
 
   const handleGenerate = async () => {
     if (!competency.trim()) {
@@ -211,7 +223,7 @@ function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | 
     setIsGenerating(true);
     try {
       const { generateSAEPQuestion } = await import('./services/geminiService');
-      const question = await generateSAEPQuestion(competency, difficulty, selectedModel, userProfile?.role as any || 'professor');
+      const question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'professor');
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
     } catch (err: any) {
@@ -253,7 +265,15 @@ function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência / Habilidade</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência / Habilidade</label>
+              <button 
+                onClick={handleFillExample} 
+                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md"
+              >
+                Preencher Exemplo
+              </button>
+            </div>
             <input 
               type="text"
               value={competency}
@@ -272,6 +292,20 @@ function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | 
               <option value="fácil">Fácil</option>
               <option value="médio">Médio</option>
               <option value="difícil">Difícil</option>
+            </select>
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Modelo de IA</label>
+            <select 
+              value={localModel}
+              onChange={(e) => setLocalModel(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            >
+              <option value="gemini-3-flash-preview">Gemini 3 Flash (Rápido)</option>
+              <option value="gemini-3-pro-preview">Gemini 3 Pro (Avançado)</option>
+              <option value="deepseek-chat">DeepSeek Chat</option>
+              <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq)</option>
             </select>
           </div>
         </div>

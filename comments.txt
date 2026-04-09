@@ -1,8 +1,82 @@
+src/components/dashboard/DashboardKPIs.tsx:1:// src/components/dashboard/DashboardKPIs.tsx
+src/components/dashboard/PainelInsightsIA.tsx:1:// src/components/dashboard/PainelInsightsIA.tsx
+src/components/dashboard/ClassRanking.tsx:1:// src/components/dashboard/ClassRanking.tsx
+src/components/dashboard/PainelRecomendacoes.tsx:1:// src/components/dashboard/PainelRecomendacoes.tsx
+src/components/dashboard/DashboardCharts.tsx:1:// src/components/dashboard/DashboardCharts.tsx
+src/components/professor/ConsolidatedReportView.tsx:55:      // Trend Data (Group by Date)
+src/components/professor/ConsolidatedReportView.tsx:69:      // Competency Stats
+src/components/professor/ConsolidatedReportView.tsx:95:      // Simple sort by assuming DD/MM format and current year (could be improved for cross-year)
+src/components/professor/CognitiveErrorAnalysisView.tsx:29:    // Fetch submissions
+src/components/professor/CognitiveErrorAnalysisView.tsx:38:    // Fetch existing analyses
+src/components/professor/CognitiveErrorAnalysisView.tsx:57:      // Fetch latest lesson plan for the class
+src/components/professor/CognitiveErrorAnalysisView.tsx:84:          // Get the most recent plan
+src/components/professor/CognitiveErrorAnalysisView.tsx:109:      // Find submissions that haven't been analyzed yet
+src/components/professor/CognitiveErrorAnalysisView.tsx:121:        // Only analyze if the student got questions wrong
+src/components/professor/CognitiveErrorAnalysisView.tsx:123:          // Fetch exam/exercise data if not in cache
+src/components/professor/CognitiveErrorAnalysisView.tsx:194:      // Aggregate errors for the student
+src/components/professor/CognitiveErrorAnalysisView.tsx:208:      // Save the plan to Firestore
+src/components/professor/CognitiveErrorAnalysisView.tsx:244:      // Aggregate all errors from active analyses
+src/components/professor/CognitiveErrorAnalysisView.tsx:258:      // Save the plan to Firestore
+src/components/professor/CognitiveErrorAnalysisView.tsx:274:  // Process data for charts
+src/components/professor/CognitiveErrorAnalysisView.tsx:305:  // Get unique students for filter
+src/components/professor/ProfessorInsights.tsx:70:      // Simulated students at risk for now
+src/components/professor/ProfessorInsights.tsx:78:      // Save to Firestore
+src/components/professor/ProfessorInsights.tsx:112:    // Fetch submissions for this class (simulated by fetching all and filtering for now)
+src/components/professor/ProfessorInsights.tsx:113:    // In a real app, submissions would have a classId
+src/components/professor/ProfessorInsights.tsx:116:      // Group by competency for the chart
+src/components/professor/ProfessorInsights.tsx:155:      // 1. Fetch submissions for these students
+src/components/professor/ProfessorInsights.tsx:159:      // 2. Fetch diagnostics for these students
+src/components/professor/ProfessorInsights.tsx:163:      // 3. Fetch cognitive analyses for these students
+src/components/professor/ProfessorInsights.tsx:167:      // 4. Aggregate performance by competency from submissions and diagnostics
+src/components/professor/ProfessorInsights.tsx:170:      // From submissions
+src/components/professor/ProfessorInsights.tsx:181:      // From diagnostics
+src/components/professor/ProfessorInsights.tsx:195:      // From cognitive analyses
+src/components/professor/ProfessorInsights.tsx:213:      // 5. Prioritize competencies with lowest average scores
+src/components/professor/ProfessorInsights.tsx:223:      // 6. Generate the plan using the AI service
+src/components/professor/ProfessorInsights.tsx:234:      // 7. Save to Firestore
+src/components/professor/ProfessorInsights.tsx:244:        // 8. Trigger n8n integration
+src/components/professor/ExternalFormsView.tsx:45:    // Fetch forms
+src/components/professor/ExternalFormsView.tsx:52:        // Fetch related exams
+src/components/admin/DataImportView.tsx:1:// src/components/admin/DataImportView.tsx
+src/components/admin/DataImportView.tsx:25:      // Save metadata to Firestore
+src/components/admin/DataImportView.tsx:34:      // Simulating webhook call to n8n
+src/components/admin/DataImportView.tsx:35:      // In a real scenario, this would be a fetch to your n8n webhook URL
+src/components/admin/ClassesManagementView.tsx:1:// src/components/admin/ClassesManagementView.tsx
+src/components/admin/ClassesManagementView.tsx:80:    // if (!window.confirm('Tem certeza que deseja excluir esta turma?')) return;
+src/components/admin/DisciplinesManagementView.tsx:1:// src/components/admin/DisciplinesManagementView.tsx
+src/components/admin/DisciplinesManagementView.tsx:102:    // if (!window.confirm('Tem certeza que deseja excluir esta disciplina?')) return;
+src/components/student/StudentInsights.tsx:89:      // Aggregate behavioral data from submissions
+src/components/student/StudentInsights.tsx:99:      // Save to Firestore
+src/components/student/StudentInsights.tsx:118:    // Fetch learning profile
+src/components/student/StudentInsights.tsx:131:    // Fetch performance predictions
+src/components/student/StudentInsights.tsx:144:    // Fetch recent submissions for radar and evolution
+src/components/student/StudentInsights.tsx:151:        // Process radar data from the most recent submission
+src/components/student/StudentInsights.tsx:169:    // Fetch diagnostic data
+src/components/student/StudentInsights.tsx:182:    // Fetch class averages
+src/components/student/SocraticTutor.tsx:50:    // Create or find a session for this question
+src/components/student/SocraticTutor.tsx:66:        // Start a new session
+src/components/student/SocraticTutor.tsx:166:      // Update session in Firestore
+src/components/student/AdaptiveExam.tsx:116:    // Simple TRI-like adjustment
+src/components/student/AdaptiveExam.tsx:125:    // Update Firestore
+src/components/student/AdaptiveExam.tsx:153:      // Save final submission
+src/components/ProtectedRoute.tsx:32:    // Should not happen if loading is false and user exists, but just in case
+src/components/ProtectedRoute.tsx:42:      // Redirect to a safe page based on role
+src/services/recommendationService.ts:1:// src/services/recommendationService.ts
+src/services/errorService.ts:34:  // If the user is not authenticated and we get a permission denied error,
+src/services/errorService.ts:35:  // it's likely because they just logged out and an onSnapshot listener fired.
+src/services/errorService.ts:36:  // We should ignore this to prevent crashing the app during logout.
 src/services/importService.ts:1:// src/services/importService.ts
-src/services/importService.ts:6:  rawName: string; // Raw discipline/competency name from external file
-src/services/importService.ts:7:  mappedDisciplineId?: string; // ID of the mapped Discipline (Main Competency)
-src/services/importService.ts:9:  data: any; // The full row data
 src/services/importService.ts:13:  // Logic to parse raw data (Excel/CSV) and create staged entries
+src/services/dashboardService.ts:1:// src/services/dashboardService.ts
+src/services/dashboardService.ts:27:    // New fields for aggregated BI
+src/services/dashboardService.ts:42:    // Filter submissions if disciplineId is provided
+src/services/dashboardService.ts:49:    // Calculate media geral
+src/services/dashboardService.ts:58:    // Calculate student scores
+src/services/dashboardService.ts:76:    // Performance por Disciplina (Aggregated BI)
+src/services/dashboardService.ts:78:      // For this specific chart, we use all submissions but group by discipline
+src/services/dashboardService.ts:94:    // Ranking
+src/services/n8nService.ts:47:      // Timeout de 10 segundos para não travar o app
+src/services/n8nService.ts:65:    // Se todas as tentativas falharem, registramos mas não bloqueamos o usuário
 src/services/aiService.ts:10:      // Enhance prompt based on role
 src/services/aiService.ts:18:      // generateContentWrapper already handles the fallback logic from OpenAI to Gemini internally
 src/services/aiService.ts:19:      // when a 429 error occurs.
@@ -20,101 +94,17 @@ src/services/questionService.ts:9:    // Enunciado
 src/services/questionService.ts:16:    // Alternativas
 src/services/questionService.ts:31:    // Resposta Correta
 src/services/questionService.ts:45:    // Dificuldade
-src/services/questionService.ts:134:      hash = hash & hash; // Convert to 32bit integer
-src/services/n8nService.ts:6:const RETRY_DELAY = 2000; // 2 segundos
-src/services/n8nService.ts:47:      // Timeout de 10 segundos para não travar o app
-src/services/n8nService.ts:60:      const waitTime = RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
-src/services/n8nService.ts:65:    // Se todas as tentativas falharem, registramos mas não bloqueamos o usuário
-src/services/mappingService.ts:1:// src/services/mappingService.ts
 src/services/chatService.ts:35:  // We only send the last message to the model for simplicity in this stateless wrapper,
 src/services/chatService.ts:36:  // but we could send the full history if needed.
 src/services/chatService.ts:37:  // For a better experience, we'll send the history.
-src/services/recommendationService.ts:1:// src/services/recommendationService.ts
-src/services/errorService.ts:34:  // If the user is not authenticated and we get a permission denied error,
-src/services/errorService.ts:35:  // it's likely because they just logged out and an onSnapshot listener fired.
-src/services/errorService.ts:36:  // We should ignore this to prevent crashing the app during logout.
-src/services/dashboardService.ts:1:// src/services/dashboardService.ts
-src/services/dashboardService.ts:27:    // New fields for aggregated BI
-src/services/dashboardService.ts:42:    // Filter submissions if disciplineId is provided
-src/services/dashboardService.ts:49:    // Calculate media geral
-src/services/dashboardService.ts:58:    // Calculate student scores
-src/services/dashboardService.ts:76:    // Performance por Disciplina (Aggregated BI)
-src/services/dashboardService.ts:78:      // For this specific chart, we use all submissions but group by discipline
-src/services/dashboardService.ts:94:    // Ranking
-src/main.tsx:6:// Suppress benign Vite WebSocket connection errors and Firestore WebChannel warnings in the AI Studio environment
-src/components/dashboard/PainelRecomendacoes.tsx:1:// src/components/dashboard/PainelRecomendacoes.tsx
-src/components/dashboard/PainelInsightsIA.tsx:1:// src/components/dashboard/PainelInsightsIA.tsx
-src/components/dashboard/ClassRanking.tsx:1:// src/components/dashboard/ClassRanking.tsx
-src/components/dashboard/DashboardCharts.tsx:1:// src/components/dashboard/DashboardCharts.tsx
-src/components/dashboard/DashboardKPIs.tsx:1:// src/components/dashboard/DashboardKPIs.tsx
-src/components/admin/ClassesManagementView.tsx:1:// src/components/admin/ClassesManagementView.tsx
-src/components/admin/ClassesManagementView.tsx:80:    // if (!window.confirm('Tem certeza que deseja excluir esta turma?')) return;
-src/components/admin/DisciplinesManagementView.tsx:1:// src/components/admin/DisciplinesManagementView.tsx
-src/components/admin/DisciplinesManagementView.tsx:102:    // if (!window.confirm('Tem certeza que deseja excluir esta disciplina?')) return;
-src/components/admin/DataImportView.tsx:1:// src/components/admin/DataImportView.tsx
-src/components/admin/DataImportView.tsx:25:      // Save metadata to Firestore
-src/components/admin/DataImportView.tsx:34:      // Simulating webhook call to n8n
-src/components/admin/DataImportView.tsx:35:      // In a real scenario, this would be a fetch to your n8n webhook URL
-src/components/professor/CognitiveErrorAnalysisView.tsx:29:    // Fetch submissions
-src/components/professor/CognitiveErrorAnalysisView.tsx:38:    // Fetch existing analyses
-src/components/professor/CognitiveErrorAnalysisView.tsx:57:      // Fetch latest lesson plan for the class
-src/components/professor/CognitiveErrorAnalysisView.tsx:77:    setLessonPlan(null); // Clear lesson plan when a specific student is selected
-src/components/professor/CognitiveErrorAnalysisView.tsx:84:          // Get the most recent plan
-src/components/professor/CognitiveErrorAnalysisView.tsx:109:      // Find submissions that haven't been analyzed yet
-src/components/professor/CognitiveErrorAnalysisView.tsx:121:        // Only analyze if the student got questions wrong
-src/components/professor/CognitiveErrorAnalysisView.tsx:123:          // Fetch exam/exercise data if not in cache
-src/components/professor/CognitiveErrorAnalysisView.tsx:194:      // Aggregate errors for the student
-src/components/professor/CognitiveErrorAnalysisView.tsx:208:      // Save the plan to Firestore
-src/components/professor/CognitiveErrorAnalysisView.tsx:244:      // Aggregate all errors from active analyses
-src/components/professor/CognitiveErrorAnalysisView.tsx:258:      // Save the plan to Firestore
-src/components/professor/CognitiveErrorAnalysisView.tsx:274:  // Process data for charts
-src/components/professor/CognitiveErrorAnalysisView.tsx:305:  // Get unique students for filter
-src/components/professor/ExternalFormsView.tsx:45:    // Fetch forms
-src/components/professor/ExternalFormsView.tsx:52:        // Fetch related exams
-src/components/professor/ProfessorInsights.tsx:69:      // Simulated students at risk for now
-src/components/professor/ProfessorInsights.tsx:77:      // Save to Firestore
-src/components/professor/ProfessorInsights.tsx:111:    // Fetch submissions for this class (simulated by fetching all and filtering for now)
-src/components/professor/ProfessorInsights.tsx:112:    // In a real app, submissions would have a classId
-src/components/professor/ProfessorInsights.tsx:115:      // Group by competency for the chart
-src/components/professor/ProfessorInsights.tsx:145:      // 1. Fetch all questions to map questionId -> competency
-src/components/professor/ProfessorInsights.tsx:153:      // 2. Fetch students in class
-src/components/professor/ProfessorInsights.tsx:157:      // 3. Fetch cognitive analyses for these students
-src/components/professor/ProfessorInsights.tsx:160:        // Firestore 'in' query limit is 10 (or 30 in newer versions), but let's be safe
-src/components/professor/ProfessorInsights.tsx:161:        // If there are many students, we might need multiple queries
-src/components/professor/ProfessorInsights.tsx:166:      // 4. Group errors by competency and prioritize critical ones
-src/components/professor/ProfessorInsights.tsx:181:      // 5. Prioritize competencies with lowest average scores (from classData)
-src/components/professor/ProfessorInsights.tsx:189:        .sort((a, b) => a.avgScore - b.avgScore) // Sort by lowest score first
-src/components/professor/ProfessorInsights.tsx:190:        .slice(0, 3); // Take top 3 most critical
-src/components/professor/ProfessorInsights.tsx:192:      // 6. Generate the plan using the AI service
-src/components/professor/ProfessorInsights.tsx:196:      // 7. Save to Firestore
-src/components/professor/ProfessorInsights.tsx:199:          userId: auth.currentUser.uid, // Matches blueprint
-src/components/professor/ProfessorInsights.tsx:200:          professor_id: auth.currentUser.uid, // Keep for backward compatibility if any
-src/components/professor/ProfessorInsights.tsx:203:          createdAt: serverTimestamp() // Matches blueprint
-src/components/professor/ProfessorInsights.tsx:206:        // 8. Trigger n8n integration
-src/components/professor/ConsolidatedReportView.tsx:55:      // Trend Data (Group by Date)
-src/components/professor/ConsolidatedReportView.tsx:69:      // Competency Stats
-src/components/professor/ConsolidatedReportView.tsx:95:      // Simple sort by assuming DD/MM format and current year (could be improved for cross-year)
-src/components/student/SocraticTutor.tsx:50:    // Create or find a session for this question
-src/components/student/SocraticTutor.tsx:66:        // Start a new session
-src/components/student/SocraticTutor.tsx:166:      // Update session in Firestore
-src/components/student/StudentInsights.tsx:89:      // Aggregate behavioral data from submissions
-src/components/student/StudentInsights.tsx:99:      // Save to Firestore
-src/components/student/StudentInsights.tsx:118:    // Fetch learning profile
-src/components/student/StudentInsights.tsx:131:    // Fetch performance predictions
-src/components/student/StudentInsights.tsx:144:    // Fetch recent submissions for radar and evolution
-src/components/student/StudentInsights.tsx:151:        // Process radar data from the most recent submission
-src/components/student/StudentInsights.tsx:169:    // Fetch diagnostic data
-src/components/student/StudentInsights.tsx:182:    // Fetch class averages
-src/components/student/AdaptiveExam.tsx:31:  const [proficiency, setProficiency] = useState(50); // Start at medium
-src/components/student/AdaptiveExam.tsx:33:  const [maxQuestions] = useState(10); // Adaptive exams are usually shorter
-src/components/student/AdaptiveExam.tsx:53:        return; // Don't start a new session if we loaded one
-src/components/student/AdaptiveExam.tsx:116:    // Simple TRI-like adjustment
-src/components/student/AdaptiveExam.tsx:125:    // Update Firestore
-src/components/student/AdaptiveExam.tsx:153:      // Save final submission
-src/components/ProtectedRoute.tsx:9:  userProfile?: any; // For backwards compatibility with App.tsx
-src/components/ProtectedRoute.tsx:32:    // Should not happen if loading is false and user exists, but just in case
-src/components/ProtectedRoute.tsx:38:      return <>{children}</>; // Admins have access to everything
-src/components/ProtectedRoute.tsx:42:      // Redirect to a safe page based on role
+src/services/mappingService.ts:1:// src/services/mappingService.ts
+src/modules/simulados/components/ImportInconsistencyManager.tsx:93:          // Manual search
+src/modules/simulados/components/ImportInconsistencyManager.tsx:100:          // Auto-suggest based on inconsistency data
+src/modules/simulados/components/ImportInconsistencyManager.tsx:121:    // Search is now handled automatically by the useEffect
+src/modules/simulados/components/ImportInconsistencyManager.tsx:122:    // This function is kept for the button click, but it's mostly redundant now
+src/modules/simulados/components/ImportInconsistencyManager.tsx:132:      // 1. Update imported response with student ID
+src/modules/simulados/components/ImportInconsistencyManager.tsx:138:      // 2. Mark inconsistency as resolved
+src/modules/simulados/components/ImportInconsistencyManager.tsx:145:      // 3. Trigger reprocessing
 src/modules/simulados/services/simuladoService.ts:72:    // Check if questions are already embedded in the simulado object (as in App.tsx)
 src/modules/simulados/services/simuladoService.ts:76:      // Fetch questions from collection if only IDs are provided
 src/modules/simulados/services/simuladoService.ts:144:      // Check for duplicates
@@ -122,18 +112,14 @@ src/modules/simulados/services/simuladoService.ts:159:        // We might want t
 src/modules/simulados/services/simuladoService.ts:181:        // Trigger processing (this would normally be a Cloud Function or separate service call)
 src/modules/simulados/services/simuladoService.ts:223:    // 1. Associate with student
 src/modules/simulados/services/simuladoService.ts:245:    // 2. Correct answers
-src/modules/simulados/services/simuladoService.ts:263:      const correctAlt = String.fromCharCode(65 + question.correctOption); // A, B, C, D...
 src/modules/simulados/services/simuladoService.ts:282:    // 3. Save items
 src/modules/simulados/services/simuladoService.ts:291:    // 4. Update response
-src/modules/simulados/services/simuladoService.ts:292:    const score = totalCorrect; // Simple score for now
 src/modules/simulados/services/simuladoService.ts:308:    // 5. Create Exam Submission for integration with existing dashboards
-src/modules/simulados/services/simuladoService.ts:333:          return selected ? selected.charCodeAt(0) - 65 : -1; // Convert A, B, C to 0, 1, 2
 src/modules/simulados/services/simuladoService.ts:349:      // Search by matricula
 src/modules/simulados/services/simuladoService.ts:356:      // Search by email
 src/modules/simulados/services/simuladoService.ts:363:      // Search by name + class (simplified)
 src/modules/simulados/services/simuladoService.ts:367:          // Could filter by class here if class is stored in user profile
 src/modules/simulados/services/pdfExportService.ts:24:      // Header
-src/modules/simulados/services/pdfExportService.ts:25:      doc.setFillColor(16, 185, 129); // Emerald-500
 src/modules/simulados/services/pdfExportService.ts:37:      // Student Info
 src/modules/simulados/services/pdfExportService.ts:49:      // Exam Info
 src/modules/simulados/services/pdfExportService.ts:63:      // Competencies Table
@@ -150,162 +136,122 @@ src/modules/simulados/services/pdfExportService.ts:203:            // Remove any
 src/modules/simulados/services/pdfExportService.ts:217:      // Restore scroll position
 src/modules/simulados/services/pdfExportService.ts:234:      // Add first page
 src/modules/simulados/services/pdfExportService.ts:238:      // Add subsequent pages if content is longer than one page
-src/modules/simulados/types/index.ts:15:  createdAt: any; // Timestamp
-src/modules/simulados/types/index.ts:16:  updatedAt: any; // Timestamp
-src/modules/simulados/types/index.ts:18:  startDate: any; // Timestamp
-src/modules/simulados/types/index.ts:19:  endDate: any; // Timestamp
-src/modules/simulados/types/index.ts:32:  createdAt: any; // Timestamp
-src/modules/simulados/types/index.ts:33:  lastSyncAt?: any; // Timestamp
-src/modules/simulados/types/index.ts:42:  alunoId?: string; // Optional if inconsistent
-src/modules/simulados/types/index.ts:47:  submittedAt: any; // Timestamp
-src/modules/simulados/types/index.ts:50:  answers: Record<string, string>; // questionId -> selectedAlternative
-src/modules/simulados/types/index.ts:78:  executedAt: any; // Timestamp
-src/modules/simulados/types/index.ts:96:  resolvedAt?: any; // Timestamp
-src/modules/simulados/types/index.ts:103:  correctOption: number; // Index 0-3
-src/modules/simulados/components/ImportInconsistencyManager.tsx:93:          // Manual search
-src/modules/simulados/components/ImportInconsistencyManager.tsx:100:          // Auto-suggest based on inconsistency data
-src/modules/simulados/components/ImportInconsistencyManager.tsx:115:      .slice(0, 10); // Limit to top 10 suggestions
-src/modules/simulados/components/ImportInconsistencyManager.tsx:121:    // Search is now handled automatically by the useEffect
-src/modules/simulados/components/ImportInconsistencyManager.tsx:122:    // This function is kept for the button click, but it's mostly redundant now
-src/modules/simulados/components/ImportInconsistencyManager.tsx:132:      // 1. Update imported response with student ID
-src/modules/simulados/components/ImportInconsistencyManager.tsx:135:        processingStatus: 'pending' // Set back to pending to trigger reprocessing
-src/modules/simulados/components/ImportInconsistencyManager.tsx:138:      // 2. Mark inconsistency as resolved
-src/modules/simulados/components/ImportInconsistencyManager.tsx:142:        resolvedBy: studentId, // Or the current user's ID
-src/modules/simulados/components/ImportInconsistencyManager.tsx:145:      // 3. Trigger reprocessing
-src/integrations/forms/FormProvider.ts:17:  answers: Record<string, string>; // questionId -> selectedAlternative
-src/contexts/AuthContext.tsx:48:        // Ensure Djalma is always an admin in the frontend, even if the DB hasn't updated yet
-src/contexts/AuthContext.tsx:52:        // Auto-populate matricula if missing
-src/contexts/AuthContext.tsx:59:        // Create profile if it doesn't exist
-src/contexts/AuthContext.tsx:75:          // The onSnapshot will trigger again and set the profile
-src/contexts/AuthContext.tsx:78:          // Fallback in case of error (e.g. permission denied before rules are updated)
-src/contexts/AuthContext.tsx:85:      setIsAuthReady(true); // Ensure app doesn't hang on error
-src/types.ts:1:// src/types.ts
-src/types.ts:86:  resourceId: string; // examId or exerciseId
-src/types.ts:127:  // Main Competency
-src/types.ts:129:  code: string; // Ex: UC-001
-src/types.ts:130:  name: string; // The name of the discipline/main competency
-src/types.ts:138:  // Habilidade / Sub-competência
-src/types.ts:140:  disciplineId: string; // Linked to Discipline/Main Competency
-src/types.ts:147:  skillId: string; // Linked to Skill
-src/App.tsx:14:// Initialize Gemini
-src/App.tsx:179:      // Level logic: level up every 1000 XP
-src/App.tsx:372:// Skeleton Component
-src/App.tsx:379:// Dark Mode Toggle Component
-src/App.tsx:392:// AI Provider Toggle Component
-src/App.tsx:393:// AI Provider Toggle Component
-src/App.tsx:465:// Protected Route Component removed, using from components/ProtectedRoute.tsx
-src/App.tsx:551:  resourceId: string; // examId or exerciseId
-src/App.tsx:600:// Error Boundary Component
-src/App.tsx:610:    // Log to Firestore if possible
-src/App.tsx:723:    // if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} diagnósticos selecionados? Esta ação não pode ser desfeita.`)) return;
-src/App.tsx:918:                          // if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
-src/App.tsx:1140:    // Sort by date
-src/App.tsx:1153:          return null; // Skip if student didn't have this competency in this diagnostic
-src/App.tsx:1532:  // Load draft from localStorage on mount
-src/App.tsx:1540:  // Save draft to localStorage whenever newTaskTitle changes
-src/App.tsx:1586:    // Optimistic Update
-src/App.tsx:1601:      // Rollback
-src/App.tsx:1611:    // Optimistic Update
-src/App.tsx:1620:      // Rollback
-src/App.tsx:1630:    // Optimistic Update
-src/App.tsx:1638:      // Rollback
-src/App.tsx:1801:        // Fetch total students
-src/App.tsx:1805:        // Fetch diagnostics for stats
-src/App.tsx:2345:  // States for missing competencies during import
-src/App.tsx:2441:    // 1. Validate Enunciado
-src/App.tsx:2451:    // 2. Validate Competência
-src/App.tsx:2457:    // 3. Validate Alternativas
-src/App.tsx:2472:    // 4. Validate Resposta Correta
-src/App.tsx:2483:    // 5. Validate Dificuldade
-src/App.tsx:2495:        // Ensure we only save the filled alternatives
-src/App.tsx:2549:    // if (!window.confirm("Excluir esta questão do banco?")) return;
-src/App.tsx:2586:      const BATCH_SIZE = 400; // Safe limit for Firestore batches (max 500)
-src/App.tsx:2588:      // 1. Handle Discipline Creation in a separate batch if needed
-src/App.tsx:2606:      // 2. Process questions in chunks of BATCH_SIZE
-src/App.tsx:2623:          // Filter out empty alternatives
-src/App.tsx:2626:          // Skip if less than 2 alternatives
-src/App.tsx:2637:          // Ensure respostaCorreta is valid
-src/App.tsx:2640:            respostaCorreta = validIds[0]; // Fallback to first valid alternative
-src/App.tsx:2712:    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-src/App.tsx:2739:        // 1. Identify questions with missing/generic competencies and suggest them
-src/App.tsx:2749:        // 2. Identify unique competencies in the imported data
-src/App.tsx:2753:          row.competenciaNome = comp; // Ensure it's set
-src/App.tsx:2757:        // 2. Check which ones are missing in the DB
-src/App.tsx:2771:          // Initialize mapping: default to 'create'
-src/App.tsx:2781:        // If no missing competencies, proceed
-src/App.tsx:3099:                  const nextId = String.fromCharCode(65 + newOpts.length); // A, B, C...
-src/App.tsx:3130:                            // Re-index IDs to A, B, C...
-src/App.tsx:3132:                            // If the deleted option was the correct one, reset it
-src/App.tsx:3137:                              // Find the new ID of the previously correct option
-src/App.tsx:3144:                            // Rebuild justificativas
-src/App.tsx:3561:      // Shuffle and pick 40
-src/App.tsx:3606:        // Notify all students if published
-src/App.tsx:3640:    // if (!window.confirm(`Tem certeza que deseja excluir este ${type === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
-src/App.tsx:3703:    const nextId = String.fromCharCode(65 + currentOptions.length); // A, B, C...
-src/App.tsx:3718:    // Re-index IDs to A, B, C...
-src/App.tsx:3750:    // Fallback to global webhook if user one is not set
-src/App.tsx:3875:                  // Send to Gemini to parse
-src/App.tsx:4554:    // Fetch published exams (Simulados only)
-src/App.tsx:4567:    // Fetch user submissions
-src/App.tsx:4576:    // Fetch active forms
-src/App.tsx:4594:    // Check for date restrictions
-src/App.tsx:4607:    // Check for max attempts
-src/App.tsx:4923:      // 1. Fetch all performance data
-src/App.tsx:4945:      // 2. Aggregate Competency Stats
-src/App.tsx:4975:          // Collect detailed weaknesses from diagnostics if available
-src/App.tsx:4986:      // Remove duplicates from detailedWeaknesses
-src/App.tsx:4989:      // 3. Use Gemini to generate the adaptive plan
-src/App.tsx:5077:      // Disparar n8n para gerar recomendações de conteúdo externo
-src/App.tsx:5426:  // Auto-save progress
-src/App.tsx:5456:      // if (!window.confirm("Você ainda tem questões sem resposta. Deseja enviar assim mesmo?")) return;
-src/App.tsx:5469:        const weight = 1; // Default weight
-src/App.tsx:5496:      // Cognitive Error Analysis Trigger
-src/App.tsx:5498:        // Run analysis in background
-src/App.tsx:5511:      // Gamification Logic
-src/App.tsx:5519:            const earnedXp = score * 10; // 10 XP per point
-src/App.tsx:5542:      // Clear auto-save on success
-src/App.tsx:5810:  // Questões focadas nas capacidades técnicas do SAEP para Técnico em Desenvolvimento de Sistemas
-src/App.tsx:5900:      // Award XP
-src/App.tsx:6115:    // Fetch basic stats to show before generating
-src/App.tsx:6152:      // 1. Fetch data
-src/App.tsx:6163:      // 2. Format data for the prompt
-src/App.tsx:6368:  // New user form state
-src/App.tsx:6395:      // Initialize a secondary app to create the user without signing out the admin
-src/App.tsx:6404:      // Save user profile in Firestore
-src/App.tsx:6445:    // if (!window.confirm("Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita no banco de dados.")) return;
-src/App.tsx:6828:      // 1. Save user message
-src/App.tsx:6836:      // 2. Get Gemini response
-src/App.tsx:6845:      // 3. Save AI response
-src/App.tsx:6863:      // Delete all messages for this user
-src/App.tsx:7332:      // 1. Find student ID from exam_submissions
-src/App.tsx:7343:        // Fallback: try to find in users by name
-src/App.tsx:7360:      // 2. Fetch cognitive analyses
-src/App.tsx:7385:      // 3. Generate Plan
-src/App.tsx:7388:      // 4. Save to Firestore
-src/App.tsx:7397:      // 5. Notify student
-src/App.tsx:7509:    // Update in Firestore if ID exists
-src/App.tsx:9466:    // Set default model for the new provider
-src/App.tsx:9499:        // Error handled by service
-src/App.tsx:9629:            // Authorization check for students
-src/App.tsx:9652:  // History Listener
-src/App.tsx:9688:  // Global Settings Listener
-src/App.tsx:9702:  // Test Connection
-src/App.tsx:9722:      // Save/Update user profile in Firestore
-src/App.tsx:9740:        // Just update last login or basic info, keep existing role
-src/App.tsx:9786:      // Update display name
-src/App.tsx:9791:      // Send verification email
-src/App.tsx:9795:      // Save user profile in Firestore
-src/App.tsx:9958:      // If not JSON, try to parse as CSV-like text if needed, but let's stick to JSON for paste
-src/App.tsx:9980:      // Group data by student
-src/App.tsx:10002:      // Process each student individually to avoid context limits and ensure all are processed
-src/App.tsx:10012:            // Save to Firestore
-src/App.tsx:10014:              userId: user.uid, // Professor ID
-src/App.tsx:10023:            // Trigger Webhook if configured
-src/App.tsx:10049:      // Set the first result as the current one to display
-src/App.tsx:10070:  const COLORS = ['#10b981', '#f59e0b', '#ef4444']; // Emerald, Amber, Red
-src/App.tsx:10129:    // Add summary row
 src/firebase.ts:15:// Import the Firebase configuration
 src/firebase.ts:18:// Initialize Firebase SDK
 src/firebase.ts:21:// Initialize Firestore with the named database if it's provided
 src/firebase.ts:24:// Initialize Auth
 src/firebase.ts:27:// Google Auth Provider
+src/types.ts:1:// src/types.ts
+src/types.ts:127:  // Main Competency
+src/types.ts:138:  // Habilidade / Sub-competência
+src/App.tsx:14:// Initialize Gemini
+src/App.tsx:179:      // Level logic: level up every 1000 XP
+src/App.tsx:406:// Skeleton Component
+src/App.tsx:413:// Dark Mode Toggle Component
+src/App.tsx:426:// AI Provider Toggle Component
+src/App.tsx:427:// AI Provider Toggle Component
+src/App.tsx:499:// Protected Route Component removed, using from components/ProtectedRoute.tsx
+src/App.tsx:634:// Error Boundary Component
+src/App.tsx:644:    // Log to Firestore if possible
+src/App.tsx:757:    // if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} diagnósticos selecionados? Esta ação não pode ser desfeita.`)) return;
+src/App.tsx:952:                          // if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
+src/App.tsx:1174:    // Sort by date
+src/App.tsx:1566:  // Load draft from localStorage on mount
+src/App.tsx:1574:  // Save draft to localStorage whenever newTaskTitle changes
+src/App.tsx:1620:    // Optimistic Update
+src/App.tsx:1635:      // Rollback
+src/App.tsx:1645:    // Optimistic Update
+src/App.tsx:1654:      // Rollback
+src/App.tsx:1664:    // Optimistic Update
+src/App.tsx:1672:      // Rollback
+src/App.tsx:1835:        // Fetch total students
+src/App.tsx:1839:        // Fetch diagnostics for stats
+src/App.tsx:2379:  // States for missing competencies during import
+src/App.tsx:2475:    // 1. Validate Enunciado
+src/App.tsx:2485:    // 2. Validate Competência
+src/App.tsx:2491:    // 3. Validate Alternativas
+src/App.tsx:2506:    // 4. Validate Resposta Correta
+src/App.tsx:2517:    // 5. Validate Dificuldade
+src/App.tsx:2529:        // Ensure we only save the filled alternatives
+src/App.tsx:2583:    // if (!window.confirm("Excluir esta questão do banco?")) return;
+src/App.tsx:2622:      // 1. Handle Discipline Creation in a separate batch if needed
+src/App.tsx:2640:      // 2. Process questions in chunks of BATCH_SIZE
+src/App.tsx:2657:          // Filter out empty alternatives
+src/App.tsx:2660:          // Skip if less than 2 alternatives
+src/App.tsx:2671:          // Ensure respostaCorreta is valid
+src/App.tsx:2773:        // 1. Identify questions with missing/generic competencies and suggest them
+src/App.tsx:2783:        // 2. Identify unique competencies in the imported data
+src/App.tsx:2791:        // 2. Check which ones are missing in the DB
+src/App.tsx:2805:          // Initialize mapping: default to 'create'
+src/App.tsx:2815:        // If no missing competencies, proceed
+src/App.tsx:3164:                            // Re-index IDs to A, B, C...
+src/App.tsx:3166:                            // If the deleted option was the correct one, reset it
+src/App.tsx:3171:                              // Find the new ID of the previously correct option
+src/App.tsx:3178:                            // Rebuild justificativas
+src/App.tsx:3595:      // Shuffle and pick 40
+src/App.tsx:3640:        // Notify all students if published
+src/App.tsx:3674:    // if (!window.confirm(`Tem certeza que deseja excluir este ${type === 'simulado' ? 'simulado' : 'exercício'}?`)) return;
+src/App.tsx:3752:    // Re-index IDs to A, B, C...
+src/App.tsx:3784:    // Fallback to global webhook if user one is not set
+src/App.tsx:3909:                  // Send to Gemini to parse
+src/App.tsx:4588:    // Fetch published exams (Simulados only)
+src/App.tsx:4601:    // Fetch user submissions
+src/App.tsx:4610:    // Fetch active forms
+src/App.tsx:4628:    // Check for date restrictions
+src/App.tsx:4641:    // Check for max attempts
+src/App.tsx:4957:      // 1. Fetch all performance data
+src/App.tsx:4979:      // 2. Aggregate Competency Stats
+src/App.tsx:5009:          // Collect detailed weaknesses from diagnostics if available
+src/App.tsx:5020:      // Remove duplicates from detailedWeaknesses
+src/App.tsx:5023:      // 3. Use Gemini to generate the adaptive plan
+src/App.tsx:5111:      // Disparar n8n para gerar recomendações de conteúdo externo
+src/App.tsx:5460:  // Auto-save progress
+src/App.tsx:5490:      // if (!window.confirm("Você ainda tem questões sem resposta. Deseja enviar assim mesmo?")) return;
+src/App.tsx:5530:      // Cognitive Error Analysis Trigger
+src/App.tsx:5532:        // Run analysis in background
+src/App.tsx:5545:      // Gamification Logic
+src/App.tsx:5576:      // Clear auto-save on success
+src/App.tsx:5844:  // Questões focadas nas capacidades técnicas do SAEP para Técnico em Desenvolvimento de Sistemas
+src/App.tsx:5934:      // Award XP
+src/App.tsx:6149:    // Fetch basic stats to show before generating
+src/App.tsx:6186:      // 1. Fetch data
+src/App.tsx:6197:      // 2. Format data for the prompt
+src/App.tsx:6402:  // New user form state
+src/App.tsx:6429:      // Initialize a secondary app to create the user without signing out the admin
+src/App.tsx:6438:      // Save user profile in Firestore
+src/App.tsx:6479:    // if (!window.confirm("Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita no banco de dados.")) return;
+src/App.tsx:6862:      // 1. Save user message
+src/App.tsx:6870:      // 2. Get Gemini response
+src/App.tsx:6879:      // 3. Save AI response
+src/App.tsx:6897:      // Delete all messages for this user
+src/App.tsx:7366:      // 1. Find student ID from exam_submissions
+src/App.tsx:7377:        // Fallback: try to find in users by name
+src/App.tsx:7394:      // 2. Fetch cognitive analyses
+src/App.tsx:7419:      // 3. Generate Plan
+src/App.tsx:7422:      // 4. Save to Firestore
+src/App.tsx:7431:      // 5. Notify student
+src/App.tsx:7543:    // Update in Firestore if ID exists
+src/App.tsx:9500:    // Set default model for the new provider
+src/App.tsx:9533:        // Error handled by service
+src/App.tsx:9663:            // Authorization check for students
+src/App.tsx:9686:  // History Listener
+src/App.tsx:9722:  // Global Settings Listener
+src/App.tsx:9736:  // Test Connection
+src/App.tsx:9756:      // Save/Update user profile in Firestore
+src/App.tsx:9774:        // Just update last login or basic info, keep existing role
+src/App.tsx:9820:      // Update display name
+src/App.tsx:9825:      // Send verification email
+src/App.tsx:9829:      // Save user profile in Firestore
+src/App.tsx:9992:      // If not JSON, try to parse as CSV-like text if needed, but let's stick to JSON for paste
+src/App.tsx:10014:      // Group data by student
+src/App.tsx:10036:      // Process each student individually to avoid context limits and ensure all are processed
+src/App.tsx:10046:            // Save to Firestore
+src/App.tsx:10057:            // Trigger Webhook if configured
+src/App.tsx:10083:      // Set the first result as the current one to display
+src/App.tsx:10163:    // Add summary row
+src/contexts/AuthContext.tsx:48:        // Ensure Djalma is always an admin in the frontend, even if the DB hasn't updated yet
+src/contexts/AuthContext.tsx:52:        // Auto-populate matricula if missing
+src/contexts/AuthContext.tsx:59:        // Create profile if it doesn't exist
+src/contexts/AuthContext.tsx:75:          // The onSnapshot will trigger again and set the profile
+src/contexts/AuthContext.tsx:78:          // Fallback in case of error (e.g. permission denied before rules are updated)
+src/main.tsx:6:// Suppress benign Vite WebSocket connection errors and Firestore WebChannel warnings in the AI Studio environment

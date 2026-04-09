@@ -35,6 +35,7 @@ import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '
 import { UserProfile } from '../../types';
 import { triggerN8NAlert } from '../../services/n8nService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { toast } from 'sonner';
 
 export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const [classes, setClasses] = useState<any[]>([]);
@@ -142,7 +143,56 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
     if (!selectedClassId || classData.length === 0) return;
     setIsGeneratingPlan(true);
     try {
-      // 1. Fetch all questions to map questionId -> competency
+      const classDoc = classes.find(c => c.id === selectedClassId);
+      const studentIds = classDoc?.studentIds || [];
+      
+      if (studentIds.length === 0) {
+        toast.warning("A turma selecionada não possui alunos.");
+        setIsGeneratingPlan(false);
+        return;
+      }
+
+      // 1. Fetch submissions for these students
+      const submissionsSnap = await getDocs(query(collection(db, 'exam_submissions'), where('studentId', 'in', studentIds.slice(0, 30))));
+      const submissions = submissionsSnap.docs.map(doc => doc.data());
+
+      // 2. Fetch diagnostics for these students
+      const diagnosticsSnap = await getDocs(query(collection(db, 'diagnostics'), where('userId', 'in', studentIds.slice(0, 30))));
+      const diagnostics = diagnosticsSnap.docs.map(doc => doc.data());
+
+      // 3. Fetch cognitive analyses for these students
+      const cognitiveSnap = await getDocs(query(collection(db, 'cognitive_error_analyses'), where('userId', 'in', studentIds.slice(0, 30))));
+      const cognitiveAnalyses = cognitiveSnap.docs.map(doc => doc.data());
+
+      // 4. Aggregate performance by competency from submissions and diagnostics
+      const competencyStats: Record<string, { correct: number, total: number, errors: Set<string> }> = {};
+      
+      // From submissions
+      submissions.forEach(sub => {
+        if (sub.competencyResults) {
+          Object.entries(sub.competencyResults).forEach(([comp, stats]: [string, any]) => {
+            if (!competencyStats[comp]) competencyStats[comp] = { correct: 0, total: 0, errors: new Set() };
+            competencyStats[comp].correct += stats.correct || 0;
+            competencyStats[comp].total += stats.total || 0;
+          });
+        }
+      });
+
+      // From diagnostics
+      diagnostics.forEach(diag => {
+        if (diag.result?.diagnostico_por_competencia) {
+          diag.result.diagnostico_por_competencia.forEach((comp: any) => {
+            if (!competencyStats[comp.competencia]) competencyStats[comp.competencia] = { correct: 0, total: 0, errors: new Set() };
+            competencyStats[comp.competencia].correct += comp.acertos || 0;
+            competencyStats[comp.competencia].total += comp.total_questoes || 0;
+            if (comp.conhecimentos_fracos) {
+              comp.conhecimentos_fracos.forEach((err: string) => competencyStats[comp.competencia].errors.add(err));
+            }
+          });
+        }
+      });
+
+      // From cognitive analyses
       const questionsSnapshot = await getDocs(collection(db, 'questions'));
       const questionMap: Record<string, string> = {};
       questionsSnapshot.docs.forEach(doc => {
@@ -150,47 +200,35 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
         if (q.competency) questionMap[doc.id] = q.competency;
       });
 
-      // 2. Fetch students in class
-      const classDoc = classes.find(c => c.id === selectedClassId);
-      const studentIds = classDoc?.studentIds || [];
-      
-      // 3. Fetch cognitive analyses for these students
-      let cognitiveAnalyses: any[] = [];
-      if (studentIds.length > 0) {
-        // Firestore 'in' query limit is 10 (or 30 in newer versions), but let's be safe
-        // If there are many students, we might need multiple queries
-        const snapshot = await getDocs(query(collection(db, 'cognitive_error_analyses'), where('userId', 'in', studentIds.slice(0, 30))));
-        cognitiveAnalyses = snapshot.docs.map(doc => doc.data());
-      }
-
-      // 4. Group errors by competency and prioritize critical ones
-      const errorsByCompetency: Record<string, { count: number, errors: Set<string> }> = {};
       cognitiveAnalyses.forEach(analysis => {
         if (analysis.errors && Array.isArray(analysis.errors)) {
           analysis.errors.forEach((err: any) => {
             const competency = questionMap[err.questionId] || 'Geral';
-            if (!errorsByCompetency[competency]) {
-              errorsByCompetency[competency] = { count: 0, errors: new Set() };
-            }
-            errorsByCompetency[competency].count++;
-            if (err.explanation) errorsByCompetency[competency].errors.add(err.explanation);
+            if (!competencyStats[competency]) competencyStats[competency] = { correct: 0, total: 0, errors: new Set() };
+            if (err.explanation) competencyStats[competency].errors.add(err.explanation);
           });
         }
       });
 
-      // 5. Prioritize competencies with lowest average scores (from classData)
-      const criticalCompetencies = classData
-        .map(c => ({
-          competency: c.name,
-          avgScore: c.avg,
-          errorCount: errorsByCompetency[c.name]?.count || 0,
-          frequentErrors: Array.from(errorsByCompetency[c.name]?.errors || [])
+      // 5. Prioritize competencies with lowest average scores
+      const criticalCompetencies = Object.entries(competencyStats)
+        .map(([competency, stats]) => ({
+          competency,
+          avgScore: stats.total > 0 ? (stats.correct / stats.total) * 100 : 0,
+          frequentErrors: Array.from(stats.errors)
         }))
-        .sort((a, b) => a.avgScore - b.avgScore) // Sort by lowest score first
-        .slice(0, 3); // Take top 3 most critical
+        .sort((a, b) => a.avgScore - b.avgScore)
+        .slice(0, 3);
 
       // 6. Generate the plan using the AI service
-      const plan = await generateLessonPlan(criticalCompetencies, cognitiveAnalyses, selectedModel, userProfile?.role as any || 'professor');
+      const planData = {
+        totalStudents: studentIds.length,
+        criticalCompetencies,
+        submissionsCount: submissions.length,
+        diagnosticsCount: diagnostics.length
+      };
+
+      const plan = await generateLessonPlan(planData, cognitiveAnalyses, selectedModel, userProfile?.role as any || 'professor');
       setLessonPlan(plan);
       
       // 7. Save to Firestore
@@ -210,9 +248,12 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
           turma_id: selectedClassId,
           ...plan
         });
+        
+        toast.success("Plano de aula gerado com sucesso!");
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'lesson_plans');
+      toast.error("Erro ao gerar plano de aula.");
     } finally {
       setIsGeneratingPlan(false);
     }
