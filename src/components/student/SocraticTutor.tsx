@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Send, Loader2, X, HelpCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
+import { Send, Loader2, X, Sparkles } from 'lucide-react';
 import { db, auth } from '../../firebase';
-import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { GoogleGenAI } from "@google/genai";
+import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { generateContentWrapper, DEFAULT_CONFIG, getSystemInstruction } from '../../services/geminiService';
 import Markdown from 'react-markdown';

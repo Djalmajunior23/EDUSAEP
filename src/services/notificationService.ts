@@ -1,6 +1,7 @@
 import { collection, addDoc, query, where, onSnapshot, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from './errorService';
+import { n8nEvents } from './n8nService';
 
 export interface AppNotification {
   id: string;
@@ -25,6 +26,14 @@ export const notificationService = {
         link,
         createdAt: serverTimestamp()
       });
+
+      // Trigger n8n automation
+      await n8nEvents.notificationCreated({
+        userId,
+        title,
+        message,
+        type
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'notifications');
     }
@@ -40,7 +49,7 @@ export const notificationService = {
     }
   },
 
-  async markAllAsRead(userId: string, notifications: AppNotification[]) {
+  async markAllAsRead(_userId: string, notifications: AppNotification[]) {
     try {
       const unread = notifications.filter(n => !n.read);
       await Promise.all(unread.map(n => 

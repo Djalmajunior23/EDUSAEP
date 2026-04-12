@@ -1,6 +1,8 @@
 import { Simulado } from "../../modules/simulados/types";
 import { FormProvider, FormCreationResult, FormResponse } from "./FormProvider";
 
+import { triggerN8NRequest } from "../../services/n8nService";
+
 export class N8nFormProvider implements FormProvider {
   private webhookUrl: string;
 
@@ -9,34 +11,23 @@ export class N8nFormProvider implements FormProvider {
   }
 
   async createForm(simulado: Simulado, questions: any[]): Promise<FormCreationResult> {
-    const response = await fetch(this.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const data = await triggerN8NRequest({
+      action: 'create_form',
+      simulado: {
+        id: simulado.id,
+        title: simulado.title,
+        description: simulado.description,
+        startDate: simulado.startDate,
+        endDate: simulado.endDate,
       },
-      body: JSON.stringify({
-        action: 'create_form',
-        simulado: {
-          id: simulado.id,
-          title: simulado.title,
-          description: simulado.description,
-          startDate: simulado.startDate,
-          endDate: simulado.endDate,
-        },
-        questions: questions.map(q => ({
-          id: q.id,
-          text: q.text,
-          options: q.options,
-          competency: q.competency,
-        })),
-      }),
-    });
+      questions: questions.map(q => ({
+        id: q.id,
+        text: q.text,
+        options: q.options,
+        competency: q.competency,
+      })),
+    }, 'forms');
 
-    if (!response.ok) {
-      throw new Error('Failed to create form via n8n');
-    }
-
-    const data = await response.json();
     return {
       externalFormId: data.externalFormId,
       publicUrl: data.publicUrl,
@@ -46,23 +37,12 @@ export class N8nFormProvider implements FormProvider {
   }
 
   async getResponses(formId: string, integrationToken: string): Promise<FormResponse[]> {
-    const response = await fetch(this.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'get_responses',
-        formId,
-        integrationToken,
-      }),
-    });
+    const data = await triggerN8NRequest({
+      action: 'get_responses',
+      formId,
+      integrationToken,
+    }, 'forms');
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch responses from n8n');
-    }
-
-    const data = await response.json();
     return data.responses.map((r: any) => ({
       ...r,
       submittedAt: new Date(r.submittedAt),
@@ -70,19 +50,9 @@ export class N8nFormProvider implements FormProvider {
   }
 
   async closeForm(formId: string): Promise<void> {
-    const response = await fetch(this.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'close_form',
-        formId,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to close form via n8n');
-    }
+    await triggerN8NRequest({
+      action: 'close_form',
+      formId,
+    }, 'forms');
   }
 }

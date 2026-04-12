@@ -1,10 +1,11 @@
 // src/components/admin/ClassesManagementView.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Class } from '../../types';
 import { Plus, Pencil, Trash2, X, Check, Search, Users } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
 
 export function ClassesManagementView() {
@@ -45,6 +46,14 @@ export function ClassesManagementView() {
         createdAt: serverTimestamp()
       };
       await addDoc(collection(db, 'classes'), newClass);
+      
+      // Trigger n8n automation
+      await n8nEvents.classCreated({
+        name: newClass.name,
+        period: newClass.period,
+        status: newClass.status
+      });
+
       toast.success('Turma criada com sucesso!');
       setIsCreating(false);
       setEditForm({});

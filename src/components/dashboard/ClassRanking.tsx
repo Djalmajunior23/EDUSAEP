@@ -1,5 +1,5 @@
 // src/components/dashboard/ClassRanking.tsx
-import React from 'react';
+// import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface RankingItem {

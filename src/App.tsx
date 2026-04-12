@@ -1,18 +1,17 @@
+import { SmartContentGenerator } from './components/common/SmartContentGenerator';
+import { SAEPItemGenerator } from './components/admin/SAEPItemGenerator';
 import { BIDashboardView } from './components/dashboard/BIDashboardView';
 import { DataImportView } from './components/admin/DataImportView';
 import { ClassesManagementView } from './components/admin/ClassesManagementView';
 import { DisciplinesManagementView } from './components/admin/DisciplinesManagementView';
 import { getClassCompetencyAverages } from './services/dashboardService';
-import React, { useState, useMemo, useEffect, Component, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
-import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from 'react-markdown';
-
 // Initialize Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 type AIProvider = 'gemini' | 'openai' | 'deepseek';
@@ -74,11 +73,10 @@ import {
   RotateCcw,
   Star,
   Brain,
+  BrainCircuit,
   Hexagon,
   Archive,
   ArchiveRestore,
-  Eye,
-  EyeOff,
   BarChart2
 } from 'lucide-react';
 import { 
@@ -94,15 +92,14 @@ import {
   Tooltip, 
   ResponsiveContainer, 
   Cell,
-  PieChart,
-  Pie,
   Legend,
   LabelList
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
+import { GoogleGenAI, Type } from "@google/genai";
 import { generateDiagnostic, generateSuggestions, DiagnosticResult, suggestCompetencies, generateRecoveryPlan, analyzeCognitiveErrors, parseQuestionsFromText, safeParseJson, generateContentWrapper, DEFAULT_CONFIG } from './services/geminiService';
-import { triggerN8NAlert } from './services/n8nService';
+import { n8nEvents, triggerN8NAlert, testWebhook } from './services/n8nService';
 import { getChatResponse, ChatMessage as GeminiChatMessage } from './services/chatService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -121,13 +118,11 @@ import { SimuladoForm } from './modules/simulados/types';
 import { simuladoService } from './modules/simulados/services/simuladoService';
 import { pdfExportService } from './modules/simulados/services/pdfExportService';
 import { NotificationBell } from './components/notifications/NotificationBell';
-import { initializeApp } from 'firebase/app';
 import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
 import { auth, db, googleProvider, firebaseConfig } from './firebase';
 import { 
   signInWithPopup, 
   signOut, 
-  onAuthStateChanged, 
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -166,238 +161,12 @@ import { ConsolidatedReportView } from './components/professor/ConsolidatedRepor
 import { handleFirestoreError, OperationType } from './services/errorService';
 
 
-async function updateXP(userId: string, amount: number) {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const data = userSnap.data();
-      const currentXP = data.xp || 0;
-      const currentLevel = data.level || 1;
-      const newXP = currentXP + amount;
-      
-      // Level logic: level up every 1000 XP
-      const newLevel = Math.floor(newXP / 1000) + 1;
-      
-      await updateDoc(userRef, {
-        xp: newXP,
-        level: newLevel
-      });
-      
-      if (newLevel > currentLevel) {
-        toast.success(`Parabéns! Você subiu para o nível ${newLevel}! 🚀`, {
-          icon: '🎉',
-          duration: 5000
-        });
-      }
-    }
-  } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
-  }
-}
+import { AdvancedDashboard } from './components/professor/AdvancedDashboard';
+import { generateStudentRecommendation, getLatestRecommendation, Recommendation } from './services/recommendationService';
+import { exportExamToGoogleForms } from './services/googleFormsService';
 
-function ItemGeneratorView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
-  const [competency, setCompetency] = useState('');
-  const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
-  const [localModel, setLocalModel] = useState(selectedModel || 'gemini-3-flash-preview');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
-
-  useEffect(() => {
-    if (selectedModel) {
-      setLocalModel(selectedModel);
-    }
-  }, [selectedModel]);
-
-  const handleFillExample = () => {
-    setCompetency('Introdução ao Desenvolvimento de Sistemas');
-    setDifficulty('médio');
-  };
-
-  const handleGenerate = async () => {
-    if (!competency.trim()) {
-      toast.error("Informe a competência para gerar a questão.");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const { generateSAEPQuestion } = await import('./services/geminiService');
-      const question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'professor');
-      setGeneratedQuestion(question);
-      toast.success("Questão gerada com sucesso!");
-    } catch (err: any) {
-      console.error("Erro ao gerar questão:", err);
-      toast.error(`Erro ao gerar questão: ${err.message || "Erro desconhecido"}`);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const saveToBank = async () => {
-    if (!generatedQuestion || !user) return;
-    try {
-      await addDoc(collection(db, 'questions'), {
-        ...generatedQuestion,
-        createdBy: user.uid,
-        createdAt: serverTimestamp()
-      });
-      toast.success("Questão salva no banco de questões!");
-      setGeneratedQuestion(null);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'questions');
-      toast.error("Erro ao salvar questão.");
-    }
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-600">
-            <Sparkles size={24} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold">Gerador de Itens SAEP (IA)</h2>
-            <p className="text-gray-500 text-sm">Crie questões inéditas seguindo a Matriz de Referência.</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência / Habilidade</label>
-              <button 
-                onClick={handleFillExample} 
-                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md"
-              >
-                Preencher Exemplo
-              </button>
-            </div>
-            <input 
-              type="text"
-              value={competency}
-              onChange={(e) => setCompetency(e.target.value)}
-              placeholder="Ex: Instalações Elétricas Prediais"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dificuldade</label>
-            <select 
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as any)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            >
-              <option value="fácil">Fácil</option>
-              <option value="médio">Médio</option>
-              <option value="difícil">Difícil</option>
-            </select>
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Modelo de IA</label>
-            <select 
-              value={localModel}
-              onChange={(e) => setLocalModel(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            >
-              <option value="gemini-3-flash-preview">Gemini 3 Flash (Rápido)</option>
-              <option value="gemini-3-pro-preview">Gemini 3 Pro (Avançado)</option>
-              <option value="deepseek-chat">DeepSeek Chat</option>
-              <option value="deepseek-reasoner">DeepSeek Reasoner</option>
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq)</option>
-            </select>
-          </div>
-        </div>
-
-        <button 
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-        >
-          {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
-          {isGenerating ? "Gerando Questão..." : "Gerar Questão Inédita"}
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {generatedQuestion && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100 space-y-6"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  {generatedQuestion.dificuldade}
-                </span>
-                <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  Bloom: {generatedQuestion.bloom}
-                </span>
-              </div>
-              <button 
-                onClick={() => setGeneratedQuestion(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-gray-900 leading-relaxed">
-                {generatedQuestion.enunciado}
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                {generatedQuestion.alternativas.map((opt: { id: string, texto: string }, idx: number) => (
-                  <div 
-                    key={opt.id}
-                    className={cn(
-                      "p-4 rounded-xl border transition-all text-sm",
-                      opt.id === generatedQuestion.respostaCorreta 
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-700 font-medium" 
-                        : "bg-gray-50 border-gray-100 text-gray-600"
-                    )}
-                  >
-                    <span className="font-bold mr-2">{opt.id})</span>
-                    {opt.texto}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-2">
-              <div className="flex items-center gap-2 text-blue-700">
-                <Info size={16} />
-                <p className="text-xs font-bold uppercase tracking-wider">Justificativa Pedagógica</p>
-              </div>
-              <p className="text-sm text-blue-800 leading-relaxed italic">
-                {generatedQuestion.comentarioGabarito}
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button 
-                onClick={saveToBank}
-                className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
-              >
-                <Database size={20} />
-                Salvar no Banco de Questões (Confirmar)
-              </button>
-              <button 
-                onClick={() => setGeneratedQuestion(null)}
-                className="px-8 py-4 bg-white text-gray-600 border-2 border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all"
-              >
-                Cancelar
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
+import { GoogleFormsExportView } from './components/professor/GoogleFormsExportView';
+import { RecommendationsView } from './components/student/RecommendationsView';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -632,7 +401,7 @@ interface ErrorBoundaryState {
 }
 
 // Error Boundary Component
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: any) {
@@ -754,7 +523,6 @@ function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, 
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    // if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} diagnósticos selecionados? Esta ação não pode ser desfeita.`)) return;
     toast.info(`Excluindo ${selectedIds.size} diagnósticos...`);
 
     try {
@@ -949,10 +717,7 @@ function HistoryView({ history, deleteDiagnostic, archiveDiagnostic, setResult, 
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          // if (window.confirm("Tem certeza que deseja excluir este diagnóstico?")) {
-                          if (true) {
-                            deleteDiagnostic(item.id);
-                          }
+                          deleteDiagnostic(item.id);
                         }}
                         className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-red-50"
                         title="Excluir"
@@ -1143,7 +908,7 @@ function ReportsView({ history }: { history: any[] }) {
       return acc;
     }, [] as typeof suggestions);
 
-    return uniqueSuggestions.sort((a, b) => a.type === 'variance' ? -1 : 1).slice(0, 4);
+    return uniqueSuggestions.sort((a, _b) => a.type === 'variance' ? -1 : 1).slice(0, 4);
   }, [history]);
 
   const chartData = useMemo(() => {
@@ -2268,7 +2033,7 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
   );
 }
 
-function AdaptiveExamView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
+function AdaptiveExamView({ user: _user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const { competency } = useParams();
   const navigate = useNavigate();
   return (
@@ -2287,7 +2052,7 @@ function AdaptiveExamView({ user, userProfile, selectedModel }: { user: User | n
   );
 }
 
-function StudentInsightsView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
+function StudentInsightsView({ user, userProfile: _userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   return (
     <div className="py-8">
       <StudentInsights studentId={user?.uid || ''} selectedModel={selectedModel} />
@@ -2328,7 +2093,7 @@ function SocraticTutorView({ userProfile, selectedModel }: { userProfile: UserPr
   );
 }
 
-function GamificationDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
+function GamificationDashboardView({ user: _user, userProfile: _userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   return (
     <div className="py-8">
       <Gamification />
@@ -2339,7 +2104,6 @@ function GamificationDashboardView({ user, userProfile }: { user: User | null, u
 function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2445,7 +2209,6 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const questionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
       setQuestions(questionsData);
-      setLoading(false);
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'questions');
     });
@@ -2580,7 +2343,6 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
   };
 
   const handleDeleteQuestion = async (id: string) => {
-    // if (!window.confirm("Excluir esta questão do banco?")) return;
     toast.info("Excluindo questão...");
     try {
       await deleteDoc(doc(db, 'questions', id));
@@ -2936,7 +2698,6 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
 
   return (
     <div className="space-y-6">
-      <ItemGeneratorView user={user} userProfile={userProfile} selectedModel={selectedModel} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Banco de Questões</h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -3634,7 +3395,7 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
         await updateDoc(doc(db, 'exams', currentExam.id), examData);
         toast.success(`${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} atualizado com sucesso!`);
       } else {
-        const docRef = await addDoc(collection(db, 'exams'), examData);
+        await addDoc(collection(db, 'exams'), examData);
         toast.success(`${currentExam.type === 'simulado' ? 'Simulado' : 'Exercício'} criado com sucesso!`);
         
         // Notify all students if published
@@ -4580,7 +4341,7 @@ function StudentExamsView({ user, userProfile, selectedModel }: { user: User | n
   const [forms, setForms] = useState<SimuladoForm[]>([]);
   const [loading, setLoading] = useState(true);
   const [takingExam, setTakingExam] = useState<Exam | null>(null);
-  const navigate = useNavigate();
+  // navigate was unused, removed.
 
   useEffect(() => {
     if (!user) return;
@@ -4767,7 +4528,6 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
   const [generating, setGenerating] = useState(false);
   const [generatingTips, setGeneratingTips] = useState(false);
   const [generatingRefined, setGeneratingRefined] = useState(false);
-  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
@@ -4875,12 +4635,6 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const toggleTask = (taskId: string) => {
-    setCompletedTasks(prev => 
-      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-    );
   };
 
   const generateRecommendations = async () => {
@@ -5109,11 +4863,13 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
       await addDoc(collection(db, 'study_plans'), newPlan);
       
       // Disparar n8n para gerar recomendações de conteúdo externo
-      await triggerN8NAlert(userProfile?.settings?.webhookUrl || null, 'RecomendacaoPedagogica', {
+      await n8nEvents.pedagogicalRecommendation({
         userId: user.uid,
-        competency: weaknesses.join(', '),
-        weaknesses,
-        priorityTopics: newPlan.priorityTopics
+        recommendation: {
+          competency: weaknesses.join(', '),
+          weaknesses,
+          priorityTopics: newPlan.priorityTopics
+        }
       });
 
       toast.success("Plano de estudos adaptativo gerado com sucesso!");
@@ -5527,6 +5283,14 @@ function ExamTakingView({ exam, user, userProfile, onCancel, selectedModel }: { 
 
       const docRef = await addDoc(collection(db, 'exam_submissions'), submission);
       
+      // Trigger n8n automation
+      await n8nEvents.examCompleted({
+        studentId: user?.uid || '',
+        examId: exam.id,
+        score,
+        proficiency: (score / maxScore) * 100
+      });
+      
       // Cognitive Error Analysis Trigger
       if (score < maxScore) {
         // Run analysis in background
@@ -5834,6 +5598,8 @@ function ExamTakingView({ exam, user, userProfile, onCancel, selectedModel }: { 
   );
 }
 
+// GamificationView was unused, removed.
+/*
 function GamificationView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'results'>('menu');
   const [score, setScore] = useState(0);
@@ -6137,7 +5903,10 @@ function GamificationView({ user, userProfile }: { user: User | null, userProfil
     </motion.div>
   );
 }
+*/
 
+// BIAnalysisView was unused, removed.
+/*
 function BIAnalysisView({ user, selectedModel }: { user: User | null, selectedModel: string }) {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -6383,6 +6152,7 @@ Quando os dados forem poucos, incompletos ou inconsistentes, deixe isso explíci
     </motion.div>
   );
 }
+*/
 
 function AdminUsersView({ user }: { user: User | null }) {
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -6427,7 +6197,7 @@ function AdminUsersView({ user }: { user: User | null }) {
     let secondaryApp;
     try {
       // Initialize a secondary app to create the user without signing out the admin
-      const { getApps, initializeApp, deleteApp } = await import('firebase/app');
+      const { getApps, initializeApp } = await import('firebase/app');
       const apps = getApps();
       secondaryApp = apps.find(app => app.name === "SecondaryApp") || initializeApp(firebaseConfig, "SecondaryApp");
       const secondaryAuth = getSecondaryAuth(secondaryApp);
@@ -7058,27 +6828,22 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
     fetchGlobalSettings();
   }, []);
 
-  const testWebhook = async (url: string, type: 'user' | 'global') => {
+  const handleTestWebhook = async (url: string, type: 'user' | 'global') => {
     if (!url) {
       toast.error('Informe uma URL para testar.');
       return;
     }
     setIsTesting(type);
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'webhook.test',
-          message: 'Este é um teste de integração do Plano de Estudos Automático.',
-          timestamp: new Date().toISOString(),
-          user: user?.email
-        })
+      const success = await testWebhook(url, {
+        message: 'Este é um teste de integração do Plano de Estudos Automático.',
+        user: user?.email
       });
-      if (response.ok) {
+      
+      if (success) {
         toast.success('Webhook testado com sucesso!');
       } else {
-        toast.error(`Erro no teste: ${response.status} ${response.statusText}`);
+        toast.error('Erro no teste do webhook. Verifique os logs do n8n.');
       }
     } catch (err) {
       toast.error('Erro ao conectar com o webhook. Verifique a URL e o CORS.');
@@ -7220,7 +6985,7 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
                   />
                 </div>
                 <button
-                  onClick={() => testWebhook(webhookUrl, 'user')}
+                  onClick={() => handleTestWebhook(webhookUrl, 'user')}
                   disabled={isTesting === 'user' || !webhookUrl}
                   className="px-4 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 font-bold text-xs hover:bg-emerald-100 transition-all disabled:opacity-50"
                 >
@@ -7251,7 +7016,7 @@ function ProfileView({ user, profile }: { user: User | null, profile: UserProfil
                     />
                   </div>
                   <button
-                    onClick={() => testWebhook(globalWebhookUrl, 'global')}
+                    onClick={() => handleTestWebhook(globalWebhookUrl, 'global')}
                     disabled={isTesting === 'global' || !globalWebhookUrl}
                     className="px-4 bg-purple-100 text-purple-700 rounded-xl border border-purple-200 font-bold text-xs hover:bg-purple-200 transition-all disabled:opacity-50"
                   >
@@ -9465,7 +9230,7 @@ export default function App() {
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, userProfile, isAuthReady, loginWithGoogle, logout } = useAuth();
+  const { user, userProfile, isAuthReady } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticResult | null>(null);
@@ -9481,7 +9246,6 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
   const [aiProvider, setAiProvider] = useState<AIProvider>(() => {
     return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
@@ -9584,10 +9348,12 @@ function AppContent() {
         { id: 'student-exams', label: 'Simulados', icon: BookOpen, path: '/student-exams', description: 'Diagnóstico e Avaliação' },
         { id: 'exercises', label: 'Exercícios', icon: CheckSquare, path: '/exercises', description: 'Prática e Aprendizado' },
         { type: 'header', label: 'Suporte IA' },
+        { id: 'smart-content', label: 'Gerador IA', icon: Sparkles, path: '/smart-content', description: 'Conteúdo Personalizado' },
         { id: 'study-plan', label: 'Plano IA', icon: Zap, path: '/study-plan' },
         { id: 'chat', label: 'Assistente IA', icon: MessageSquare, path: '/chat' },
         { type: 'header', label: 'Outros' },
         { id: 'history', label: 'Histórico', icon: History, path: '/history' },
+        { id: 'recommendations', label: 'Recomendações IA', icon: Target, path: '/recommendations' },
         { id: 'plan', label: 'Meu Plano', icon: Calendar, disabled: !result, path: '/plan' },
         { id: 'profile', label: 'Perfil', icon: UserIcon, path: '/profile' },
       ];
@@ -9602,6 +9368,7 @@ function AppContent() {
       { type: 'header', label: 'Painel Principal' },
       { id: 'dashboard', label: 'Painel do Professor', icon: LayoutDashboard, path: '/dashboard' },
       { id: 'bi-analysis', label: 'Análise BI', icon: TrendingUp, path: '/bi-analysis', description: 'Insights da Turma' },
+      { id: 'advanced-dashboard', label: 'Dashboard Power BI', icon: BarChart2, path: '/advanced-dashboard', description: 'Visão Executiva' },
       
       { type: 'header', label: 'Gestão de Dados' },
       { id: 'data-import', label: 'Importação n8n', icon: Database, path: '/data-import', description: 'Integração SIAC' },
@@ -9614,13 +9381,16 @@ function AppContent() {
       { type: 'header', label: 'Gestão Pedagógica' },
       { id: 'classes', label: 'Turmas', icon: Users, path: '/classes' },
       { id: 'disciplines', label: 'Disciplinas', icon: BookOpen, path: '/disciplines' },
+      { id: 'generate-questions', label: 'Gerar Questões IA', icon: BrainCircuit, path: '/generate-questions', description: 'Criação SAEP' },
       { id: 'questions-bank', label: 'Banco de Questões', icon: Database, path: '/questions-bank' },
       { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Avaliação Formal' },
+      { id: 'google-forms-export', label: 'Exportar Google Forms', icon: Share2, path: '/google-forms-export', description: 'Integração Externa' },
       { id: 'exercises-management', label: 'Exercícios', icon: CheckSquare, path: '/exercises-management', description: 'Prática Dirigida' },
       
       { type: 'header', label: 'Comunicação e Admin' },
       { id: 'chat', label: 'Chat IA', icon: MessageSquare, path: '/chat' },
       { id: 'admin-users', label: 'Gestão', icon: Users, path: '/admin-users' },
+      { id: 'smart-content', label: 'Gerador IA', icon: Sparkles, path: '/smart-content', description: 'Conteúdo Inteligente' },
       
       { type: 'header', label: 'Visão do Aluno' },
       { id: 'aluno', label: 'Detalhes', icon: UserCheck, disabled: !result, path: result && currentDiagnosticId ? `/aluno/${currentDiagnosticId}` : '/aluno' },
@@ -9718,20 +9488,6 @@ function AppContent() {
 
     return () => unsubscribe();
   }, [user, userProfile]);
-
-  // Global Settings Listener
-  useEffect(() => {
-    if (!isAuthReady || !user) return;
-    const docRef = doc(db, 'settings', 'global');
-    const unsubscribe = onSnapshot(docRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setGlobalSettings(snapshot.data());
-      }
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'settings/global');
-    });
-    return () => unsubscribe();
-  }, [isAuthReady, user]);
 
   // Test Connection
   useEffect(() => {
@@ -10054,21 +9810,12 @@ function AppContent() {
             });
             savedIds.push(docRef.id);
 
-            // Trigger Webhook if configured
-            const effectiveWebhookUrl = userProfile?.settings?.webhookUrl || globalSettings?.webhookUrl;
-            if (effectiveWebhookUrl) {
-              fetch(effectiveWebhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  event: 'diagnostic.created',
-                  diagnosticId: docRef.id,
-                  aluno: res.aluno,
-                  data: res,
-                  timestamp: new Date().toISOString()
-                })
-              }).catch(err => console.error("Webhook Error:", err));
-            }
+            // Trigger n8n automation
+            await n8nEvents.diagnosticCreated({
+              professorId: user.uid,
+              aluno: res.aluno,
+              result: res
+            });
           }
         } catch (err) {
           console.error(`Erro ao processar aluno ${name}:`, err);
@@ -10100,8 +9847,6 @@ function AppContent() {
       setLoading(false);
     }
   };
-
-  const COLORS = ['#10b981', '#f59e0b', '#ef4444']; // Emerald, Amber, Red
 
   const chartData = useMemo(() => {
     if (!result) return [];
@@ -10581,6 +10326,8 @@ function AppContent() {
               <Route path="/consolidated-report" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ConsolidatedReportRoute history={history} /></ProtectedRoute>} />
               <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/smart-content" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><SmartContentGenerator userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/generate-questions" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><SAEPItemGenerator user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div
@@ -10760,6 +10507,58 @@ function AppContent() {
             <Route path="/tasks" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <TasksView user={user} />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/advanced-dashboard" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <AdvancedDashboard 
+                  stats={{
+                    totalStudents: 42,
+                    totalExams: 156,
+                    averageScore: 0.68,
+                    successRate: 0.74,
+                    evolutionRate: 0.12,
+                    criticalCompetencies: ['Banco de Dados', 'Lógica de Programação']
+                  }}
+                  disciplinePerformance={[
+                    { name: 'Lógica', score: 75 },
+                    { name: 'Banco de Dados', score: 45 },
+                    { name: 'Redes', score: 62 },
+                    { name: 'Sistemas', score: 88 },
+                    { name: 'Segurança', score: 54 }
+                  ]}
+                  studentEvolution={[
+                    { date: 'Jan', score: 45 },
+                    { date: 'Fev', score: 52 },
+                    { date: 'Mar', score: 48 },
+                    { date: 'Abr', score: 61 },
+                    { date: 'Mai', score: 68 }
+                  ]}
+                  competencyDistribution={[
+                    { name: 'Técnica', value: 40 },
+                    { name: 'Analítica', value: 30 },
+                    { name: 'Sócio-emocional', value: 20 },
+                    { name: 'Gestão', value: 10 }
+                  ]}
+                  classComparison={[
+                    { name: 'Turma A', score: 72 },
+                    { name: 'Turma B', score: 65 },
+                    { name: 'Turma C', score: 78 }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/recommendations" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}>
+                <RecommendationsView user={user} userProfile={userProfile} />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/google-forms-export" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <GoogleFormsExportView user={user} userProfile={userProfile} />
               </ProtectedRoute>
             } />
 
@@ -11336,7 +11135,7 @@ function AppContent() {
               <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white">
                 <BarChart3 size={18} />
               </div>
-              <span className="font-bold tracking-tight">EduDiagnóstico</span>
+              <span className="font-bold tracking-tight">EDUSAEP</span>
             </div>
             <p className="text-sm text-gray-500 leading-relaxed">
               Transformando dados de avaliações em caminhos claros para o sucesso acadêmico através de inteligência artificial especializada.
@@ -11363,7 +11162,7 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">© 2024 EduDiagnóstico SAEP - Versão 1.0.0</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">© 2024 EDUSAEP - Versão 1.0.0</p>
           <div className="flex gap-6">
             <a href="#" className="text-xs text-gray-400 hover:text-emerald-600 transition-colors">Privacidade</a>
             <a href="#" className="text-xs text-gray-400 hover:text-emerald-600 transition-colors">Termos</a>

@@ -1,14 +1,14 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import { fileURLToPath } from "url";
+// import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import multer from "multer";
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const upload = multer({ storage: multer.memoryStorage() });
 
 async function startServer() {
   const app = express();
@@ -16,14 +16,137 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Helper to forward to n8n
+  const forwardToN8N = async (data: any, type: string) => {
+    const n8nUrl = process.env.N8N_WEBHOOK_URL;
+    if (!n8nUrl) {
+      console.warn(`[n8n] N8N_WEBHOOK_URL not configured. Skipping ${type}.`);
+      return { status: "skipped", reason: "no_url" };
+    }
+
+    try {
+      const response = await fetch(n8nUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...data,
+          workflow_type: type,
+          server_timestamp: new Date().toISOString()
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`n8n responded with ${response.status}`);
+      }
+
+      return await response.json().catch(() => ({ status: "ok" }));
+    } catch (error) {
+      console.error(`[n8n] Error forwarding ${type}:`, error);
+      throw error;
+    }
+  };
+
   // Initialize APIs
   const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const deepseek = process.env.DEEPSEEK_API_KEY ? new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com/v1' }) : null;
   const groq = process.env.GROQ_API_KEY ? new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' }) : null;
 
   // API routes go here
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // n8n Workflow Endpoints
+  app.post("/api/n8n/alerts", async (req, res) => {
+    try {
+      const result = await forwardToN8N(req.body, 'alert');
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/n8n/plans", async (req, res) => {
+    try {
+      const result = await forwardToN8N(req.body, 'plan');
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/n8n/import", upload.single('file'), async (req, res) => {
+    try {
+      const n8nUrl = process.env.N8N_WEBHOOK_URL;
+      if (!n8nUrl) {
+        return res.status(500).json({ error: "N8N_WEBHOOK_URL not configured" });
+      }
+
+      const formData = new FormData();
+      if (req.file) {
+        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        formData.append('file', blob, req.file.originalname);
+      }
+      
+      // Add other body fields
+      Object.keys(req.body).forEach(key => {
+        formData.append(key, req.body[key]);
+      });
+      formData.append('workflow_type', 'import');
+      formData.append('server_timestamp', new Date().toISOString());
+
+      const response = await fetch(n8nUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`n8n responded with ${response.status}`);
+      }
+
+      const result = await response.json().catch(() => ({ status: "ok" }));
+      res.json(result);
+    } catch (error: any) {
+      console.error("[n8n] Import Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/n8n/forms", async (req, res) => {
+    try {
+      const result = await forwardToN8N(req.body, 'forms');
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/n8n/test", async (req, res) => {
+    const { url, data } = req.body;
+    if (!url) return res.status(400).json({ error: "URL is required" });
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          workflow_type: 'test',
+          server_timestamp: new Date().toISOString()
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook responded with ${response.status}`);
+      }
+
+      const result = await response.json().catch(() => ({ status: "ok" }));
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Generic AI generation endpoint for OpenAI and DeepSeek
@@ -102,7 +225,7 @@ async function startServer() {
 
   // Webhook for external form responses (n8n integration)
   app.post("/api/webhooks/forms", async (req, res) => {
-    const { simuladoId, formId, responses, integrationToken } = req.body;
+    const { simuladoId, responses } = req.body;
     const authHeader = req.headers.authorization;
 
     // Simple token validation
@@ -122,10 +245,12 @@ async function startServer() {
 
   // Endpoint to trigger manual sync/import
   app.post("/api/simulados/sync", async (req, res) => {
-    const { formId, userId } = req.body;
-    // This could call the syncFormResponses logic if we had a server-side Firebase Admin setup.
-    // For now, we'll just acknowledge the request.
-    res.json({ status: "sync_triggered", formId });
+    try {
+      const result = await forwardToN8N(req.body, 'sync');
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Error logging endpoint for the frontend
@@ -145,7 +270,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

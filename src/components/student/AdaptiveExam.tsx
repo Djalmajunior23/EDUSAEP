@@ -1,21 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Brain, 
-  Target, 
-  Zap, 
   ChevronRight, 
   Loader2, 
   CheckCircle2, 
   XCircle,
   AlertCircle,
-  ArrowRight,
-  Trophy
+  ArrowRight
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getNextAdaptiveQuestion, SAEPQuestion } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { n8nEvents } from '../../services/n8nService';
 
 interface AdaptiveExamProps {
   examId: string;
@@ -163,6 +161,15 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
       });
 
       localStorage.removeItem(STORAGE_KEY);
+      
+      // Trigger n8n automation
+      await n8nEvents.examCompleted({
+        studentId: auth.currentUser.uid,
+        examId,
+        score,
+        proficiency
+      });
+
       onComplete(score);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'adaptive_sessions/exam_submissions');
@@ -230,7 +237,7 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
             </div>
 
             <div className="space-y-3 mb-8">
-              {currentQuestion.alternativas.map((option, idx) => (
+              {currentQuestion.alternativas.map((option) => (
                 <button
                   key={option.id}
                   onClick={() => !showFeedback && setSelectedOption(option.id)}

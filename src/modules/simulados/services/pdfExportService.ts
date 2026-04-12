@@ -178,7 +178,7 @@ export const pdfExportService = {
         backgroundColor: '#FFFFFF',
         scrollX: 0,
         scrollY: 0,
-        onclone: (clonedDoc, clonedElement) => {
+        onclone: (_clonedDoc, clonedElement) => {
           // Fix for SVGs in html2canvas
           const svgs = clonedElement.querySelectorAll('svg');
           svgs.forEach(svg => {

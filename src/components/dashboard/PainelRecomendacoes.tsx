@@ -1,8 +1,8 @@
 // src/components/dashboard/PainelRecomendacoes.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { AlertCircle, BookOpen, Target } from 'lucide-react';
+import { AlertCircle, Target } from 'lucide-react';
 
 export function PainelRecomendacoes() {
   const [recommendations, setRecommendations] = useState<any[]>([]);

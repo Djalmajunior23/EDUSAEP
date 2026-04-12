@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { DiagnosticResult, generateContentWrapper } from "./geminiService";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 export interface ChatMessage {
   role: "user" | "model";
@@ -24,13 +24,6 @@ DIRETRIZES:
 3. Dê dicas práticas de estudo baseadas nas competências críticas identificadas.
 4. Se o usuário perguntar algo fora do contexto educacional, gentilmente redirecione para o foco pedagógico.
 5. Use Markdown para formatar suas respostas (negrito, listas, etc).`;
-
-  const chat = ai.chats.create({
-    model: "gemini-3-flash-preview",
-    config: {
-      systemInstruction,
-    },
-  });
 
   // We only send the last message to the model for simplicity in this stateless wrapper,
   // but we could send the full history if needed.

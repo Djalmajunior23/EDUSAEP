@@ -8,9 +8,7 @@ import {
   query, 
   where, 
   serverTimestamp, 
-  Timestamp,
-  orderBy,
-  limit
+  Timestamp
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { 
@@ -18,8 +16,6 @@ import {
   SimuladoForm, 
   ImportedResponse, 
   ResponseItem, 
-  ImportLog, 
-  ImportInconsistency,
   Question
 } from "../types";
 import { N8nFormProvider } from "../../../integrations/forms/N8nFormProvider";
@@ -344,7 +340,7 @@ export const simuladoService = {
     }
   },
 
-  async findStudent(matricula: string, email: string, nome: string, turma: string): Promise<string | null> {
+  async findStudent(matricula: string, email: string, nome: string, _turma: string): Promise<string | null> {
     try {
       // Search by matricula
       if (matricula) {

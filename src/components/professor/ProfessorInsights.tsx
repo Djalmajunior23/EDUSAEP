@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Users, 
   BarChart3, 
-  FileText, 
   Sparkles, 
   AlertCircle, 
   CheckCircle2, 
-  ChevronRight, 
-  Plus,
   Loader2,
   TrendingUp,
-  Target,
-  BookOpen,
   Zap,
   X,
   ArrowRight,
@@ -26,14 +20,13 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Cell,
-  Legend
+  Cell
 } from 'recharts';
 import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '../../services/geminiService';
 import { UserProfile } from '../../types';
-import { triggerN8NAlert } from '../../services/n8nService';
+import { n8nEvents } from '../../services/n8nService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
 
@@ -83,6 +76,13 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
           ...result,
           status: 'disparada',
           createdAt: serverTimestamp()
+        });
+
+        // Trigger n8n automation
+        await n8nEvents.sipaIntervention({
+          professorId: auth.currentUser.uid,
+          turmaId: selectedClassId,
+          intervention: result
         });
       }
     } catch (error) {
@@ -233,7 +233,7 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
       
       // 7. Save to Firestore
       if (auth.currentUser) {
-        const docRef = await addDoc(collection(db, 'lesson_plans'), {
+        await addDoc(collection(db, 'lesson_plans'), {
           userId: auth.currentUser.uid, // Matches blueprint
           professor_id: auth.currentUser.uid, // Keep for backward compatibility if any
           turma_id: selectedClassId,
@@ -242,11 +242,10 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
         });
         
         // 8. Trigger n8n integration
-        await triggerN8NAlert(null, 'PlanoAulaGerado', {
-          planId: docRef.id,
-          professor_id: auth.currentUser.uid,
-          turma_id: selectedClassId,
-          ...plan
+        await n8nEvents.lessonPlanGenerated({
+          professorId: auth.currentUser.uid,
+          turmaId: selectedClassId,
+          plan: plan
         });
         
         toast.success("Plano de aula gerado com sucesso!");

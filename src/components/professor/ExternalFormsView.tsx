@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   collection, 
   query, 
   where, 
   onSnapshot, 
-  getDocs,
   doc,
   getDoc
 } from 'firebase/firestore';
@@ -16,10 +15,8 @@ import {
   LayoutDashboard, 
   AlertCircle, 
   ExternalLink, 
-  RefreshCw,
   Loader2,
-  Search,
-  Filter
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';

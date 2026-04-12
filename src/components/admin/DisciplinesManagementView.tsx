@@ -1,10 +1,11 @@
 // src/components/admin/DisciplinesManagementView.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Discipline } from '../../types';
 import { Plus, Pencil, Trash2, X, Check, Search, BookOpen } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
 
 export function DisciplinesManagementView() {
@@ -64,6 +65,15 @@ export function DisciplinesManagementView() {
         createdAt: serverTimestamp()
       };
       await addDoc(collection(db, 'disciplines'), newDiscipline);
+      
+      // Trigger n8n automation
+      await n8nEvents.disciplineCreated({
+        name: newDiscipline.name,
+        code: newDiscipline.code,
+        area: newDiscipline.area,
+        status: newDiscipline.status
+      });
+
       toast.success('Disciplina criada com sucesso!');
       setIsCreating(false);
       setEditForm({});

@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { pdfExportService } from '../../modules/simulados/services/pdfExportService';
 import { 
   Target, 
-  Zap, 
   TrendingUp, 
   Brain, 
   Award, 
@@ -11,7 +10,6 @@ import {
   AlertCircle,
   ChevronRight,
   Sparkles,
-  BookOpen,
   FileText,
   Loader2
 } from 'lucide-react';
@@ -24,8 +22,6 @@ import {
   PolarAngleAxis, 
   PolarRadiusAxis, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -34,12 +30,11 @@ import {
   Area,
   BarChart,
   Bar,
-  Legend,
   Cell
 } from 'recharts';
-import { db, auth } from '../../firebase';
+import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
-import { classifyLearningProfile, predictPerformance } from '../../services/geminiService';
+import { classifyLearningProfile } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
 
@@ -542,7 +537,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
           {submissions.length === 0 ? (
             <p className="text-sm text-gray-500 pl-6">Nenhuma atividade registrada ainda.</p>
           ) : (
-            submissions.map((sub, idx) => (
+            submissions.map((sub) => (
               <div key={sub.id} className="relative pl-6">
                 <div className={cn(
                   "absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-900",

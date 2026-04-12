@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Question } from '../types';
 
@@ -84,7 +84,7 @@ export class QuestionService {
     }
   }
 
-  static async updateQuestion(questionId: string, questionData: Partial<Question>, userId: string, userRole: string): Promise<void> {
+  static async updateQuestion(questionId: string, questionData: Partial<Question>, _userId: string, userRole: string): Promise<void> {
     if (userRole !== 'admin' && userRole !== 'professor') {
       throw new Error("Permissão negada: Apenas professores e administradores podem editar questões.");
     }

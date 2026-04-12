@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   AlertCircle, 
   UserPlus, 
@@ -32,7 +32,6 @@ export function ImportInconsistencyManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [allStudents, setAllStudents] = useState<UserProfile[]>([]);
   const [students, setStudents] = useState<UserProfile[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedInconsistency, setSelectedInconsistency] = useState<string | null>(null);
 
   useEffect(() => {
@@ -224,10 +223,9 @@ export function ImportInconsistencyManager() {
                     </div>
                     <button 
                       onClick={handleSearchStudents}
-                      disabled={isSearching}
                       className="px-4 py-2 bg-gray-900 text-white rounded-lg font-bold hover:bg-gray-800 disabled:opacity-50"
                     >
-                      {isSearching ? <Loader2 className="animate-spin" size={18} /> : "Buscar"}
+                      Buscar
                     </button>
                   </div>
 
@@ -251,7 +249,7 @@ export function ImportInconsistencyManager() {
                         </button>
                       </div>
                     ))}
-                    {students.length === 0 && searchTerm && !isSearching && (
+                    {students.length === 0 && searchTerm && (
                       <p className="text-center text-sm text-gray-500 py-4">Nenhum aluno encontrado.</p>
                     )}
                   </div>

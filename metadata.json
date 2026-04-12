@@ -1,5 +1,5 @@
 {
-  "name": "EduDiagnóstico SAEP Pro",
-  "description": "Plataforma Full-Stack de diagnóstico educacional com backend Express, integração Gemini e tratamento robusto de erros.",
+  "name": "EDUSAEP - Solução Educacional com IA",
+  "description": "Plataforma completa para gestão pedagógica, diagnósticos SAEP, dashboards analíticos, recomendações de estudo e integração com n8n e Google Forms.",
   "requestFramePermissions": []
 }

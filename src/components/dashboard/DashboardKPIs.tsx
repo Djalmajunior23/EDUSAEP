@@ -1,5 +1,5 @@
 // src/components/dashboard/DashboardKPIs.tsx
-import React from 'react';
+// import React from 'react';
 
 export function DashboardKPIs({ data }: { data: any }) {
   return (

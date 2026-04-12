@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus, 
   RefreshCw, 
   ExternalLink, 
   Copy, 
   CheckCircle2, 
-  AlertCircle,
   Loader2,
   Calendar,
   Users
@@ -102,7 +101,7 @@ export function ExternalFormManager({ simuladoId, user, webhookUrl }: ExternalFo
 
     setIsSyncing(true);
     try {
-      const logId = await simuladoService.syncFormResponses(form.id, effectiveUrl, user.uid);
+      await simuladoService.syncFormResponses(form.id, effectiveUrl, user.uid);
       toast.success("Sincronização concluída!");
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `simulado_forms/${form.id}`);

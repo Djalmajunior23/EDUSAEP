@@ -1,5 +1,5 @@
 // src/components/dashboard/DashboardCharts.tsx
-import React from 'react';
+// import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend } from 'recharts';
 
 const CustomDot = (props: any) => {

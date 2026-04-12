@@ -1,9 +1,10 @@
 // src/components/admin/DataImportView.tsx
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
+import { n8nEvents } from '../../services/n8nService';
 
 export function DataImportView() {
   const [file, setFile] = useState<File | null>(null);
@@ -31,30 +32,12 @@ export function DataImportView() {
         observacoes: 'Aguardando processamento do n8n'
       });
 
-      // Simulating webhook call to n8n
-      // In a real scenario, this would be a fetch to your n8n webhook URL
-      const formData = new FormData();
-      formData.append('file', file);
+      // Trigger n8n automation
+      const success = await n8nEvents.fileImport(file);
       
-      let webhookUrl = '';
-      try {
-        const docRef = doc(db, 'settings', 'global');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().webhookUrl) {
-          webhookUrl = docSnap.data().webhookUrl;
-        }
-      } catch (err) {
-        console.error("[n8n] Erro ao buscar webhook global:", err);
+      if (!success) {
+        throw new Error("Falha ao enviar arquivo para o n8n. Verifique a configuração do Webhook.");
       }
-
-      if (!webhookUrl) {
-        throw new Error("URL do Webhook n8n não configurada nas configurações globais.");
-      }
-
-      await fetch(webhookUrl, {
-        method: 'POST',
-        body: formData
-      });
       
       setStatus('success');
     } catch (error) {

@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
   Trophy, 
   Star, 
   Zap, 
   Target, 
-  Shield, 
   Flame, 
-  Award, 
-  ChevronRight,
   TrendingUp,
   Users,
   Medal,
@@ -32,7 +29,6 @@ export function Gamification() {
 
   if (loading || !userProfile) return null;
 
-  const xpToNextLevel = (userProfile.level || 1) * 1000;
   const progress = ((userProfile.xp || 0) % 1000) / 10;
 
   const badges = [

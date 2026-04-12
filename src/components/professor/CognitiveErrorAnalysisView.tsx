@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Brain, AlertCircle, Loader2, BarChart3, Users, Filter, Search, FileText, Sparkles, Target, Send, BookOpen, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
+import { Brain, Loader2, BarChart3, Filter, FileText, Sparkles, Target, Send, BookOpen, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, getDocs, getDoc, where, updateDoc, doc } from 'firebase/firestore';
-import { analyzeCognitiveErrors, CognitiveErrorResult, generateRecoveryPlan, RecoveryPlanResult, generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
+import { analyzeCognitiveErrors, generateRecoveryPlan, RecoveryPlanResult, generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
 import { UserProfile } from '../../types';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
-import { triggerN8NAlert } from '../../services/n8nService';
+import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const [submissions, setSubmissions] = useState<any[]>([]);
@@ -20,7 +20,6 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlanResult | null>(null);
   const [lessonPlan, setLessonPlan] = useState<LessonPlanResult | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
-  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
@@ -212,7 +211,14 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
         createdAt: serverTimestamp()
       });
 
-      toast.success("Plano de recuperação gerado com sucesso!");
+      // Trigger n8n automation automatically
+      await n8nEvents.recoveryPlanGenerated({
+        studentId: selectedStudent,
+        submissionId: 'auto_generated',
+        plan: plan
+      });
+
+      toast.success("Plano de recuperação gerado e enviado ao n8n!");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'recovery_plans');
       toast.error("Erro ao gerar plano de recuperação.");
@@ -225,7 +231,11 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
     if (!recoveryPlan) return;
     
     try {
-      await triggerN8NAlert(null, 'PlanoRecuperacao', recoveryPlan);
+      await n8nEvents.recoveryPlanGenerated({
+        studentId: recoveryPlan.studentId,
+        submissionId: 'manual_trigger',
+        plan: recoveryPlan
+      });
       toast.success("Plano enviado para automação (n8n) com sucesso!");
     } catch (error) {
       toast.error("Erro ao notificar via n8n.");
@@ -262,7 +272,14 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
         createdAt: serverTimestamp()
       });
 
-      toast.success("Plano de aula gerado com sucesso!");
+      // Trigger n8n automation automatically
+      await n8nEvents.lessonPlanGenerated({
+        professorId: auth.currentUser?.uid || '',
+        turmaId: 'turma_geral', // Could be dynamic if turma selection is added
+        plan: plan
+      });
+
+      toast.success("Plano de aula gerado e enviado ao n8n!");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'lesson_plans');
       toast.error("Erro ao gerar plano de aula.");
@@ -416,7 +433,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {chartData.map((entry, index) => (
+                  {chartData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>

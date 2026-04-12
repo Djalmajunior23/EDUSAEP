@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Check, Trash2, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bell, Check, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { notificationService, AppNotification } from '../../services/notificationService';
 import { useNavigate } from 'react-router-dom';

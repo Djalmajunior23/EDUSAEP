@@ -1,0 +1,474 @@
+[
+  {
+    "name": "Workflow A — Geração de Questões",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "gerar-questoes",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 300]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "Gerar {{ $json.quantidade }} questões de múltipla escolha para a disciplina {{ $json.disciplina }} e competência {{ $json.competencia }} no nível {{ $json.nivel }}. Retornar em JSON estruturado com enunciado, alternativas, respostaCorreta e comentário pedagógico.",
+          "options": {}
+        },
+        "name": "Google Gemini",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [450, 300]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "collection": "questions",
+          "documentId": "={{ $json.id }}",
+          "data": "={{ $json }}"
+        },
+        "name": "Firebase",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [650, 300]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow B — Análise de Desempenho",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "analisar-desempenho",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 500]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "Analisar o desempenho do aluno {{ $json.nomeAluno }} na disciplina {{ $json.disciplina }}. Dados: {{ JSON.stringify($json.dados_desempenho) }}. Identificar pontos fortes, fracos e sugerir ações pedagógicas.",
+          "options": {}
+        },
+        "name": "AI Analysis",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [450, 500]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "collection": "analises",
+          "data": "={{ $json }}"
+        },
+        "name": "Save Analysis",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [650, 500]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow C — Plano de Estudo Automático",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "gerar-plano-estudo",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 700]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "Com base na análise de desempenho {{ JSON.stringify($json.analise) }}, gere um plano de estudo personalizado para o aluno. Inclua sequência sugerida, atividades e prioridades.",
+          "options": {}
+        },
+        "name": "AI Study Plan",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [450, 700]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "collection": "study_plans",
+          "data": "={{ $json }}"
+        },
+        "name": "Save Plan",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [650, 700]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow D — Exportação para Google Forms",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "exportar-google-forms",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 900]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "title": "={{ $json.titulo }}",
+          "description": "={{ $json.descricao }}",
+          "questions": "={{ $json.questoes }}"
+        },
+        "name": "Google Forms",
+        "type": "n8n-nodes-base.googleForms",
+        "typeVersion": 1,
+        "position": [450, 900]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "collection": "simulados",
+          "documentId": "={{ $json.simuladoId }}",
+          "data": "{ \"externalFormId\": \"{{ $json.formId }}\", \"publicUrl\": \"{{ $json.responderUrl }}\" }"
+        },
+        "name": "Update Simulado",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [650, 900]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow E — Simulado Concluído",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "simulado-concluido",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 1100]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "=Você é um tutor pedagógico da plataforma EDUSAEP. O aluno {{ $json.studentId }} concluiu o simulado {{ $json.examId }} com desempenho de {{ $json.score }} pontos (Proficiência: {{ $json.proficiency }}%).\n\nGere um feedback pedagógico inicial que seja:\n1. Motivacional (reconheça o esforço).\n2. Analítico (aponte áreas de melhoria com base na nota).\n3. Prático (sugira o próximo passo na trilha de aprendizagem).\n\nRetorne apenas o texto do feedback.",
+          "options": {}
+        },
+        "name": "Google Gemini - Feedback",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [450, 1100]
+      },
+      {
+        "parameters": {
+          "operation": "add",
+          "collection": "notifications",
+          "data": "={ \"userId\": \"{{ $node[\"Webhook\"].json[\"studentId\"] }}\", \"title\": \"Feedback do Simulado\", \"message\": \"{{ $json.text }}\", \"type\": \"info\", \"createdAt\": \"{{ new Date().toISOString() }}\", \"read\": false }"
+        },
+        "name": "Firebase - Salvar Notificação",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [650, 1100]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={ \"status\": \"success\", \"message\": \"Feedback gerado e enviado ao aluno.\" }"
+        },
+        "name": "Responder Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [850, 1100]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow F — Plano de Aula Gerado",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "plano-aula-gerado",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 1300]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "collection": "system_logs",
+          "data": "{ \"type\": \"LESSON_PLAN_GENERATED\", \"professorId\": \"{{ $json.professorId }}\", \"turmaId\": \"{{ $json.turmaId }}\", \"timestamp\": \"{{ new Date().toISOString() }}\" }"
+        },
+        "name": "Log Event",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [450, 1300]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow G — Recomendação Pedagógica",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "recomendacao-pedagogica",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 1500]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "collection": "notifications",
+          "data": "{ \"userId\": \"{{ $json.userId }}\", \"title\": \"Nova Recomendação IA\", \"message\": \"Temos novas sugestões de estudo para você baseadas no seu desempenho recente.\", \"type\": \"info\" }"
+        },
+        "name": "Notify Student",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [450, 1500]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow H — Plano de Recuperação",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "plano-recuperacao",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 1700]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "Gere um roteiro de recuperação para o aluno {{ $json.studentId }} com base no plano: {{ JSON.stringify($json.plan) }}.",
+          "options": {}
+        },
+        "name": "Refine Recovery",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [450, 1700]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow I — Criar Google Form",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "forms",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 1900]
+      },
+      {
+        "parameters": {
+          "resource": "form",
+          "operation": "create",
+          "title": "={{ $json.titulo }}",
+          "description": "={{ $json.descricao }}"
+        },
+        "name": "Create Form",
+        "type": "n8n-nodes-base.googleForms",
+        "typeVersion": 1,
+        "position": [450, 1900]
+      },
+      {
+        "parameters": {
+          "resource": "question",
+          "operation": "create",
+          "formId": "={{ $node[\"Create Form\"].json[\"formId\"] }}",
+          "questions": "={{ $json.questoes.map(q => ({ title: q.enunciado, type: 'MULTIPLE_CHOICE', choices: q.alternativas })) }}"
+        },
+        "name": "Add Questions",
+        "type": "n8n-nodes-base.googleForms",
+        "typeVersion": 1,
+        "position": [650, 1900]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={ \"formId\": \"{{ $node[\\\"Create Form\\\"].json[\\\"formId\\\"] }}\", \"publicUrl\": \"{{ $node[\\\"Create Form\\\"].json[\\\"responderUri\\\"] }}\" }"
+        },
+        "name": "Return Success",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [850, 1900]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "Workflow J — Sincronizar Respostas",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "sync",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 2100]
+      },
+      {
+        "parameters": {
+          "resource": "response",
+          "operation": "getAll",
+          "formId": "={{ $json.formId }}"
+        },
+        "name": "Get Responses",
+        "type": "n8n-nodes-base.googleForms",
+        "typeVersion": 1,
+        "position": [450, 2100]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.APP_URL }}/api/webhooks/forms",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "simuladoId",
+                "value": "={{ $node[\"Webhook\"].json[\"examId\"] }}"
+              },
+              {
+                "name": "responses",
+                "value": "={{ $json }}"
+              }
+            ]
+          }
+        },
+        "name": "Send to EDUSAEP",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [650, 2100]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "EduSAEP - Gerador de Questões",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "generate-questions",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 2300]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "=Gere 10 questões de múltipla escolha para a disciplina {{ $json.disciplina }}, competência {{ $json.competencia }} e nível de dificuldade {{ $json.dificuldade }}.\n\nCada questão deve seguir este formato JSON estritamente:\n{\n  \"id_unico\": \"(gere um UUID ou string aleatória única)\",\n  \"enunciado\": \"...\",\n  \"alternativas\": [\n    {\"id\": \"A\", \"texto\": \"...\"},\n    {\"id\": \"B\", \"texto\": \"...\"},\n    {\"id\": \"C\", \"texto\": \"...\"},\n    {\"id\": \"D\", \"texto\": \"...\"},\n    {\"id\": \"E\", \"texto\": \"...\"}\n  ],\n  \"respostaCorreta\": \"A\",\n  \"comentarioGabarito\": \"...\",\n  \"bloom\": \"...\",\n  \"disciplina\": \"{{ $json.disciplina }}\",\n  \"competency\": \"{{ $json.competencia }}\",\n  \"difficulty\": \"{{ $json.dificuldade }}\",\n  \"status\": \"rascunho\",\n  \"createdAt\": \"{{ new Date().toISOString() }}\"\n}\n\nRetorne APENAS um array JSON contendo as 10 questões.",
+          "options": {}
+        },
+        "name": "Gemini - Gerar Questões",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [450, 2300]
+      },
+      {
+        "parameters": {
+          "jsCode": "const questions = JSON.parse($node[\"Gemini - Gerar Questões\"].json[\"text\"]);\nreturn questions.map(q => ({ json: q }));"
+        },
+        "name": "Parse Questions",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [650, 2300]
+      },
+      {
+        "parameters": {
+          "operation": "add",
+          "collection": "questions",
+          "data": "={{ $json }}"
+        },
+        "name": "Firebase - Salvar Questão",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [850, 2300]
+      },
+      {
+        "parameters": {
+          "operation": "aggregateItems",
+          "aggregateBy": "all",
+          "include": "id"
+        },
+        "name": "Agrupar IDs",
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [1050, 2300]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={ \"status\": \"success\", \"createdIds\": \"{{ $json.id }}\" }"
+        },
+        "name": "Retornar IDs",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [1250, 2300]
+      }
+    ],
+    "connections": {}
+  }
+]

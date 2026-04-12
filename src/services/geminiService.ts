@@ -18,39 +18,61 @@ export function getSystemInstruction(profile: 'professor' | 'aluno', module: str
   const isBancoQuestoes = module === 'banco_questoes';
   const isSimulados = module === 'simulados';
   const isExportForms = module === 'exportacao_google_forms';
+  const isSmartContent = module === 'smart_content';
 
   return `
 ## 🎯 PAPEL DO MODELO
-Você é um assistente educacional especialista em ensino técnico profissional no padrão SENAI, focado em geração de questões, organização de banco avaliativo, simulados inteligentes e análise pedagógica.
+Você atuará como um **Especialista em Educação Profissional, Avaliação por Competências, BI Educacional e Inteligência Artificial aplicada ao ensino técnico**, com domínio do padrão SAEP (SENAI) e da Taxonomia de Bloom.
+Seu objetivo é analisar dados, gerar conteúdos educacionais inteligentes, personalizados e estruturados, e propor recomendações inteligentes para aprendizagem a partir de comandos recebidos.
+Você está integrado à plataforma educacional chamada **EDUSAEP**.
 
 ---
 
 ## 👤 PERFIL DO USUÁRIO
 perfil: ${profile}
-
----
-
-## 📚 MÓDULO DO SISTEMA
-modulo: ${module}
+Sua resposta deve se adaptar automaticamente ao perfil do usuário (Professores esperam profundidade técnica e insights de BI; Alunos esperam clareza didática e caminhos de aprendizagem).
 
 ---
 
 ## ⚙️ OBJETIVO
-Gerar conteúdo educacional de alta qualidade, com foco em:
-- questões pedagógicas bem elaboradas
-- compatibilidade com Firebase/Firestore
-- controle de duplicação
-- suporte a banco com 200+ questões por competência
-- sorteio inteligente para simulados com 40 questões
-- gabarito comentado automático
-- exportação estruturada para Google Forms
+Gerar conteúdo educacional de alta qualidade e análises de desempenho, com foco em:
+- questões pedagógicas bem elaboradas no padrão SAEP
+- planos de estudo personalizados baseados em dados de desempenho
+- explicações técnicas claras e contextualizadas
+- simulados inteligentes com balanceamento de competências
+- análise de BI educacional para professores
+- recomendações de estudo baseadas em lacunas de competência
+
+---
+
+## 📥 FORMATO DE ENTRADA (JSON)
+Você receberá um JSON com os seguintes campos:
+{
+  "tipo": "questoes | simulado | plano_estudo | explicacao | analise_desempenho",
+  "perfil": "${profile}",
+  "disciplina": "nome da disciplina",
+  "competencias": ["lista de competências"],
+  "nivel": "facil | medio | dificil",
+  "dados_desempenho": [
+    {
+      "competencia": "nome",
+      "acertos": number,
+      "erros": number
+    }
+  ],
+  "historico": {
+    "simulados_realizados": number,
+    "media_geral": number
+  },
+  "prompt": "instrução adicional"
+}
 
 ---
 
 ## 🚫 REGRAS POR PERFIL
 
-${isProfessor && isBancoQuestoes ? `
-### 👨‍🏫 REGRA CRÍTICA (PROFESSOR + BANCO DE QUESTÕES)
+${isProfessor && (isBancoQuestoes || isSmartContent) ? `
+### 👨‍🏫 REGRA CRÍTICA (PROFESSOR)
 - PRIORIDADE: QUALIDADE PEDAGÓGICA MÁXIMA.
 - NÃO simplificar enunciados excessivamente.
 - NÃO reduzir contexto da questão.
@@ -805,37 +827,16 @@ export async function analyzeCognitiveErrors(submissionData: any, questions: any
         role: "user",
         parts: [
           {
-            text: `Analise os erros cometidos pelo aluno nesta submissão e classifique-os por categoria cognitiva (Interpretação, Conceito, Atenção, Lógica).
-            
-            Para cada erro identificado:
-            1. Forneça uma explicação pedagógica profunda e detalhada sobre a falha cognitiva específica que levou ao erro. Não apenas descreva o erro, mas analise o processo de pensamento do aluno.
-            2. Forneça uma sugestão de intervenção prática, clara e acionável para o professor. A sugestão deve incluir atividades, perguntas de sondagem ou materiais de apoio específicos para superar essa dificuldade.
+            text: `Analise os erros cognitivos cometidos pelo aluno nesta submissão de simulado.
             
             DADOS DA SUBMISSÃO:
             ${JSON.stringify(submissionData)}
             
-            DETALHES DAS QUESTÕES:
-            ${JSON.stringify(questions.map(q => ({
-              id: q.id,
-              text: q.text,
-              options: q.options,
-              correctOption: q.correctOption,
-              competency: q.competency
-            })))}
+            QUESTÕES DO SIMULADO:
+            ${JSON.stringify(questions)}
             
-            RETORNE UM JSON COM:
-            {
-              "errors": [
-                {
-                  "questionId": string,
-                  "category": "Interpretação" | "Conceito" | "Atenção" | "Lógica",
-                  "explanation": "Resumo curto do erro",
-                  "explicacao_detalhada": "Análise pedagógica profunda do processo cognitivo (mínimo 2 frases)",
-                  "suggested_fix": "Como o aluno pode corrigir (curto)",
-                  "sugestao_intervencao": "Plano de ação detalhado para o professor (mínimo 2 frases)"
-                }
-              ]
-            }`
+            Classifique cada erro em: Interpretação, Conceito, Atenção ou Lógica.
+            Forneça uma explicação detalhada do erro e uma sugestão de intervenção pedagógica.`
           }
         ]
       }
@@ -847,7 +848,55 @@ export async function analyzeCognitiveErrors(submissionData: any, questions: any
     }
   });
 
-  return safeParseJson(response.text, {});
+  return safeParseJson(response.text, { errors: [] });
+}
+
+export interface SmartContentInput {
+  tipo: 'questoes' | 'simulado' | 'plano_estudo' | 'explicacao' | 'analise_desempenho';
+  perfil: 'professor' | 'aluno';
+  disciplina: string;
+  competencias: string[];
+  nivel: 'facil' | 'medio' | 'dificil';
+  dados_desempenho?: Array<{
+    competencia: string;
+    acertos: number;
+    erros: number;
+  }>;
+  historico?: {
+    simulados_realizados: number;
+    media_geral: number;
+  };
+  prompt: string;
+}
+
+/**
+ * Gera conteúdo educacional inteligente baseado no input estruturado.
+ */
+export async function generateSmartContent(input: SmartContentInput, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: JSON.stringify(input)
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction(input.perfil, 'smart_content'),
+      responseMimeType: input.tipo === 'questoes' || input.tipo === 'simulado' ? "application/json" : "text/plain",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  if (input.tipo === 'questoes' || input.tipo === 'simulado' || input.tipo === 'analise_desempenho') {
+    return safeParseJson(response.text);
+  }
+  
+  return response.text;
 }
 
 export interface RecoveryPlanResult {

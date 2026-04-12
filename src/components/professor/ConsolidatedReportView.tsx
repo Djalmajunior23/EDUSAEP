@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   BarChart, 
@@ -10,10 +10,9 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  Legend,
   Cell
 } from 'recharts';
-import { TrendingUp, TrendingDown, Target, Award, AlertTriangle, Users, BookOpen } from 'lucide-react';
+import { TrendingUp, Target, Award, AlertTriangle, Users, BookOpen } from 'lucide-react';
 
 interface ConsolidatedReportViewProps {
   history: any[];
