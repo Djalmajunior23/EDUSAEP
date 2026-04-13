@@ -5,13 +5,16 @@ import {
 } from 'recharts';
 import { 
   Users, FileText, Target, TrendingUp, AlertTriangle, CheckCircle, 
-  Filter, Calendar, BookOpen, GraduationCap, ArrowUpRight, ArrowDownRight
+  Filter, Calendar, BookOpen, GraduationCap, ArrowUpRight, ArrowDownRight, Sparkles
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { ProfessorInsights } from './ProfessorInsights';
+import { UserProfile } from '../../App';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 interface DashboardProps {
+  userProfile: UserProfile | null;
   stats: {
     totalStudents: number;
     totalExams: number;
@@ -26,7 +29,7 @@ interface DashboardProps {
   classComparison: any[];
 }
 
-export function AdvancedDashboard({ stats, disciplinePerformance, studentEvolution, competencyDistribution, classComparison }: DashboardProps) {
+export function AdvancedDashboard({ userProfile, stats, disciplinePerformance, studentEvolution, competencyDistribution, classComparison }: DashboardProps) {
   return (
     <div className="space-y-8 p-4 md:p-8 bg-gray-50/50 min-h-screen">
       {/* Header & Filters */}
@@ -45,6 +48,15 @@ export function AdvancedDashboard({ stats, disciplinePerformance, studentEvoluti
             Filtros Avançados
           </button>
         </div>
+      </div>
+
+      {/* AI Insights Panel */}
+      <div className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <Sparkles className="text-emerald-600" />
+          Insights Gerados por IA
+        </h2>
+        <ProfessorInsights userProfile={userProfile} />
       </div>
 
       {/* KPI Cards */}

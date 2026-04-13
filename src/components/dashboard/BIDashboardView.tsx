@@ -82,7 +82,7 @@ export function BIDashboardView() {
           <DashboardCharts data={data.charts} />
           <AggregatedBIView data={data.charts.performancePorDisciplina} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PainelInsightsIA />
+            <PainelInsightsIA data={data} />
             <PainelRecomendacoes />
           </div>
           <ClassRanking data={data.charts.ranking} />

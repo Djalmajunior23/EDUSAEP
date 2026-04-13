@@ -12,13 +12,15 @@ import {
   Line,
   Cell
 } from 'recharts';
-import { TrendingUp, Target, Award, AlertTriangle, Users, BookOpen } from 'lucide-react';
+import { TrendingUp, Target, Award, AlertTriangle, Users, BookOpen, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ConsolidatedReportViewProps {
   history: any[];
+  onReset: () => void;
 }
 
-export function ConsolidatedReportView({ history }: ConsolidatedReportViewProps) {
+export function ConsolidatedReportView({ history, onReset }: ConsolidatedReportViewProps) {
   const [timeframe, setTimeframe] = useState<'all' | '30d' | '7d'>('all');
 
   const filteredHistory = useMemo(() => {
@@ -47,9 +49,11 @@ export function ConsolidatedReportView({ history }: ConsolidatedReportViewProps)
     filteredHistory.forEach(diagnostic => {
       totalStudents.add(diagnostic.aluno);
       
-      if (diagnostic.summary?.acuracia_geral !== undefined) {
-        totalAccuracySum += diagnostic.summary.acuracia_geral;
-      }
+      // Handle data from different sources (diagnostics, submissions, forms)
+      const accuracy = diagnostic.summary?.acuracia_geral ?? 
+                       (diagnostic.score / diagnostic.maxScore) ?? 0;
+      
+      totalAccuracySum += accuracy;
 
       // Trend Data (Group by Date)
       const dateObj = diagnostic.createdAt?.seconds 
@@ -61,12 +65,18 @@ export function ConsolidatedReportView({ history }: ConsolidatedReportViewProps)
         if (!trendDataMap[dateStr]) {
           trendDataMap[dateStr] = { date: dateStr, accuracy: 0, count: 0 };
         }
-        trendDataMap[dateStr].accuracy += (diagnostic.summary?.acuracia_geral || 0);
+        trendDataMap[dateStr].accuracy += accuracy;
         trendDataMap[dateStr].count += 1;
       }
 
       // Competency Stats
-      diagnostic.diagnostico_por_competencia?.forEach((comp: any) => {
+      const competencies = diagnostic.diagnostico_por_competencia || 
+                           Object.entries(diagnostic.competencyResults || {}).map(([name, res]: any) => ({
+                             competencia: name,
+                             acuracia: res.correct / res.total
+                           }));
+
+      competencies.forEach((comp: any) => {
         if (!competencyStats[comp.competencia]) {
           competencyStats[comp.competencia] = { totalAccuracy: 0, count: 0 };
         }
@@ -91,7 +101,6 @@ export function ConsolidatedReportView({ history }: ConsolidatedReportViewProps)
         date: t.date,
         average: t.accuracy / t.count
       }))
-      // Simple sort by assuming DD/MM format and current year (could be improved for cross-year)
       .sort((a, b) => {
         const [dayA, monthA] = a.date.split('/');
         const [dayB, monthB] = b.date.split('/');
@@ -109,12 +118,17 @@ export function ConsolidatedReportView({ history }: ConsolidatedReportViewProps)
     };
   }, [filteredHistory]);
 
+  const handleReset = () => {
+    onReset();
+    toast.success("Análise reiniciada com sucesso.");
+  };
+
   if (!reportData) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
         <BookOpen size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
         <h3 className="text-xl font-bold text-gray-900 dark:text-white">Nenhum dado disponível</h3>
-        <p className="text-gray-500 dark:text-gray-400">Não há diagnósticos suficientes para gerar o relatório consolidado.</p>
+        <p className="text-gray-500 dark:text-gray-400">Não há dados suficientes para gerar o relatório consolidado.</p>
       </div>
     );
   }
@@ -130,15 +144,24 @@ export function ConsolidatedReportView({ history }: ConsolidatedReportViewProps)
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Relatório Consolidado</h2>
           <p className="text-gray-500 dark:text-gray-400">Visão geral do desempenho de todos os alunos.</p>
         </div>
-        <select
-          value={timeframe}
-          onChange={(e) => setTimeframe(e.target.value as any)}
-          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="all">Todo o Período</option>
-          <option value="30d">Últimos 30 dias</option>
-          <option value="7d">Últimos 7 dias</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+          >
+            <RefreshCw size={16} />
+            Reiniciar Análise
+          </button>
+          <select
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value as any)}
+            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="all">Todo o Período</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="7d">Últimos 7 dias</option>
+          </select>
+        </div>
       </div>
 
       {/* Overview Cards */}

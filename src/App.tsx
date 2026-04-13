@@ -2078,10 +2078,20 @@ function CognitiveAnalysisView({ userProfile, selectedModel }: { userProfile: Us
   );
 }
 
-function ConsolidatedReportRoute({ history }: { history: any[] }) {
+function ConsolidatedReportRoute({ history, examSubmissions, onReset }: { history: any[], examSubmissions: any[], onReset: () => void }) {
+  const combinedData = useMemo(() => {
+    const formattedSubmissions = examSubmissions.map(sub => ({
+      ...sub,
+      isSubmission: true,
+      createdAt: sub.completedAt,
+      aluno: sub.studentName || sub.studentId,
+    }));
+    return [...history, ...formattedSubmissions];
+  }, [history, examSubmissions]);
+
   return (
     <div className="py-8">
-      <ConsolidatedReportView history={history} />
+      <ConsolidatedReportView history={combinedData} onReset={onReset} />
     </div>
   );
 }
@@ -7195,7 +7205,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
         createdAt: serverTimestamp()
       });
 
-      // 5. Notify student
+      // 5. Notify student (Internal)
       const { notificationService } = await import('./services/notificationService');
       await notificationService.createNotification(
         studentId,
@@ -7205,7 +7215,24 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
         '/study-plan'
       );
 
-      toast.success("Plano de recuperação gerado e salvo com sucesso!");
+      // 6. Notify student (n8n - External)
+      try {
+        const studentDoc = await getDoc(doc(db, 'users', studentId));
+        const studentInfo = studentDoc.exists() ? studentDoc.data() : null;
+        
+        const { n8nEvents } = await import('./services/n8nService');
+        await n8nEvents.recoveryPlanGenerated({
+          studentId,
+          studentEmail: studentInfo?.email,
+          studentName: result.aluno,
+          submissionId: diagnosticId || 'diagnostic',
+          plan: plan
+        });
+      } catch (n8nErr) {
+        console.warn("Failed to trigger n8n notification:", n8nErr);
+      }
+
+      toast.success("Plano de recuperação gerado e enviado com sucesso!");
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'recovery_plans');
       toast.error("Erro ao gerar plano de recuperação.");
@@ -9248,6 +9275,7 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [examSubmissions, setExamSubmissions] = useState<any[]>([]);
   const [evolutionFilter, setEvolutionFilter] = useState<'7d' | '30d' | 'all'>('all');
   const [aiProvider, setAiProvider] = useState<AIProvider>(() => {
     return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
@@ -9284,6 +9312,11 @@ function AppContent() {
     }
     return false;
   });
+
+  const resetHistory = () => {
+    setHistory([]);
+    setExamSubmissions([]);
+  };
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -9484,6 +9517,42 @@ function AppContent() {
         ...doc.data()
       }));
       setHistory(docs);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, path);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  // Exam Submissions Listener
+  useEffect(() => {
+    if (!user || !userProfile) {
+      setExamSubmissions([]);
+      return;
+    }
+
+    const path = 'exam_submissions';
+    let q;
+    
+    if (userProfile.role === 'professor' || userProfile.role === 'admin') {
+      q = query(
+        collection(db, path),
+        orderBy('completedAt', 'desc')
+      );
+    } else {
+      q = query(
+        collection(db, path),
+        where('studentId', '==', user.uid),
+        orderBy('completedAt', 'desc')
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setExamSubmissions(docs);
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, path);
     });
@@ -10325,7 +10394,7 @@ function AppContent() {
               <Route path="/adaptive-exam/:competency" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><AdaptiveExamView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/student-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentInsightsView user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/professor-insights" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ProfessorInsightsView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
-              <Route path="/consolidated-report" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ConsolidatedReportRoute history={history} /></ProtectedRoute>} />
+              <Route path="/consolidated-report" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ConsolidatedReportRoute history={history} examSubmissions={examSubmissions} onReset={resetHistory} /></ProtectedRoute>} />
               <Route path="/cognitive-analysis" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><CognitiveAnalysisView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/smart-content" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><SmartContentGenerator userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
@@ -10515,6 +10584,7 @@ function AppContent() {
             <Route path="/advanced-dashboard" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <AdvancedDashboard 
+                  userProfile={userProfile}
                   stats={{
                     totalStudents: 42,
                     totalExams: 156,

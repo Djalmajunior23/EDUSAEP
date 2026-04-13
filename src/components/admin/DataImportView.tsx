@@ -1,15 +1,19 @@
 // src/components/admin/DataImportView.tsx
 import React, { useState } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download, Loader2 } from 'lucide-react';
 import { exportStudentsToCSV } from '../../services/exportService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
+import * as XLSX from 'xlsx';
+import { generatePedagogicalAnalysis } from '../../services/geminiService';
+import { toast } from 'sonner';
 
 export function DataImportView() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -22,28 +26,56 @@ export function DataImportView() {
     if (!file) return;
     
     setStatus('uploading');
+    setIsAnalyzing(true);
     
     try {
+      // Parse file locally
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
       // Save metadata to Firestore
-      await addDoc(collection(db, 'importacoes'), {
+      const importRef = await addDoc(collection(db, 'importacoes'), {
         origem: 'Upload Manual (SIAC)',
         arquivo_nome: file.name,
         data_importacao: serverTimestamp(),
         status: 'Processando',
-        observacoes: 'Aguardando processamento do n8n'
+        observacoes: 'Processando dados e gerando insights...'
       });
 
-      // Trigger n8n automation
-      const success = await n8nEvents.fileImport(file);
-      
-      if (!success) {
-        throw new Error("Falha ao enviar arquivo para o n8n. Verifique a configuração do Webhook.");
+      // Generate insights using Gemini
+      toast.info('Analisando dados do SIAC com IA...');
+      const analysis = await generatePedagogicalAnalysis({
+        source: 'SIAC_Import',
+        fileName: file.name,
+        data: jsonData.slice(0, 100) // Limit to first 100 rows to avoid huge payloads
+      });
+
+      // Save insights
+      await addDoc(collection(db, 'insights_ia'), {
+        tipo: 'analise_siac',
+        resumo: analysis.resumo_geral,
+        json_resposta: analysis,
+        data_geracao: serverTimestamp(),
+        importacao_id: importRef.id
+      });
+
+      // Also trigger n8n automation as fallback/additional processing
+      try {
+        await n8nEvents.fileImport(file);
+      } catch (e) {
+        console.warn("n8n webhook failed, but local analysis succeeded.", e);
       }
       
       setStatus('success');
+      toast.success('Planilha analisada e insights gerados com sucesso!');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'importacoes');
       setStatus('error');
+      toast.error('Erro ao processar a planilha.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -51,7 +83,7 @@ export function DataImportView() {
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Importação de Dados (SIAC)</h1>
-        <p className="text-gray-500 mt-2">Faça o upload de planilhas de notas ou dados do SIAC para processamento via n8n.</p>
+        <p className="text-gray-500 mt-2">Faça o upload de planilhas de notas ou dados do SIAC para análise inteligente.</p>
       </div>
 
       <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
@@ -80,11 +112,14 @@ export function DataImportView() {
           <div className="mt-6 flex justify-end">
             <button
               onClick={handleUpload}
-              disabled={status === 'uploading' || status === 'success'}
+              disabled={status === 'uploading' || status === 'success' || isAnalyzing}
               className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {status === 'uploading' ? (
-                <>Processando no n8n...</>
+              {isAnalyzing ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Analisando com IA...
+                </>
               ) : status === 'success' ? (
                 <>Enviado com Sucesso</>
               ) : (
@@ -101,8 +136,8 @@ export function DataImportView() {
           <div className="mt-6 p-4 bg-green-50 text-green-800 rounded-lg flex items-start gap-3 border border-green-200">
             <CheckCircle2 className="mt-0.5 flex-shrink-0" />
             <div>
-              <h4 className="font-bold">Arquivo enviado para o n8n!</h4>
-              <p className="text-sm mt-1">O fluxo de automação está processando os dados. Os insights e recomendações aparecerão no Dashboard em breve.</p>
+              <h4 className="font-bold">Análise Concluída!</h4>
+              <p className="text-sm mt-1">Os dados foram processados e os insights gerados pela IA já estão disponíveis no Dashboard de Inteligência Educacional.</p>
             </div>
           </div>
         )}
@@ -112,7 +147,7 @@ export function DataImportView() {
             <AlertCircle className="mt-0.5 flex-shrink-0" />
             <div>
               <h4 className="font-bold">Erro na importação</h4>
-              <p className="text-sm mt-1">Não foi possível conectar ao webhook do n8n. Verifique a configuração.</p>
+              <p className="text-sm mt-1">Ocorreu um erro ao processar a planilha ou gerar os insights.</p>
             </div>
           </div>
         )}
@@ -132,11 +167,11 @@ export function DataImportView() {
       <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
         <h3 className="font-bold text-gray-900 mb-2">Como funciona a integração?</h3>
         <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-          <li>O arquivo é enviado para um Webhook no n8n.</li>
-          <li>O n8n lê, limpa e padroniza as colunas (Nome, Disciplina, Nota).</li>
-          <li>Os dados são cruzados com a matriz de competências no Firestore.</li>
-          <li>A IA (Gemini) é acionada para gerar o diagnóstico da turma.</li>
-          <li>O Motor de Recomendação gera alertas para alunos em risco.</li>
+          <li>O arquivo é lido diretamente no navegador.</li>
+          <li>Os dados são enviados para a IA (Gemini) para análise pedagógica.</li>
+          <li>A IA gera insights, identifica alunos em risco e sugere planos de ação.</li>
+          <li>Os resultados são salvos e exibidos no Dashboard de Inteligência Educacional.</li>
+          <li>Uma cópia também é enviada ao n8n para fluxos de automação adicionais.</li>
         </ol>
       </div>
     </div>

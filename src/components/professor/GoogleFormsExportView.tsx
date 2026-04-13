@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 import { db } from '../../firebase';
 import { collection, query, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { exportExamToGoogleForms, syncFormResponses } from '../../services/googleFormsService';
@@ -11,12 +15,81 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 export function GoogleFormsExportView({ user, userProfile }: { user: any, userProfile: any }) {
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [formType, setFormType] = useState<'internal' | 'external'>('external');
+  const [importing, setImporting] = useState(false);
+  const [importedQuestions, setImportedQuestions] = useState<any[]>([]);
+
+  const handleImportQuestions = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    
+    try {
+      if (file.name.endsWith('.csv')) {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            setImportedQuestions(results.data);
+            setImporting(false);
+            toast.success(`${results.data.length} questões importadas!`);
+          }
+        });
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet);
+          setImportedQuestions(json);
+          setImporting(false);
+          toast.success(`${json.length} questões importadas!`);
+        };
+        reader.readAsBinaryString(file);
+      } else if (file.name.endsWith('.pdf')) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument({ data }).promise;
+          let text = '';
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map((item: any) => item.str).join(' ');
+          }
+          setImportedQuestions([{ enunciado: text }]);
+          setImporting(false);
+          toast.success(`Questões importadas do PDF!`);
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          const text = result.value;
+          setImportedQuestions([{ enunciado: text }]);
+          setImporting(false);
+          toast.success(`Questões importadas do documento!`);
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao importar arquivo.');
+      setImporting(false);
+    }
+  };
 
   useEffect(() => {
     const fetchExams = async () => {
@@ -36,14 +109,15 @@ export function GoogleFormsExportView({ user, userProfile }: { user: any, userPr
   const handleExport = async (exam: any) => {
     setExporting(exam.id);
     try {
-      const result = await exportExamToGoogleForms(exam.id, exam);
-      toast.success(`Simulado "${exam.title}" exportado com sucesso!`);
+      const result = await exportExamToGoogleForms(exam.id, { ...exam, formType });
+      toast.success(`Simulado "${exam.title}" exportado como ${formType === 'internal' ? 'interno' : 'externo'} com sucesso!`);
       
       // Refresh local state
       setExams(prev => prev.map(e => e.id === exam.id ? { 
         ...e, 
         publicUrl: result.publicUrl,
-        externalFormId: result.formId
+        externalFormId: result.formId,
+        formType: formType
       } : e));
     } catch (err) {
       toast.error('Erro ao exportar para Google Forms.');
@@ -81,6 +155,31 @@ export function GoogleFormsExportView({ user, userProfile }: { user: any, userPr
           <p className="text-gray-500 mt-1">Sincronize seus simulados SAEP com formulários externos via n8n.</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+            <button
+              onClick={() => setFormType('internal')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                formType === 'internal' ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Interno
+            </button>
+            <button
+              onClick={() => setFormType('external')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                formType === 'external' ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Externo
+            </button>
+          </div>
+          <label className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 cursor-pointer transition-all shadow-md">
+            {importing ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />}
+            Importar Questões
+            <input type="file" accept=".csv,.xlsx,.pdf,.docx,.doc" className="hidden" onChange={handleImportQuestions} />
+          </label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
@@ -107,6 +206,24 @@ export function GoogleFormsExportView({ user, userProfile }: { user: any, userPr
         </div>
       </div>
 
+      {/* Imported Questions Preview */}
+      {importedQuestions.length > 0 && (
+        <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 space-y-4">
+          <h3 className="text-xl font-bold text-gray-900">Questões Importadas ({importedQuestions.length})</h3>
+          <div className="max-h-96 overflow-y-auto space-y-4">
+            {importedQuestions.map((q, i) => (
+              <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-sm">
+                <p className="font-bold text-gray-900">{i + 1}. {q.enunciado || q.question || 'Sem enunciado'}</p>
+                <div className="mt-2 text-gray-600">
+                  {Object.entries(q).filter(([k]) => k.startsWith('alt')).map(([k, v]) => (
+                    <p key={k}>{k}: {v as string}</p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {loading ? (
         <div className="flex justify-center py-20">
           <Loader2 className="animate-spin text-emerald-600" size={40} />

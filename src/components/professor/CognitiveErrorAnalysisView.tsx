@@ -190,6 +190,10 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
 
     setGeneratingPlan(true);
     try {
+      // Fetch student info for n8n notification
+      const studentDoc = await getDoc(doc(db, 'users', selectedStudent));
+      const studentInfo = studentDoc.exists() ? studentDoc.data() : null;
+
       // Aggregate errors for the student
       const aggregatedErrors = studentAnalyses.reduce((acc, curr) => {
         return acc.concat(curr.errors || []);
@@ -197,6 +201,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
 
       const studentData = {
         studentId: selectedStudent,
+        studentName: studentInfo?.displayName || 'Aluno',
         totalErrors: aggregatedErrors.length,
         errors: aggregatedErrors
       };
@@ -207,6 +212,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
       // Save the plan to Firestore
       await addDoc(collection(db, 'recovery_plans'), {
         userId: selectedStudent,
+        studentName: studentInfo?.displayName || 'Aluno',
         ...plan,
         createdAt: serverTimestamp()
       });
@@ -214,6 +220,8 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
       // Trigger n8n automation automatically
       await n8nEvents.recoveryPlanGenerated({
         studentId: selectedStudent,
+        studentEmail: studentInfo?.email,
+        studentName: studentInfo?.displayName,
         submissionId: 'auto_generated',
         plan: plan
       });
@@ -231,8 +239,14 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
     if (!recoveryPlan) return;
     
     try {
+      // Fetch student info for n8n notification
+      const studentDoc = await getDoc(doc(db, 'users', recoveryPlan.studentId));
+      const studentInfo = studentDoc.exists() ? studentDoc.data() : null;
+
       await n8nEvents.recoveryPlanGenerated({
         studentId: recoveryPlan.studentId,
+        studentEmail: studentInfo?.email,
+        studentName: studentInfo?.displayName,
         submissionId: 'manual_trigger',
         plan: recoveryPlan
       });

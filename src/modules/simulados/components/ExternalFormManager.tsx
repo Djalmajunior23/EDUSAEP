@@ -7,7 +7,8 @@ import {
   CheckCircle2, 
   Loader2,
   Calendar,
-  Users
+  Users,
+  AlertCircle
 } from 'lucide-react';
 import { 
   collection, 
@@ -19,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { simuladoService } from '../services/simuladoService';
+import { testWebhook } from '../../../services/n8nService';
 import { SimuladoForm } from '../types';
 import { toast } from 'sonner';
 import { User } from 'firebase/auth';
@@ -35,6 +37,33 @@ export function ExternalFormManager({ simuladoId, user, webhookUrl }: ExternalFo
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const handleTestConnection = async () => {
+    const effectiveUrl = await getEffectiveWebhookUrl();
+    if (!effectiveUrl) {
+      toast.error("URL do Webhook n8n não configurada.");
+      return;
+    }
+    setIsTesting(true);
+    setTestStatus('idle');
+    try {
+      const success = await testWebhook(effectiveUrl, { action: 'test' });
+      if (success) {
+        setTestStatus('success');
+        toast.success("Conexão com Webhook bem-sucedida!");
+      } else {
+        setTestStatus('error');
+        toast.error("Falha ao conectar com Webhook.");
+      }
+    } catch (err) {
+      setTestStatus('error');
+      toast.error("Erro ao testar conexão.");
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   useEffect(() => {
     if (!simuladoId) return;
@@ -155,6 +184,20 @@ export function ExternalFormManager({ simuladoId, user, webhookUrl }: ExternalFo
           </div>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={handleTestConnection}
+            disabled={isTesting}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all flex items-center gap-2 text-sm font-bold"
+            title="Testar Conexão"
+          >
+            {isTesting ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+            Testar Conexão
+          </button>
+          {testStatus !== 'idle' && (
+            <div className="flex items-center gap-1 text-sm font-bold">
+              {testStatus === 'success' ? <CheckCircle2 size={18} className="text-emerald-600" /> : <AlertCircle size={18} className="text-red-600" />}
+            </div>
+          )}
           <button 
             onClick={handleSync}
             disabled={isSyncing}
