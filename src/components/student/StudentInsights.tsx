@@ -30,7 +30,10 @@ import {
   Area,
   BarChart,
   Bar,
-  Cell
+  Cell,
+  LineChart,
+  Line,
+  Legend
 } from 'recharts';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -366,54 +369,27 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
         >
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evolução de Desempenho</h3>
-              <p className="text-xs text-gray-500">Progresso nos últimos 10 simulados</p>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evolução por Competência</h3>
+              <p className="text-xs text-gray-500">Progresso histórico nas competências</p>
             </div>
             <TrendingUp className="text-blue-600" size={20} />
           </div>
 
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={[...submissions].reverse()}>
-                <defs>
-                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <LineChart data={submissions.slice().reverse().map(s => ({
+                date: s.completedAt?.seconds ? new Date(s.completedAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '---',
+                ...Object.fromEntries(Object.entries(s.competencyResults || {}).map(([k, v]: any) => [k, v.acuracia * 100]))
+              }))}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="completedAt" 
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  tickFormatter={(val) => new Date(val).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis 
-                  domain={[0, 100]} 
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: 'none', 
-                    borderRadius: '12px',
-                    color: '#fff',
-                    fontSize: '12px'
-                  }}
-                  itemStyle={{ color: '#3b82f6' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="score" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorScore)" 
-                />
-              </AreaChart>
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                {Object.keys(submissions[0]?.competencyResults || {}).map((key, i) => (
+                  <Line key={key} type="monotone" dataKey={key} stroke={`hsl(${i * 40}, 70%, 50%)`} strokeWidth={2} dot={{ r: 4 }} />
+                ))}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </motion.div>

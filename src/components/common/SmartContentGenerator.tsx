@@ -67,7 +67,7 @@ export function SmartContentGenerator({ userProfile, selectedModel }: SmartConte
             <Sparkles size={28} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold dark:text-white">Gerador Inteligente EDUSAEP</h2>
+            <h2 className="text-2xl font-bold dark:text-white">Gerador Inteligente JuniorsStudent</h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm">Crie conteúdos personalizados seguindo o padrão SAEP (SENAI).</p>
           </div>
         </div>

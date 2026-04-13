@@ -153,6 +153,7 @@ import {
 import { ExternalFormsView } from './components/professor/ExternalFormsView';
 import { SocraticTutor } from './components/student/SocraticTutor';
 import { StudentInsights } from './components/student/StudentInsights';
+import { StudentQuickActions } from './components/student/StudentQuickActions';
 import { AdaptiveExam } from './components/student/AdaptiveExam';
 import { Gamification } from './components/student/Gamification';
 import { ProfessorInsights } from './components/professor/ProfessorInsights';
@@ -2055,6 +2056,7 @@ function AdaptiveExamView({ user: _user, userProfile, selectedModel }: { user: U
 function StudentInsightsView({ user, userProfile: _userProfile, selectedModel }: { user: User | null, userProfile: UserProfile | null, selectedModel: string }) {
   return (
     <div className="py-8">
+      <StudentQuickActions />
       <StudentInsights studentId={user?.uid || ''} selectedModel={selectedModel} />
     </div>
   );
@@ -11135,7 +11137,7 @@ function AppContent() {
               <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white">
                 <BarChart3 size={18} />
               </div>
-              <span className="font-bold tracking-tight">EDUSAEP</span>
+              <span className="font-bold tracking-tight">JuniorsStudent</span>
             </div>
             <p className="text-sm text-gray-500 leading-relaxed">
               Transformando dados de avaliações em caminhos claros para o sucesso acadêmico através de inteligência artificial especializada.
@@ -11162,7 +11164,7 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">© 2024 EDUSAEP - Versão 1.0.0</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">© 2024 JuniorsStudent - Versão 1.0.0</p>
           <div className="flex gap-6">
             <a href="#" className="text-xs text-gray-400 hover:text-emerald-600 transition-colors">Privacidade</a>
             <a href="#" className="text-xs text-gray-400 hover:text-emerald-600 transition-colors">Termos</a>

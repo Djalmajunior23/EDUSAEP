@@ -100,7 +100,7 @@ export function GoogleFormsExportView({ user, userProfile }: { user: any, userPr
         <div>
           <h3 className="font-bold text-blue-900">Como funciona a integração?</h3>
           <p className="text-sm text-blue-700 mt-1 leading-relaxed">
-            Ao clicar em exportar, o EDUSAEP envia os dados do simulado para um workflow no n8n. 
+            Ao clicar em exportar, o JuniorsStudent envia os dados do simulado para um workflow no n8n. 
             O n8n cria automaticamente o formulário no Google Forms e retorna o link público. 
             Isso permite que você aplique a prova em qualquer lugar e receba os resultados de volta na plataforma.
           </p>

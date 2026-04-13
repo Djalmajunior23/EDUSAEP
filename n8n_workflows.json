@@ -175,7 +175,7 @@
       {
         "parameters": {
           "model": "gemini-pro",
-          "prompt": "=Você é um tutor pedagógico da plataforma EDUSAEP. O aluno {{ $json.studentId }} concluiu o simulado {{ $json.examId }} com desempenho de {{ $json.score }} pontos (Proficiência: {{ $json.proficiency }}%).\n\nGere um feedback pedagógico inicial que seja:\n1. Motivacional (reconheça o esforço).\n2. Analítico (aponte áreas de melhoria com base na nota).\n3. Prático (sugira o próximo passo na trilha de aprendizagem).\n\nRetorne apenas o texto do feedback.",
+          "prompt": "=Você é um tutor pedagógico da plataforma JuniorsStudent. O aluno {{ $json.studentId }} concluiu o simulado {{ $json.examId }} com desempenho de {{ $json.score }} pontos (Proficiência: {{ $json.proficiency }}%).\n\nGere um feedback pedagógico inicial que seja:\n1. Motivacional (reconheça o esforço).\n2. Analítico (aponte áreas de melhoria com base na nota).\n3. Prático (sugira o próximo passo na trilha de aprendizagem).\n\nRetorne apenas o texto do feedback.",
           "options": {}
         },
         "name": "Google Gemini - Feedback",
@@ -394,7 +394,7 @@
             ]
           }
         },
-        "name": "Send to EDUSAEP",
+        "name": "Send to JuniorsStudent",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.1,
         "position": [650, 2100]

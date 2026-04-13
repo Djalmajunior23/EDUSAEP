@@ -8,7 +8,7 @@ export const exportExamToGoogleForms = async (examId: string, examData: any, web
     const exportData = {
       simuladoId: examId,
       titulo: examData.title,
-      descricao: examData.description || 'Simulado SAEP gerado pelo EDUSAEP',
+      descricao: examData.description || 'Simulado SAEP gerado pelo JuniorsStudent',
       questoes: examData.questions.map((q: any) => ({
         enunciado: q.enunciado,
         alternativas: q.alternativas.map((a: any) => a.texto),
