@@ -470,5 +470,157 @@
       }
     ],
     "connections": {}
+  },
+  {
+    "name": "EduSAEP - Relatório Semanal",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "weeks",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        },
+        "name": "Cron",
+        "type": "n8n-nodes-base.cron",
+        "typeVersion": 1,
+        "position": [250, 2500]
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "collection": "exam_submissions"
+        },
+        "name": "Get Submissions",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [450, 2500]
+      },
+      {
+        "parameters": {
+          "model": "gemini-pro",
+          "prompt": "=Analise os dados de desempenho da semana: {{ JSON.stringify($json) }}. Gere um resumo executivo para os professores.",
+          "options": {}
+        },
+        "name": "Gemini - Resumo",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [650, 2500]
+      },
+      {
+        "parameters": {
+          "resource": "message",
+          "sendTo": "professores@edusaep.com",
+          "subject": "Relatório Semanal de Desempenho",
+          "text": "={{ $json.text }}"
+        },
+        "name": "Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 1,
+        "position": [850, 2500]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "EduSAEP - Alerta Evasão",
+    "nodes": [
+      {
+        "parameters": {
+          "operation": "create",
+          "collection": "exam_submissions"
+        },
+        "name": "Firebase Trigger",
+        "type": "n8n-nodes-base.firebaseTrigger",
+        "typeVersion": 1,
+        "position": [250, 2700]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{ $json.score }}",
+                "value2": 50,
+                "operation": "smaller"
+              }
+            ]
+          }
+        },
+        "name": "Check Score",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [450, 2700]
+      },
+      {
+        "parameters": {
+          "resource": "message",
+          "sendTo": "={{ $json.professorEmail }}",
+          "subject": "Alerta: Aluno em Risco",
+          "text": "=O aluno {{ $json.studentName }} teve desempenho crítico: {{ $json.score }}."
+        },
+        "name": "Email Alerta",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 1,
+        "position": [650, 2700]
+      }
+    ],
+    "connections": {}
+  },
+  {
+    "name": "EduSAEP - Agendamento Simulado",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "days",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        },
+        "name": "Cron",
+        "type": "n8n-nodes-base.cron",
+        "typeVersion": 1,
+        "position": [250, 2900]
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "collection": "turmas"
+        },
+        "name": "Get Turmas",
+        "type": "n8n-nodes-base.firebase",
+        "typeVersion": 1,
+        "position": [450, 2900]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.APP_URL }}/api/n8n/forms",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "titulo",
+                "value": "=Simulado automático - {{ $json.nome }}"
+              }
+            ]
+          }
+        },
+        "name": "Trigger Form Creation",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [650, 2900]
+      }
+    ],
+    "connections": {}
   }
 ]
+

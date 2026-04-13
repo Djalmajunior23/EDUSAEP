@@ -1,6 +1,7 @@
 // src/components/admin/DataImportView.tsx
 import React, { useState } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { exportStudentsToCSV } from '../../services/exportService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
@@ -115,6 +116,17 @@ export function DataImportView() {
             </div>
           </div>
         )}
+      </div>
+      
+      <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Gerenciamento de Alunos</h3>
+        <button
+          onClick={exportStudentsToCSV}
+          className="flex items-center gap-2 bg-white text-gray-700 px-6 py-3 rounded-lg font-medium border border-gray-300 hover:bg-gray-50 transition-colors"
+        >
+          <Download size={20} />
+          Exportar Lista de Alunos (CSV)
+        </button>
       </div>
       
       <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">

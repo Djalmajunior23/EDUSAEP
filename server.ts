@@ -1,7 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-// import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import multer from "multer";
@@ -56,6 +55,22 @@ async function startServer() {
   // API routes go here
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Endpoint for question generation
+  app.post("/api/n8n/generate-questions", async (req, res) => {
+    try {
+      const n8nUrl = "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/gerar-questoes";
+      const response = await fetch(n8nUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // n8n Workflow Endpoints
