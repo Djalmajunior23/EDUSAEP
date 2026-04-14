@@ -269,6 +269,31 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
                 Salvar no Banco de Questões
               </button>
               <button 
+                onClick={async () => {
+                  setIsGenerating(true);
+                  try {
+                    const { exportQuestionsToGoogleForms } = await import('../../services/googleFormsService');
+                    const result = await exportQuestionsToGoogleForms(
+                      `Questão Inédita: ${generatedQuestion.temaNome}`,
+                      [generatedQuestion]
+                    );
+                    if (result.publicUrl) {
+                      window.open(result.publicUrl, '_blank');
+                      toast.success("Formulário criado com sucesso!");
+                    }
+                  } catch (e) {
+                    toast.error("Erro ao exportar questão.");
+                  } finally {
+                    setIsGenerating(false);
+                  }
+                }}
+                disabled={isGenerating}
+                className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Zap size={20} />
+                Exportar para Form
+              </button>
+              <button 
                 onClick={() => setGeneratedQuestion(null)}
                 className="px-8 py-4 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-700 rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
               >

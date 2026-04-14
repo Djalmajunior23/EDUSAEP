@@ -164,7 +164,7 @@ import { handleFirestoreError, OperationType } from './services/errorService';
 
 import { AdvancedDashboard } from './components/professor/AdvancedDashboard';
 import { generateStudentRecommendation, getLatestRecommendation, Recommendation } from './services/recommendationService';
-import { exportExamToGoogleForms } from './services/googleFormsService';
+import { exportExamToGoogleForms, exportQuestionsToGoogleForms } from './services/googleFormsService';
 
 import { GoogleFormsExportView } from './components/professor/GoogleFormsExportView';
 import { RecommendationsView } from './components/student/RecommendationsView';
@@ -3055,6 +3055,27 @@ function QuestionsBankView({ user, userProfile, selectedModel }: { user: User | 
                     </button>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={async () => {
+                        toast.info("Exportando questão para Google Forms...");
+                        try {
+                          const result = await exportQuestionsToGoogleForms(
+                            `Questão: ${q.competenciaNome}`,
+                            [q]
+                          );
+                          if (result.publicUrl) {
+                            window.open(result.publicUrl, '_blank');
+                            toast.success("Formulário criado com sucesso!");
+                          }
+                        } catch (e) {
+                          toast.error("Erro ao exportar questão.");
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-blue-600"
+                      title="Exportar para Google Forms"
+                    >
+                      <ExternalLink size={18} />
+                    </button>
                     <button onClick={() => { setCurrentQuestion(q); setIsEditing(true); }} className="p-2 text-gray-400 hover:text-emerald-600"><Pencil size={18} /></button>
                     <button onClick={() => handleDeleteQuestion(q.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={18} /></button>
                   </div>
@@ -4163,6 +4184,28 @@ function ExamsManagementView({ user, userProfile, selectedModel, defaultType = '
                     >
                       <Download size={14} />
                       Exportar Notas (CSV)
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        toast.info("Exportando avaliação para Google Forms...");
+                        try {
+                          const result = await exportExamToGoogleForms(
+                            exam.id,
+                            exam
+                          );
+                          if (result.publicUrl) {
+                            window.open(result.publicUrl, '_blank');
+                            toast.success("Formulário criado com sucesso!");
+                          }
+                        } catch (e) {
+                          toast.error("Erro ao exportar avaliação.");
+                        }
+                      }}
+                      className="w-full py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-bold hover:bg-purple-100 transition-all flex items-center justify-center gap-2 border border-purple-100"
+                    >
+                      <ExternalLink size={14} />
+                      Exportar para Google Forms
                     </button>
                   </div>
                 );

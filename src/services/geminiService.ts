@@ -717,56 +717,6 @@ export async function generateSuggestions(conhecimentos: string[], recomendacoes
   return safeParseJson(response.text, []);
 }
 
-export interface PedagogicalAnalysis {
-  resumo_geral: string;
-  principais_dificuldades: string[];
-  pontos_fortes: string[];
-  alunos_em_risco: string[];
-  sugestoes_para_professor: string[];
-  plano_de_acao: string[];
-}
-
-export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-pro-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<PedagogicalAnalysis> {
-  const response = await generateContentWrapper({
-    model: modelName,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Aja como um motor de análise pedagógica avançado.
-Analise os seguintes dados estruturados do sistema de avaliação e gere um relatório pedagógico estruturado.
-
-DADOS:
-${JSON.stringify(data)}
-
-RETORNE O RELATÓRIO NO FORMATO JSON SEGUINDO O ESQUEMA DEFINIDO.`
-          }
-        ]
-      }
-    ],
-    config: {
-      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
-      responseMimeType: "application/json",
-      ...DEFAULT_CONFIG,
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          resumo_geral: { type: Type.STRING, description: "Resumo geral da análise pedagógica." },
-          principais_dificuldades: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista das principais dificuldades identificadas." },
-          pontos_fortes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista dos pontos fortes identificados." },
-          alunos_em_risco: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista dos nomes dos alunos em risco pedagógico." },
-          sugestoes_para_professor: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Sugestões de intervenção para o professor." },
-          plano_de_acao: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Plano de ação detalhado." }
-        },
-        required: ["resumo_geral", "principais_dificuldades", "pontos_fortes", "alunos_em_risco", "sugestoes_para_professor", "plano_de_acao"]
-      }
-    }
-  });
-
-  return safeParseJson(response.text, {});
-}
-
 export interface LearningProfileResult {
   vark_style: "Visual" | "Aural" | "Read/Write" | "Kinesthetic" | "Multimodal";
   cognitive_level: string;
@@ -1253,6 +1203,59 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
   }
   
   return parsed;
+}
+
+export interface PedagogicalAnalysisResult {
+  resumo_geral: string;
+  pontos_fortes: string[];
+  principais_dificuldades: string[];
+  alunos_em_risco: string[];
+  plano_de_acao: string[];
+  sugestoes_para_professor: string[];
+}
+
+export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<PedagogicalAnalysisResult> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um Analista de BI Educacional Sênior.
+            Analise os seguintes dados de importação (SIAC/Planilha) e gere um relatório pedagógico estratégico.
+            
+            DADOS:
+            ${JSON.stringify(data)}
+            
+            RETORNE UM JSON COM:
+            {
+              "resumo_geral": string (Um parágrafo executivo sobre o desempenho global),
+              "pontos_fortes": string[] (Lista de competências ou áreas onde os alunos se destacaram),
+              "principais_dificuldades": string[] (Lista de lacunas críticas identificadas),
+              "alunos_em_risco": string[] (Nomes ou IDs de alunos que precisam de atenção imediata),
+              "plano_de_acao": string[] (Passos práticos para recuperação),
+              "sugestoes_para_professor": string[] (Dicas didáticas específicas para abordar as falhas)
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, {
+    resumo_geral: "Erro ao gerar análise.",
+    pontos_fortes: [],
+    principais_dificuldades: [],
+    alunos_em_risco: [],
+    plano_de_acao: [],
+    sugestoes_para_professor: []
+  });
 }
 
 export interface BloomAnalysisResult {

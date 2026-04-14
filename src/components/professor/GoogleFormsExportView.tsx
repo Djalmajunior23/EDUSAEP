@@ -209,7 +209,41 @@ export function GoogleFormsExportView({ user, userProfile }: { user: any, userPr
       {/* Imported Questions Preview */}
       {importedQuestions.length > 0 && (
         <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 space-y-4">
-          <h3 className="text-xl font-bold text-gray-900">Questões Importadas ({importedQuestions.length})</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-gray-900">Questões Importadas ({importedQuestions.length})</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  setImporting(true);
+                  try {
+                    const result = await (await import('../../services/googleFormsService')).exportQuestionsToGoogleForms(
+                      `Importação ${new Date().toLocaleDateString()}`,
+                      importedQuestions
+                    );
+                    if (result.publicUrl) {
+                      window.open(result.publicUrl, '_blank');
+                      toast.success("Formulário criado com sucesso!");
+                    }
+                  } catch (e) {
+                    toast.error("Erro ao exportar questões.");
+                  } finally {
+                    setImporting(false);
+                  }
+                }}
+                disabled={importing}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-md disabled:opacity-50"
+              >
+                {importing ? <Loader2 className="animate-spin" size={14} /> : <Share2 size={14} />}
+                Exportar para Google Forms
+              </button>
+              <button 
+                onClick={() => setImportedQuestions([])}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
           <div className="max-h-96 overflow-y-auto space-y-4">
             {importedQuestions.map((q, i) => (
               <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-sm">

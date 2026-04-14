@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ProfessorInsights } from './ProfessorInsights';
+import { PainelInsightsIA } from './PainelInsightsIA';
+import { PedagogicalRecommendations } from './PedagogicalRecommendations';
 import { UserProfile } from '../../App';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -51,12 +53,24 @@ export function AdvancedDashboard({ userProfile, stats, disciplinePerformance, s
       </div>
 
       {/* AI Insights Panel */}
-      <div className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <Sparkles className="text-emerald-600" />
-          Insights Gerados por IA
-        </h2>
-        <ProfessorInsights userProfile={userProfile} />
+      <div className="space-y-8">
+        <PedagogicalRecommendations userProfile={userProfile} />
+        
+        <div className="bg-white p-8 rounded-3xl shadow-xl border border-indigo-100">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Sparkles className="text-indigo-600" />
+            Insights de Importação (SIAC)
+          </h2>
+          <PainelInsightsIA />
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-100">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Sparkles className="text-emerald-600" />
+            Insights de Desempenho Interno
+          </h2>
+          <ProfessorInsights userProfile={userProfile} />
+        </div>
       </div>
 
       {/* KPI Cards */}
