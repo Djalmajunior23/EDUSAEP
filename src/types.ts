@@ -45,10 +45,13 @@ export interface Question {
   perfilGeracao: string;
   tipoQuestao: string;
   enunciado: string;
-  alternativas: Array<{ id: string; texto: string }>;
-  respostaCorreta: string;
-  comentarioGabarito: string;
-  justificativasAlternativas: Record<string, string>;
+  alternativas?: Array<{ id: string; texto: string }>;
+  respostaCorreta?: string;
+  respostaEsperada?: string;
+  criteriosAvaliacao?: Array<{ criterio: string; pontuacao: number; descricao: string }>;
+  comentarioGabarito?: string;
+  comentarioPedagogico?: string;
+  justificativasAlternativas?: Record<string, string>;
   contextoHash: string;
   tags: string[];
   status: string;

@@ -6,6 +6,9 @@ import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp,
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { generateContentWrapper, DEFAULT_CONFIG, getSystemInstruction } from '../../services/geminiService';
 import Markdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { cn } from '../../lib/utils';
 
 interface Message {
   id?: string;
@@ -222,13 +225,35 @@ export function SocraticTutor({
             )}
           >
             <div className={cn(
-              "max-w-[85%] p-4 rounded-2xl shadow-sm",
+              "max-w-[85%] p-4 rounded-2xl shadow-sm overflow-x-auto",
               msg.role === 'user' 
                 ? "bg-emerald-600 text-white rounded-tr-none" 
                 : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-tl-none"
             )}>
-              <div className="markdown-body text-sm leading-relaxed">
-                <Markdown>{msg.text}</Markdown>
+              <div className="markdown-body text-sm leading-relaxed overflow-x-auto">
+                <Markdown
+                  components={{
+                    code({node, inline, className, children, ...props}: any) {
+                      const match = /language-(\w+)/.exec(className || '')
+                      return !inline && match ? (
+                        <SyntaxHighlighter
+                          {...props}
+                          children={String(children).replace(/\n$/, '')}
+                          style={vscDarkPlus}
+                          language={match[1]}
+                          PreTag="div"
+                          className="rounded-md my-2 text-xs"
+                        />
+                      ) : (
+                        <code {...props} className={cn(className, "bg-black/5 dark:bg-white/10 rounded px-1 py-0.5")}>
+                          {children}
+                        </code>
+                      )
+                    }
+                  }}
+                >
+                  {msg.text}
+                </Markdown>
               </div>
             </div>
           </motion.div>
@@ -284,8 +309,4 @@ export function SocraticTutor({
   }
 
   return content;
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

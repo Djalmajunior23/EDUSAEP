@@ -1483,3 +1483,87 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
   
   return parsed;
 }
+
+export async function generateDiscursiveQuestion(
+  prompt: string,
+  difficulty: string,
+  modelName: string = 'gemini-3-flash-preview',
+  userRole: 'professor' | 'aluno' = 'professor'
+): Promise<any> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um especialista em avaliação educacional.
+            Gere uma questão DISCURSIVA (aberta) com base no seguinte prompt do professor: "${prompt}".
+            Nível de dificuldade desejado: ${difficulty}.
+            
+            A questão deve ser desafiadora, clara e avaliar competências de alto nível.
+            Além do enunciado, você DEVE fornecer:
+            1. Uma resposta esperada (padrão de resposta).
+            2. Critérios de avaliação detalhados (rubrica) para o professor usar na correção.
+            
+            RETORNE O JSON COMPLETO CONFORME O PADRÃO ESPECIFICADO.`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'simulados'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          questionUid: { type: Type.STRING },
+          competenciaNome: { type: Type.STRING },
+          temaNome: { type: Type.STRING },
+          dificuldade: { type: Type.STRING },
+          bloom: { type: Type.STRING },
+          tipoQuestao: { type: Type.STRING },
+          enunciado: { type: Type.STRING },
+          respostaEsperada: { type: Type.STRING },
+          criteriosAvaliacao: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                criterio: { type: Type.STRING },
+                pontuacao: { type: Type.NUMBER },
+                descricao: { type: Type.STRING }
+              },
+              required: ["criterio", "pontuacao", "descricao"]
+            }
+          },
+          comentarioPedagogico: { type: Type.STRING },
+          tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: [
+          "questionUid", "competenciaNome", "temaNome", "dificuldade", "bloom", 
+          "tipoQuestao", "enunciado", "respostaEsperada", "criteriosAvaliacao"
+        ]
+      }
+    }
+  });
+
+  const parsed = safeParseJson(response.text, {});
+  
+  if (!parsed || !parsed.enunciado || !parsed.respostaEsperada || !Array.isArray(parsed.criteriosAvaliacao)) {
+    console.error("[Gemini] Invalid discursive question generated:", parsed);
+    throw new Error("A IA gerou uma questão discursiva em um formato inválido. Tente novamente.");
+  }
+  
+  return {
+    ...parsed,
+    tipoQuestao: 'discursiva',
+    status: 'published',
+    revisadaPorProfessor: false,
+    usoTotal: 0,
+    origem: 'IA',
+    criadoEm: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString()
+  };
+}

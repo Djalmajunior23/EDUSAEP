@@ -25,6 +25,7 @@ import {
 import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '../../services/geminiService';
+import { LessonPlan } from './LessonPlan';
 import { UserProfile } from '../../types';
 import { n8nEvents } from '../../services/n8nService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
@@ -144,7 +145,7 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
     setIsGeneratingPlan(true);
     try {
       const classDoc = classes.find(c => c.id === selectedClassId);
-      const studentIds = classDoc?.studentIds || [];
+      const studentIds = (classDoc?.studentIds || []).filter(Boolean);
       
       if (studentIds.length === 0) {
         toast.warning("A turma selecionada não possui alunos.");
@@ -430,76 +431,12 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
       </AnimatePresence>
 
       {/* AI Lesson Plan */}
-      <AnimatePresence>
-        {lessonPlan && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-emerald-600 text-white p-8 rounded-3xl shadow-xl shadow-emerald-200 dark:shadow-none"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-white/20 rounded-2xl">
-                <Sparkles size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold">{lessonPlan.title}</h3>
-                <p className="text-xs text-emerald-100 italic">Plano de aula remediador gerado por IA</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Objetivos</h4>
-                  <ul className="space-y-2">
-                    {lessonPlan.objectives.map((obj, i) => (
-                      <li key={i} className="flex items-start gap-3 text-sm">
-                        <CheckCircle2 size={16} className="mt-1 flex-shrink-0" />
-                        {obj}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Tópicos para Revisão</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {lessonPlan.topicsToReview?.map((topic, i) => (
-                      <span key={i} className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium">
-                        {topic}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Atividades Sugeridas</h4>
-                  <ul className="space-y-3">
-                    {lessonPlan.practicalActivities?.map((act, i) => (
-                      <li key={i} className="p-3 bg-white/10 rounded-2xl text-sm flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <div className="p-2 bg-white/20 rounded-xl text-xs font-bold">{i + 1}</div>
-                          <span className="font-bold">{act.name}</span>
-                          <span className="text-xs bg-white/20 px-2 py-1 rounded-md">{act.duration}</span>
-                        </div>
-                        <p className="text-xs text-emerald-100 pl-10">{act.description}</p>
-                        <textarea
-                          placeholder="Adicionar observações para esta atividade..."
-                          className="mt-2 w-full p-2 text-xs bg-white/10 rounded-lg border border-white/20 focus:ring-1 focus:ring-white outline-none"
-                          value={activityNotes[i] || act.professor_notes || ''}
-                          onChange={(e) => handleUpdateActivityNote(i, e.target.value)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <LessonPlan 
+        plan={lessonPlan} 
+        activityNotes={activityNotes} 
+        onUpdateActivityNote={handleUpdateActivityNote} 
+        onClose={() => setLessonPlan(null)}
+      />
 
       {/* Alerts & Risk */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

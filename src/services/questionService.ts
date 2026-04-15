@@ -13,31 +13,45 @@ export class QuestionService {
       }
     }
 
-    // Alternativas
-    if (!isUpdate || data.alternativas !== undefined) {
-      if (!data.alternativas || !Array.isArray(data.alternativas) || data.alternativas.length < 2) {
-        throw new Error("A questão deve ter pelo menos duas alternativas válidas.");
+    if (data.tipoQuestao === 'discursiva') {
+      // Validação específica para questões discursivas
+      if (!isUpdate || data.respostaEsperada !== undefined) {
+        if (!data.respostaEsperada || typeof data.respostaEsperada !== 'string' || data.respostaEsperada.trim() === '') {
+          throw new Error("O campo 'respostaEsperada' é obrigatório para questões discursivas.");
+        }
       }
-      data.alternativas.forEach((alt, index) => {
-        if (!alt.id || typeof alt.id !== 'string' || alt.id.trim() === '') {
-          throw new Error(`A alternativa na posição ${index + 1} deve ter um 'id' válido.`);
+      if (!isUpdate || data.criteriosAvaliacao !== undefined) {
+        if (!data.criteriosAvaliacao || !Array.isArray(data.criteriosAvaliacao) || data.criteriosAvaliacao.length === 0) {
+          throw new Error("A questão discursiva deve ter critérios de avaliação definidos.");
         }
-        if (!alt.texto || typeof alt.texto !== 'string' || alt.texto.trim() === '') {
-          throw new Error(`A alternativa '${alt.id}' deve ter um 'texto' não vazio.`);
+      }
+    } else {
+      // Alternativas (apenas para múltipla escolha)
+      if (!isUpdate || data.alternativas !== undefined) {
+        if (!data.alternativas || !Array.isArray(data.alternativas) || data.alternativas.length < 2) {
+          throw new Error("A questão deve ter pelo menos duas alternativas válidas.");
         }
-      });
-    }
+        data.alternativas.forEach((alt, index) => {
+          if (!alt.id || typeof alt.id !== 'string' || alt.id.trim() === '') {
+            throw new Error(`A alternativa na posição ${index + 1} deve ter um 'id' válido.`);
+          }
+          if (!alt.texto || typeof alt.texto !== 'string' || alt.texto.trim() === '') {
+            throw new Error(`A alternativa '${alt.id}' deve ter um 'texto' não vazio.`);
+          }
+        });
+      }
 
-    // Resposta Correta
-    if (!isUpdate || data.respostaCorreta !== undefined) {
-      if (!data.respostaCorreta || typeof data.respostaCorreta !== 'string' || data.respostaCorreta.trim() === '') {
-        throw new Error("O campo 'respostaCorreta' é obrigatório.");
-      }
-      
-      if (data.alternativas && data.respostaCorreta) {
-        const validAlternativeIds = data.alternativas.map(a => a.id);
-        if (!validAlternativeIds.includes(data.respostaCorreta)) {
-          throw new Error(`A 'respostaCorreta' (${data.respostaCorreta}) deve corresponder a uma das alternativas fornecidas.`);
+      // Resposta Correta (apenas para múltipla escolha)
+      if (!isUpdate || data.respostaCorreta !== undefined) {
+        if (!data.respostaCorreta || typeof data.respostaCorreta !== 'string' || data.respostaCorreta.trim() === '') {
+          throw new Error("O campo 'respostaCorreta' é obrigatório.");
+        }
+        
+        if (data.alternativas && data.respostaCorreta) {
+          const validAlternativeIds = data.alternativas.map(a => a.id);
+          if (!validAlternativeIds.includes(data.respostaCorreta)) {
+            throw new Error(`A 'respostaCorreta' (${data.respostaCorreta}) deve corresponder a uma das alternativas fornecidas.`);
+          }
         }
       }
     }

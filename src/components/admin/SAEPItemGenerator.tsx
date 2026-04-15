@@ -157,7 +157,6 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
             >
               <option value="gemini-3-flash-preview">Gemini 3 Flash (Rápido)</option>
               <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Avançado)</option>
-              <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Econômico)</option>
               <option value="gemini-flash-latest">Gemini Flash Latest</option>
             </select>
           </div>

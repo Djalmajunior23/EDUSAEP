@@ -1,9 +1,11 @@
 import { SmartContentGenerator } from './components/common/SmartContentGenerator';
 import { SAEPItemGenerator } from './components/admin/SAEPItemGenerator';
+import { DiscursiveQuestionGenerator } from './components/professor/DiscursiveQuestionGenerator';
 import { BIDashboardView } from './components/dashboard/BIDashboardView';
 import { DataImportView } from './components/admin/DataImportView';
 import { ClassesManagementView } from './components/admin/ClassesManagementView';
 import { DisciplinesManagementView } from './components/admin/DisciplinesManagementView';
+import { LessonManagementView } from './components/professor/LessonManagementView';
 import { getClassCompetencyAverages } from './services/dashboardService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
@@ -11,6 +13,8 @@ import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import Markdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 // Initialize Gemini
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -77,7 +81,8 @@ import {
   Hexagon,
   Archive,
   ArchiveRestore,
-  BarChart2
+  BarChart2,
+  Layout
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -6779,13 +6784,35 @@ function ChatView({ user, diagnostic }: { user: User | null, diagnostic: Diagnos
             )}
           >
             <div className={cn(
-              "max-w-[85%] px-4 py-3 text-sm shadow-sm transition-all hover:shadow-md",
+              "max-w-[85%] px-4 py-3 text-sm shadow-sm transition-all hover:shadow-md overflow-x-auto",
               msg.role === 'user' 
                 ? "bg-emerald-600 text-white rounded-2xl rounded-tr-none" 
                 : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-tl-none"
             )}>
-              <div className="markdown-body">
-                <Markdown>{msg.text}</Markdown>
+              <div className="markdown-body overflow-x-auto">
+                <Markdown
+                  components={{
+                    code({node, inline, className, children, ...props}: any) {
+                      const match = /language-(\w+)/.exec(className || '')
+                      return !inline && match ? (
+                        <SyntaxHighlighter
+                          {...props}
+                          children={String(children).replace(/\n$/, '')}
+                          style={vscDarkPlus}
+                          language={match[1]}
+                          PreTag="div"
+                          className="rounded-md my-2 text-xs"
+                        />
+                      ) : (
+                        <code {...props} className={cn(className, "bg-black/5 dark:bg-white/10 rounded px-1 py-0.5")}>
+                          {children}
+                        </code>
+                      )
+                    }
+                  }}
+                >
+                  {msg.text}
+                </Markdown>
               </div>
               <div className={cn(
                 "flex items-center gap-1 mt-1 opacity-60 text-[9px]",
@@ -9459,7 +9486,9 @@ function AppContent() {
       { type: 'header', label: 'Gestão Pedagógica' },
       { id: 'classes', label: 'Turmas', icon: Users, path: '/classes' },
       { id: 'disciplines', label: 'Disciplinas', icon: BookOpen, path: '/disciplines' },
+      { id: 'lesson-management', label: 'Gestão de Aulas', icon: Layout, path: '/lesson-management', description: 'Planejamento IA' },
       { id: 'generate-questions', label: 'Gerar Questões IA', icon: BrainCircuit, path: '/generate-questions', description: 'Criação SAEP' },
+      { id: 'generate-discursive', label: 'Gerar Discursivas IA', icon: FileText, path: '/generate-discursive', description: 'Questões Abertas' },
       { id: 'questions-bank', label: 'Banco de Questões', icon: Database, path: '/questions-bank' },
       { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Avaliação Formal' },
       { id: 'google-forms-export', label: 'Exportar Google Forms', icon: Share2, path: '/google-forms-export', description: 'Integração Externa' },
@@ -9528,7 +9557,7 @@ function AppContent() {
 
   const activeTab = useMemo(() => {
     const path = location.pathname.split('/')[1] || 'input';
-    return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat' | 'profile' | 'aluno' | 'admin-users' | 'student-dashboard' | 'student-exams' | 'external-forms';
+    return path as 'input' | 'dashboard' | 'plan' | 'json' | 'history' | 'tasks' | 'chat' | 'profile' | 'aluno' | 'admin-users' | 'student-dashboard' | 'student-exams' | 'external-forms' | 'generate-discursive';
   }, [location]);
 
   // History Listener
@@ -10442,6 +10471,7 @@ function AppContent() {
               <Route path="/socratic-tutor" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><SocraticTutorView userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/smart-content" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><SmartContentGenerator userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/generate-questions" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><SAEPItemGenerator user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
+              <Route path="/generate-discursive" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><DiscursiveQuestionGenerator user={user} userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
             <Route path="/input" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
               <motion.div
@@ -10513,7 +10543,6 @@ function AppContent() {
                         >
                           <option value="gemini-3-flash-preview">Gemini 3 Flash (Rápido)</option>
                           <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Avançado)</option>
-                          <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Econômico)</option>
                           <option value="gemini-flash-latest">Gemini Flash Latest</option>
                         </select>
                       </div>
@@ -10734,6 +10763,12 @@ function AppContent() {
             <Route path="/disciplines" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <DisciplinesManagementView />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/lesson-management" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <LessonManagementView userProfile={userProfile} selectedModel={selectedModel} />
               </ProtectedRoute>
             } />
 

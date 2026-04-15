@@ -4,10 +4,16 @@ import path from "path";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import multer from "multer";
+import https from "https";
 
 dotenv.config();
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Create a custom agent that ignores self-signed certificate errors
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
 
 async function startServer() {
   const app = express();
@@ -34,6 +40,8 @@ async function startServer() {
           workflow_type: type,
           server_timestamp: new Date().toISOString()
         }),
+        // @ts-ignore - node-fetch specific option
+        agent: n8nUrl.startsWith('https') ? httpsAgent : undefined,
       });
 
       if (!response.ok) {
@@ -115,6 +123,8 @@ async function startServer() {
       const response = await fetch(n8nUrl, {
         method: 'POST',
         body: formData,
+        // @ts-ignore
+        agent: n8nUrl.startsWith('https') ? httpsAgent : undefined,
       });
 
       if (!response.ok) {
@@ -151,6 +161,8 @@ async function startServer() {
           workflow_type: 'test',
           server_timestamp: new Date().toISOString()
         }),
+        // @ts-ignore
+        agent: url.startsWith('https') ? httpsAgent : undefined,
       });
 
       if (!response.ok) {
@@ -222,8 +234,8 @@ async function startServer() {
         });
         return res.json({ text: completion.choices[0].message.content });
       } catch (err: any) {
-        if (err?.status === 429) {
-          console.warn(`[AI] OpenAI quota exceeded, falling back to Groq`);
+        if (err?.status === 429 || err?.status === 404) {
+          console.warn(`[AI] OpenAI error (${err?.status}), falling back to Groq`);
           const text = await tryGroq();
           return res.json({ text });
         }

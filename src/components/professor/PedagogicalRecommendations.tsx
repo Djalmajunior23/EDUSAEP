@@ -3,7 +3,7 @@ import { Sparkles, Loader2, Target, BookOpen, AlertCircle, CheckCircle2, ArrowRi
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { generateSuggestions } from '../../services/geminiService';
+import { generatePedagogicalAnalysis } from '../../services/geminiService';
 import { toast } from 'sonner';
 
 export function PedagogicalRecommendations({ userProfile }: { userProfile: any }) {
@@ -52,7 +52,7 @@ export function PedagogicalRecommendations({ userProfile }: { userProfile: any }
         recentSubmissions: submissions.slice(0, 10)
       };
 
-      const result = await generateSuggestions(context, 'gemini-2.0-flash-exp', 'professor');
+      const result = await generatePedagogicalAnalysis(context, 'gemini-3-flash-preview', 'professor');
       setRecommendations(result);
       toast.success("Novas recomendações geradas!");
     } catch (error) {
