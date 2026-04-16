@@ -100,6 +100,70 @@ async function startServer() {
     }
   });
 
+  // Endpoint to simulate AI Webhook to n8n
+  app.post("/api/n8n/ai-webhook-simulate", async (req, res) => {
+    try {
+      // Use the environment variable or a default test URL
+      const n8nUrl = process.env.N8N_AI_WEBHOOK_URL || "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/ai-simulation";
+      
+      console.log(`[n8n Simulation] Sending payload to ${n8nUrl}`);
+      
+      const response = await fetch(n8nUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: "ai_generation_request",
+          prompt: req.body.prompt || "Gere um plano de aula sobre fotossíntese",
+          model: req.body.model || "gemini-3-flash-preview",
+          userRole: req.body.userRole || "professor",
+          timestamp: new Date().toISOString()
+        }),
+        // @ts-ignore
+        agent: n8nUrl.startsWith('https') ? httpsAgent : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error(`n8n responded with ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json().catch(() => ({ status: "ok", message: "No JSON returned from n8n" }));
+      res.json({ success: true, n8nResponse: result });
+    } catch (error: any) {
+      console.error("[n8n Simulation Error]:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Chatbot Endpoint
+  app.post("/api/n8n/chatbot", async (req, res) => {
+    try {
+      const n8nUrl = process.env.N8N_CHATBOT_WEBHOOK_URL || "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/student-chatbot";
+      
+      const response = await fetch(n8nUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: req.body.studentId,
+          message: req.body.message,
+          context: req.body.context || {},
+          timestamp: new Date().toISOString()
+        }),
+        // @ts-ignore
+        agent: n8nUrl.startsWith('https') ? httpsAgent : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error(`n8n responded with ${response.status}`);
+      }
+
+      const result = await response.json().catch(() => ({ reply: "Desculpe, não consegui processar a resposta no momento." }));
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Chatbot Error]:", error);
+      res.status(500).json({ error: error.message, reply: "Erro ao conectar com o assistente virtual." });
+    }
+  });
+
   app.post("/api/n8n/import", upload.single('file'), async (req, res) => {
     try {
       const n8nUrl = process.env.N8N_WEBHOOK_URL;

@@ -1,6 +1,33 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../firebase";
+
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
+/**
+ * Logs AI usage to Firestore for institutional governance and cost analysis.
+ */
+async function logAIUsage(provider: AIProvider, model: string, success: boolean, error?: string) {
+  try {
+    const userId = auth.currentUser?.uid || 'anonymous';
+    const email = auth.currentUser?.email || 'anonymous';
+    
+    await addDoc(collection(db, 'ai_usage_logs'), {
+      userId,
+      email,
+      provider,
+      model,
+      timestamp: serverTimestamp(),
+      success,
+      error: error || null,
+      // In a real environment, we would also log tokens here if the API provides them
+      costEstimate: provider === 'openai' ? 0.01 : 0.005, // Placeholder for cost tracking logic
+    });
+  } catch (err) {
+    console.warn("[AI Logging] Failed to log usage:", err);
+  }
+}
 
 export type AIProvider = 'gemini' | 'openai' | 'deepseek';
 
@@ -192,6 +219,9 @@ export async function generateContentWrapper(params: any): Promise<any> {
     }
 
     if (fetchError || !fetchResponse?.ok) {
+      const errorMsg = fetchError ? fetchError.message : (fetchResponse ? `Status ${fetchResponse.status}` : 'Unknown error');
+      await logAIUsage(provider, params.model || 'unknown', false, errorMsg);
+      
       if (fetchError) {
         // Only log if it's not a quota/rate limit error
         if (!fetchError.message?.includes('429') && !fetchError.message?.includes('quota')) {
@@ -224,6 +254,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
     }
 
     const data = await fetchResponse.json();
+    await logAIUsage(provider, params.model || 'unknown', true);
     return { text: data.text };
   } else {
     // Ensure we use a Gemini model if the provider is gemini
@@ -232,9 +263,14 @@ export async function generateContentWrapper(params: any): Promise<any> {
       geminiParams.model = 'gemini-3-flash-preview';
     }
     try {
-      return await ai.models.generateContent(geminiParams);
+      const result = await ai.models.generateContent(geminiParams);
+      await logAIUsage('gemini', geminiParams.model, true);
+      return result;
     } catch (err: any) {
-      if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('quota')) {
+      const isQuotaError = err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('quota');
+      await logAIUsage('gemini', geminiParams.model, false, err.message);
+
+      if (isQuotaError) {
         console.warn(`[AI] Gemini quota exceeded, falling back to backend (DeepSeek/Groq)`);
         
         let prompt = "";
@@ -274,6 +310,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
         }
 
         if (!fetchResponse.ok) {
+          await logAIUsage('deepseek', 'deepseek-chat', false, `Secondary fallback failed: ${fetchResponse.status}`);
           if (fetchResponse.status === 429) {
             throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
           }
@@ -281,6 +318,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
         }
 
         const data = await fetchResponse.json();
+        await logAIUsage('deepseek', 'deepseek-chat', true);
         return { text: data.text };
       }
       throw err;
@@ -525,6 +563,99 @@ export interface DiagnosticResult {
     pesos: number[];
   };
   mensagem_para_o_aluno: string;
+}
+
+export async function generateInterventionPlan(classData: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um Coordenador Pedagógico Especialista em Intervenção.
+            Com base nos dados de desempenho da turma abaixo, crie um Plano de Intervenção Pedagógica detalhado.
+            
+            DADOS DA TURMA:
+            ${JSON.stringify(classData)}
+            
+            O plano deve conter:
+            1. Diagnóstico da Situação (Resumo dos principais gargalos)
+            2. Estratégias de Recuperação (Ações imediatas para alunos em risco)
+            3. Atividades Complementares Sugeridas (Por competência crítica)
+            4. Cronograma de Aplicação (Sugestão de 4 semanas)
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "diagnostico": string,
+              "estrategias": string[],
+              "atividades": { "competencia": string, "sugestao": string }[],
+              "cronograma": { "semana": number, "foco": string, "acoes": string[] }[]
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'smart_content'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, {});
+}
+
+export async function generateLearningPath(studentData: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um Tutor de IA Especialista em Trilhas de Aprendizagem Personalizadas.
+            Com base nos dados de desempenho do aluno abaixo, crie uma trilha de aprendizagem estruturada para os próximos 15 dias.
+            
+            DADOS DO ALUNO:
+            ${JSON.stringify(studentData)}
+            
+            A trilha deve ser dividida em 3 fases:
+            1. Fase de Nivelamento (Foco nas competências críticas)
+            2. Fase de Consolidação (Foco nas competências em atenção)
+            3. Fase de Excelência (Desafios avançados nas competências fortes)
+            
+            Para cada fase, forneça:
+            - Objetivos de Aprendizagem
+            - Lista de tópicos a estudar
+            - Sugestões de atividades práticas
+            - Recursos recomendados (vídeos, artigos, exercícios)
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "fases": [
+                {
+                  "nome": "Nivelamento",
+                  "objetivos": string[],
+                  "topicos": string[],
+                  "atividades": string[],
+                  "recursos": string[]
+                }
+              ],
+              "mensagem_motivacional": string
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction('aluno', 'plano_estudo'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, {});
 }
 
 export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
@@ -1303,6 +1434,13 @@ export interface OpenQuestionGrade {
   missing_points: string[];
 }
 
+export interface OpenQuestionGrade {
+  score: number;
+  feedback: string;
+  criteria_met: string[];
+  missing_points: string[];
+}
+
 export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<OpenQuestionGrade> {
   const response = await generateContentWrapper({
     model: modelName,
@@ -1337,6 +1475,78 @@ export async function gradeOpenQuestion(question: string, answer: string, rubric
   });
 
   return safeParseJson(response.text, {});
+}
+
+export interface QuestionQualityAnalysis {
+  questionId: string;
+  originalEnunciado: string;
+  suggestedEnunciado?: string;
+  originalAlternativas: Array<{ id: string, texto: string }>;
+  suggestedAlternativas: Array<{ id: string, texto: string }>;
+  analysis: string;
+  improvements: string[];
+  cognitiveErrorsAddressed: string[];
+}
+
+export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionQualityAnalysis> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Como um Especialista em Avaliação Educacional e Design de Itens (padrão SAEP), analise esta questão de múltipla escolha que apresenta alto índice de erros cognitivos pelos alunos.
+            
+            DADOS DA QUESTÃO:
+            ${JSON.stringify({
+              enunciado: question.enunciado,
+              alternativas: question.alternativas,
+              respostaCorreta: question.respostaCorreta,
+              comentarioGabarito: question.comentarioGabarito
+            })}
+            
+            DADOS DE ERROS COGNITIVOS IDENTIFICADOS NAS SUBMISSÕES:
+            ${JSON.stringify(errors.map(e => ({ category: e.category, explanation: e.explanation })))}
+            
+            Sua tarefa:
+            1. Identificar se o enunciado possui ambiguidades, falta de clareza ou excesso de carga cognitiva (interpretação de texto vs conhecimento técnico).
+            2. Avaliar se os distratores capturam equívocos comuns de raciocínio.
+            3. Sugerir uma reformulação do enunciado focada na clareza e objetividade.
+            4. Sugerir alternativas que diferenciem melhor alunos que possuem o conceito daqueles que estão cometendo erros de processo.
+            5. Explicar como essas mudanças abordam especificamente os erros cognitivos (Falta de Conceito, Interpretação, Processo, etc).
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "questionId": "${question.id || question.questionUid}",
+              "originalEnunciado": string,
+              "suggestedEnunciado": string (opcional, apenas se houver melhoria),
+              "originalAlternativas": Array<{id, texto}>,
+              "suggestedAlternativas": Array<{id, texto}>,
+              "analysis": string (Análise pedagógica da questão original),
+              "improvements": string[] (Lista de melhorias sugeridas),
+              "cognitiveErrorsAddressed": string[] (Quais categorias de erro esta reformulação visa reduzir)
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, {
+    questionId: question.id || question.questionUid,
+    originalEnunciado: question.enunciado,
+    originalAlternativas: question.alternativas || [],
+    suggestedAlternativas: question.alternativas || [],
+    analysis: "Não foi possível gerar análise.",
+    improvements: [],
+    cognitiveErrorsAddressed: []
+  });
 }
 
 export interface SIPAResult {

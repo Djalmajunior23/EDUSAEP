@@ -1,134 +1,136 @@
-import { useState, useEffect, useRef } from 'react';
-import { Bell, Check, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Check, Trash2, ExternalLink, Info, AlertCircle, CheckCircle2, MessageSquare, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { notificationService, AppNotification } from '../../services/notificationService';
-import { useNavigate } from 'react-router-dom';
-import { cn } from '../../lib/utils';
+import { notificationService } from '../../services/notificationService';
+import { AppNotification } from '../../types/edusaep.types';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-interface NotificationBellProps {
-  userId: string;
-}
-
-export function NotificationBell({ userId }: NotificationBellProps) {
+export function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!userId) return;
-    const unsubscribe = notificationService.subscribeToNotifications(userId, (data) => {
-      setNotifications(data);
+    const unsubscribe = notificationService.subscribeToUnreadNotifications(userId, (notifs) => {
+      setNotifications(notifs);
     });
     return () => unsubscribe();
   }, [userId]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const handleNotificationClick = (notification: AppNotification) => {
-    if (!notification.read) {
-      notificationService.markAsRead(notification.id);
-    }
-    if (notification.link) {
-      navigate(notification.link);
-      setIsOpen(false);
-    }
+  const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await notificationService.markAsRead(id);
   };
 
-  const markAllAsRead = () => {
-    notificationService.markAllAsRead(userId, notifications);
+  const handleMarkAllAsRead = async () => {
+    await notificationService.markAllAsRead(userId);
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'activity_published': return <Calendar className="text-blue-500" size={18} />;
+      case 'activity_submitted': return <CheckCircle2 className="text-emerald-500" size={18} />;
+      case 'activity_graded': return <CheckCircle2 className="text-indigo-500" size={18} />;
+      case 'activity_returned': return <AlertCircle className="text-amber-500" size={18} />;
+      case 'forum_reply': return <MessageSquare className="text-purple-500" size={18} />;
+      default: return <Info className="text-gray-500" size={18} />;
+    }
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-gray-400 hover:text-emerald-600 transition-colors bg-white rounded-full shadow-sm border border-gray-100 relative"
+        className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
       >
-        <Bell size={20} />
-        {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
+        <Bell size={24} />
+        {notifications.length > 0 && (
+          <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+            {notifications.length > 9 ? '9+' : notifications.length}
           </span>
         )}
       </button>
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
-          >
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <h3 className="font-bold text-gray-900">Notificações</h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-                >
-                  <Check size={14} />
-                  Marcar todas como lidas
-                </button>
-              )}
-            </div>
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setIsOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden"
+            >
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="font-bold text-gray-900">Notificações</h3>
+                {notifications.length > 0 && (
+                  <button
+                    onClick={handleMarkAllAsRead}
+                    className="text-xs text-indigo-600 font-medium hover:underline flex items-center gap-1"
+                  >
+                    Marcar todas como lidas
+                  </button>
+                )}
+              </div>
 
-            <div className="max-h-[400px] overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-2">
-                  <Bell size={24} className="text-gray-300" />
-                  <p className="text-sm">Nenhuma notificação no momento.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {notifications.map((notification) => (
+              <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <Bell size={32} className="mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">Nenhuma nova notificação</p>
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
                     <div
-                      key={notification.id}
-                      onClick={() => handleNotificationClick(notification)}
-                      className={cn(
-                        "p-4 hover:bg-gray-50 transition-colors cursor-pointer flex gap-3",
-                        !notification.read ? "bg-emerald-50/30" : ""
-                      )}
+                      key={notif.id}
+                      className="p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 cursor-pointer group"
+                      onClick={() => {
+                        if (notif.link) window.location.hash = notif.link;
+                        notificationService.markAsRead(notif.id!);
+                        setIsOpen(false);
+                      }}
                     >
-                      <div className={cn(
-                        "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                        !notification.read ? "bg-emerald-500" : "bg-transparent"
-                      )} />
-                      <div className="flex-1 space-y-1">
-                        <p className={cn(
-                          "text-sm font-medium",
-                          !notification.read ? "text-gray-900" : "text-gray-600"
-                        )}>
-                          {notification.title}
-                        </p>
-                        <p className="text-xs text-gray-500 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <span className="text-[10px] text-gray-400 block pt-1">
-                          {notification.createdAt?.seconds ? new Date(notification.createdAt.seconds * 1000).toLocaleString() : 'Agora'}
-                        </span>
+                      <div className="flex gap-3">
+                        <div className="mt-1">{getIcon(notif.type)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">{notif.title}</p>
+                          <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{notif.message}</p>
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            {notif.createdAt?.seconds 
+                              ? formatDistanceToNow(new Date(notif.createdAt.seconds * 1000), { addSuffix: true, locale: ptBR })
+                              : 'Agora mesmo'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => handleMarkAsRead(notif.id!, e)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-indigo-600 transition-all"
+                          title="Marcar como lida"
+                        >
+                          <Check size={16} />
+                        </button>
                       </div>
-                      {notification.link && (
-                        <ExternalLink size={14} className="text-gray-400 shrink-0 mt-1" />
-                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-3 border-t border-gray-100 text-center bg-gray-50/30">
+                <button 
+                  onClick={() => {
+                    window.location.hash = '/notifications';
+                    setIsOpen(false);
+                  }}
+                  className="text-sm text-gray-500 font-medium hover:text-indigo-600 transition-colors"
+                >
+                  Ver todo o histórico
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

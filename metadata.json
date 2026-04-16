@@ -1,5 +1,5 @@
 {
-  "name": "JuniorsStudent - Solução Educacional com IA",
-  "description": "Plataforma completa para gestão pedagógica, diagnósticos SAEP, dashboards analíticos, recomendações de estudo e integração com n8n e Google Forms.",
+  "name": "EDUSAEP - Plataforma de Gestão Pedagógica",
+  "description": "Sistema avançado de gestão educacional orientado por dados e IA para avaliações técnicas (SAEP), simulados inteligentes e trilhas adaptativas.",
   "requestFramePermissions": []
 }

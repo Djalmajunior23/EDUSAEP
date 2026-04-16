@@ -10,7 +10,17 @@ export interface UserProfile {
   displayName?: string;
   role: 'aluno' | 'professor' | 'admin';
   xp?: number;
+  level?: number;
+  badges?: string[];
 }
+
+export const calculateLevel = (xp: number = 0) => {
+  return Math.floor(Math.sqrt(xp / 100)) + 1;
+};
+
+export const getXPForNextLevel = (level: number) => {
+  return Math.pow(level, 2) * 100;
+};
 
 export interface DashboardData {
   kpi: {
@@ -27,6 +37,119 @@ export interface DashboardData {
     // New fields for aggregated BI
     performancePorDisciplina: { name: string; media: number; alunos: number }[];
   };
+}
+
+export interface StudentRiskProfile {
+  id: string;
+  name: string;
+  email: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  reasons: string[];
+  averageGrade: number;
+  submissionRate: number;
+  lastAccess?: any;
+}
+
+export interface ClassObservatoryData {
+  studentsAtRisk: StudentRiskProfile[];
+  engagementMetrics: {
+    averageSubmissionRate: number;
+    forumParticipation: number;
+    averageGrade: number;
+  };
+  competencyHeatmap: { competency: string; score: number; status: 'critical' | 'attention' | 'good' }[];
+  evolution: { period: string; classAverage: number }[];
+}
+
+export async function getClassObservatoryData(): Promise<ClassObservatoryData> {
+  try {
+    const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+    const activitiesSnap = await getDocs(collection(db, 'activities'));
+    const activitySubmissionsSnap = await getDocs(collection(db, 'activity_submissions'));
+    const forumCommentsSnap = await getDocs(collection(db, 'forum_comments'));
+    
+    const students = usersSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    const activities = activitiesSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    const submissions = activitySubmissionsSnap.docs.map(d => d.data() as any);
+    const forumComments = forumCommentsSnap.docs.map(d => d.data() as any);
+
+    const totalActivities = activities.length;
+    
+    const studentsAtRisk: StudentRiskProfile[] = students.map(student => {
+      const studentSubmissions = submissions.filter(s => s.studentId === student.id);
+      const gradedSubmissions = studentSubmissions.filter(s => s.status === 'graded');
+      
+      const avgGrade = gradedSubmissions.length > 0 
+        ? gradedSubmissions.reduce((acc, curr) => acc + (curr.grade || 0), 0) / gradedSubmissions.length 
+        : 0;
+        
+      const submissionRate = totalActivities > 0 ? (studentSubmissions.length / totalActivities) * 100 : 0;
+      
+      const reasons: string[] = [];
+      if (avgGrade < 60) reasons.push('Baixo desempenho acadêmico');
+      if (submissionRate < 70) reasons.push('Baixa taxa de entrega de atividades');
+      
+      const forumPosts = forumComments.filter(c => c.userId === student.id).length;
+      if (forumPosts === 0 && totalActivities > 0) reasons.push('Baixa participação em fóruns');
+
+      let riskLevel: 'low' | 'medium' | 'high' = 'low';
+      if (reasons.length >= 2 || avgGrade < 50) riskLevel = 'high';
+      else if (reasons.length === 1 || avgGrade < 70) riskLevel = 'medium';
+
+      return {
+        id: student.id,
+        name: student.displayName || student.email,
+        email: student.email,
+        riskLevel,
+        reasons,
+        averageGrade: Math.round(avgGrade),
+        submissionRate: Math.round(submissionRate),
+        lastAccess: student.lastAccess
+      };
+    }).filter(s => s.riskLevel !== 'low').sort((a, b) => {
+      const riskOrder = { high: 0, medium: 1, low: 2 };
+      return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+    });
+
+    const averageSubmissionRate = students.length > 0 
+      ? students.reduce((acc, curr) => {
+          const subCount = submissions.filter(s => s.studentId === curr.id).length;
+          return acc + (totalActivities > 0 ? (subCount / totalActivities) * 100 : 0);
+        }, 0) / students.length
+      : 0;
+
+    const forumParticipation = students.length > 0 
+      ? (new Set(forumComments.map(c => c.userId)).size / students.length) * 100 
+      : 0;
+
+    const averageGrade = submissions.filter(s => s.status === 'graded').length > 0
+      ? submissions.filter(s => s.status === 'graded').reduce((acc, curr) => acc + (curr.grade || 0), 0) / submissions.filter(s => s.status === 'graded').length
+      : 0;
+
+    return {
+      studentsAtRisk,
+      engagementMetrics: {
+        averageSubmissionRate: Math.round(averageSubmissionRate),
+        forumParticipation: Math.round(forumParticipation),
+        averageGrade: Math.round(averageGrade)
+      },
+      competencyHeatmap: [
+        { competency: 'Lógica de Programação', score: 45, status: 'critical' },
+        { competency: 'Banco de Dados', score: 62, status: 'attention' },
+        { competency: 'Arquitetura de Sistemas', score: 78, status: 'good' },
+        { competency: 'Segurança da Informação', score: 55, status: 'critical' }
+      ],
+      evolution: [
+        { period: 'Semana 1', classAverage: 65 },
+        { period: 'Semana 2', classAverage: 68 },
+        { period: 'Semana 3', classAverage: 62 },
+        { period: 'Semana 4', classAverage: 72 }
+      ]
+    };
+  } catch (error) {
+    console.error("Error fetching observatory data:", error);
+    throw error;
+  }
 }
 
 export async function getDashboardData(filters: { disciplineId?: string }): Promise<DashboardData> {

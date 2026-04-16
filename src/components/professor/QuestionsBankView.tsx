@@ -1,0 +1,595 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Database, 
+  Search, 
+  Filter, 
+  Plus, 
+  MoreVertical, 
+  Edit2, 
+  Copy, 
+  Trash2, 
+  CheckCircle2, 
+  AlertCircle, 
+  BrainCircuit,
+  BarChart3,
+  Tag,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Sparkles,
+  History,
+  Target,
+  FileUp,
+  FileText,
+  Table,
+  FileSpreadsheet,
+  X,
+  Save,
+  ExternalLink
+} from 'lucide-react';
+import { db } from '../../firebase';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
+import { toast } from 'sonner';
+import { generateContentWrapper, getSystemInstruction, parseQuestionsFromText } from '../../services/geminiService';
+import { exportQuestionsToGoogleForms } from '../../services/googleFormsService';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
+
+// Configuração do worker do PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+interface Question {
+  id?: string;
+  questionUid: string;
+  enunciado: string;
+  alternativas: { id: string; texto: string }[];
+  respostaCorreta: string;
+  dificuldade: 'fácil' | 'médio' | 'difícil';
+  bloom: string;
+  competenciaNome: string;
+  temaNome: string;
+  tags: string[];
+  usoTotal: number;
+  taxaAcerto?: number;
+  status: 'rascunho' | 'publicado';
+  origem?: string;
+}
+
+interface Competency {
+  id: string;
+  name: string;
+}
+
+export function QuestionsBankView({ user, userProfile, selectedModel }: { user: any, userProfile: any, selectedModel: string }) {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterDifficulty, setFilterDifficulty] = useState('all');
+  const [filterCompetency, setFilterCompetency] = useState('all');
+  const [isGeneratingVariation, setIsGeneratingVariation] = useState<string | null>(null);
+  
+  // Import State
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [missingCompetencies, setMissingCompetencies] = useState<string[]>([]);
+  const [mappedCompetencies, setMappedCompetencies] = useState<Record<string, string>>({});
+  const [tempQuestions, setTempQuestions] = useState<any[]>([]);
+  const [disciplines, setDisciplines] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchQuestions();
+    fetchDisciplines();
+  }, []);
+
+  const fetchDisciplines = async () => {
+    try {
+      const q = query(collection(db, 'disciplines'), orderBy('name'));
+      const snap = await getDocs(q);
+      setDisciplines(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching disciplines:", error);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileName = file.name.toLowerCase();
+    
+    if (fileName.endsWith('.csv')) {
+      setIsImporting(true);
+      Papa.parse(file, {
+        header: true,
+        complete: async (results) => {
+          const text = JSON.stringify(results.data);
+          await processImportedQuestions(text);
+        },
+        error: (error) => {
+          console.error("CSV Parse Error:", error);
+          toast.error("Erro ao ler arquivo CSV.");
+          setIsImporting(false);
+        }
+      });
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      setIsImporting(true);
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const bstr = evt.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws);
+          await processImportedQuestions(JSON.stringify(data));
+        } catch (error) {
+          console.error("Excel Parse Error:", error);
+          toast.error("Erro ao ler arquivo Excel.");
+          setIsImporting(false);
+        }
+      };
+      reader.readAsBinaryString(file);
+    } else if (fileName.endsWith('.pdf')) {
+      setIsImporting(true);
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const typedarray = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
+          let fullText = '';
+          
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
+            fullText += pageText + '\n';
+            setImportProgress(Math.round((i / pdf.numPages) * 100));
+          }
+          
+          await processImportedQuestions(fullText);
+        } catch (error) {
+          console.error("PDF Parse Error:", error);
+          toast.error("Erro ao ler arquivo PDF.");
+          setIsImporting(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (fileName.endsWith('.docx')) {
+      setIsImporting(true);
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const arrayBuffer = evt.target?.result as ArrayBuffer;
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          await processImportedQuestions(result.value);
+        } catch (error) {
+          console.error("DOCX Parse Error:", error);
+          toast.error("Erro ao ler arquivo DOCX.");
+          setIsImporting(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      toast.error("Formato de arquivo não suportado. Use CSV, Excel, PDF ou DOCX.");
+    }
+    
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const processImportedQuestions = async (text: string) => {
+    setImportProgress(0);
+    try {
+      toast.info("A IA está analisando o conteúdo e extraindo as questões...");
+      const parsedQuestions = await parseQuestionsFromText(text, selectedModel, 'professor');
+      
+      if (!parsedQuestions || parsedQuestions.length === 0) {
+        toast.error("Nenhuma questão identificada no arquivo.");
+        setIsImporting(false);
+        return;
+      }
+
+      // Check for missing competencies
+      const uniqueCompetencies = Array.from(new Set(parsedQuestions.map(q => q.competenciaNome)));
+      const existingCompetencies = disciplines.map(d => d.name);
+      const missing = uniqueCompetencies.filter(c => !existingCompetencies.includes(c));
+
+      if (missing.length > 0) {
+        setMissingCompetencies(missing);
+        setTempQuestions(parsedQuestions);
+        setShowMappingModal(true);
+      } else {
+        await saveImportedQuestions(parsedQuestions);
+      }
+    } catch (error) {
+      console.error("Error processing questions:", error);
+      toast.error("Erro ao processar questões com IA.");
+    } finally {
+      setIsImporting(false);
+      setImportProgress(0);
+    }
+  };
+
+  const saveImportedQuestions = async (questionsToSave: any[]) => {
+    try {
+      const batch = writeBatch(db);
+      const questionsCol = collection(db, 'questions');
+      
+      questionsToSave.forEach(q => {
+        const newDocRef = doc(questionsCol);
+        batch.set(newDocRef, {
+          ...q,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          usoTotal: 0,
+          status: 'rascunho'
+        });
+      });
+
+      await batch.commit();
+      toast.success(`${questionsToSave.length} questões importadas com sucesso!`);
+      fetchQuestions();
+    } catch (error) {
+      console.error("Error saving questions:", error);
+      toast.error("Erro ao salvar questões no banco.");
+    }
+  };
+
+  const handleSaveMappedQuestions = async () => {
+    const finalQuestions = tempQuestions.map(q => {
+      const mappedName = mappedCompetencies[q.competenciaNome];
+      if (mappedName) {
+        return { ...q, competenciaNome: mappedName };
+      }
+      return q;
+    });
+
+    await saveImportedQuestions(finalQuestions);
+    setShowMappingModal(false);
+    setTempQuestions([]);
+    setMappedCompetencies({});
+  };
+
+  const handleExportToGoogleForms = async () => {
+    if (filteredQuestions.length === 0) {
+      toast.error("Não há questões filtradas para exportar.");
+      return;
+    }
+
+    try {
+      toast.info("Preparando exportação para Google Forms...");
+      const result = await exportQuestionsToGoogleForms("Banco de Questões - EDUSAEP", filteredQuestions);
+      if (result.success) {
+        toast.success("Exportação concluída!");
+        window.open(result.formUrl, '_blank');
+      } else {
+        toast.error("Erro na exportação.");
+      }
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error("Erro ao exportar para Google Forms.");
+    }
+  };
+
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, 'questions'),
+        orderBy('usoTotal', 'desc')
+      );
+      const snap = await getDocs(q);
+      setQuestions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
+    } catch (error) {
+      console.error("Error fetching questions:", error);
+      toast.error("Erro ao carregar banco de questões.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDuplicateWithVariation = async (original: Question) => {
+    if (!original.id) return;
+    setIsGeneratingVariation(original.id);
+    
+    try {
+      const prompt = `
+        Aja como um especialista em avaliação.
+        Crie uma VARIAÇÃO da seguinte questão, mantendo a mesma competência (${original.competenciaNome}) e nível de dificuldade (${original.dificuldade}), mas alterando o cenário, os valores ou a abordagem do enunciado.
+        
+        QUESTÃO ORIGINAL:
+        Enunciado: ${original.enunciado}
+        Alternativas: ${original.alternativas.map(a => `${a.id}) ${a.texto}`).join(' | ')}
+        Resposta Correta: ${original.respostaCorreta}
+        
+        Retorne a nova questão no formato JSON seguindo o padrão do sistema.
+      `;
+
+      const response = await generateContentWrapper({
+        model: selectedModel || 'gemini-3-flash-preview',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: getSystemInstruction('professor', 'banco_questoes'),
+          responseMimeType: 'application/json'
+        }
+      });
+
+      const newQuestion = JSON.parse(response.text);
+      
+      await addDoc(collection(db, 'questions'), {
+        ...newQuestion,
+        origem: 'ia_variacao',
+        originalQuestionId: original.id,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        usoTotal: 0,
+        status: 'rascunho'
+      });
+
+      toast.success("Variação gerada com sucesso e salva como rascunho!");
+      fetchQuestions();
+    } catch (error) {
+      console.error("Error generating variation:", error);
+      toast.error("Erro ao gerar variação da questão.");
+    } finally {
+      setIsGeneratingVariation(null);
+    }
+  };
+
+  const filteredQuestions = questions.filter(q => {
+    const matchesSearch = q.enunciado.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         q.competenciaNome.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDifficulty = filterDifficulty === 'all' || q.dificuldade === filterDifficulty;
+    const matchesCompetency = filterCompetency === 'all' || q.competenciaNome === filterCompetency;
+    return matchesSearch && matchesDifficulty && matchesCompetency;
+  });
+
+  const competencies = Array.from(new Set(questions.map(q => q.competenciaNome)));
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center p-20 space-y-4">
+      <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+      <p className="text-gray-500 font-medium">Acessando banco de inteligência...</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".csv,.xlsx,.xls,.pdf,.docx"
+        className="hidden"
+      />
+
+      {/* Header */}
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 flex items-center gap-3">
+            <Database className="text-indigo-600" size={32} /> Banco Inteligente de Questões
+          </h2>
+          <p className="text-gray-500 mt-1">Gestão centralizada, variações por IA e análise de calibração.</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => window.location.href = '/question-optimizer'}
+            className="px-4 py-3 bg-amber-50 text-amber-600 border border-amber-200 rounded-2xl font-bold hover:bg-amber-100 transition-all flex items-center gap-2"
+          >
+            <Sparkles size={20} /> Otimizar com IA
+          </button>
+          <button 
+            onClick={handleExportToGoogleForms}
+            className="px-4 py-3 bg-white text-gray-700 border border-gray-200 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center gap-2"
+          >
+            <ExternalLink size={20} /> Exportar Forms
+          </button>
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className="px-4 py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {isImporting ? <Loader2 size={20} className="animate-spin" /> : <FileUp size={20} />}
+            Importar Arquivo
+          </button>
+          <button className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2">
+            <Plus size={20} /> Nova Questão
+          </button>
+        </div>
+      </div>
+
+      {/* Import Progress */}
+      {isImporting && importProgress > 0 && (
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-bold text-gray-700">Processando documento...</span>
+            <span className="text-sm font-bold text-indigo-600">{importProgress}%</span>
+          </div>
+          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+            <div 
+              className="bg-indigo-600 h-full transition-all duration-300" 
+              style={{ width: `${importProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Mapping Modal */}
+      <AnimatePresence>
+        {showMappingModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Mapeamento de Competências</h3>
+                  <p className="text-sm text-gray-500">Algumas competências do arquivo não foram encontradas no sistema.</p>
+                </div>
+                <button onClick={() => setShowMappingModal(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto space-y-6">
+                {missingCompetencies.map(missing => (
+                  <div key={missing} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle size={18} />
+                      <span className="font-bold text-sm">No Arquivo: {missing}</span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Mapear para:</label>
+                      <select 
+                        value={mappedCompetencies[missing] || ''}
+                        onChange={e => setMappedCompetencies({ ...mappedCompetencies, [missing]: e.target.value })}
+                        className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">Criar nova competência: "{missing}"</option>
+                        {disciplines.map(d => (
+                          <option key={d.id} value={d.name}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowMappingModal(false)}
+                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleSaveMappedQuestions}
+                  className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all flex items-center gap-2"
+                >
+                  <Save size={20} /> Confirmar e Salvar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Filters */}
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-2 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <input 
+            type="text"
+            placeholder="Buscar por enunciado ou competência..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+          />
+        </div>
+        <select 
+          value={filterDifficulty}
+          onChange={e => setFilterDifficulty(e.target.value)}
+          className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none"
+        >
+          <option value="all">Todas Dificuldades</option>
+          <option value="fácil">Fácil</option>
+          <option value="médio">Médio</option>
+          <option value="difícil">Difícil</option>
+        </select>
+        <select 
+          value={filterCompetency}
+          onChange={e => setFilterCompetency(e.target.value)}
+          className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none"
+        >
+          <option value="all">Todas Competências</option>
+          {competencies.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Questions List */}
+      <div className="space-y-4">
+        {filteredQuestions.map(question => (
+          <motion.div 
+            key={question.id}
+            layout
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all group"
+          >
+            <div className="flex justify-between items-start gap-6">
+              <div className="flex-1 space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                    question.dificuldade === 'difícil' ? 'bg-red-100 text-red-700' :
+                    question.dificuldade === 'médio' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {question.dificuldade}
+                  </span>
+                  <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black uppercase">
+                    {question.competenciaNome}
+                  </span>
+                  <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
+                    <BrainCircuit size={12} /> {question.bloom}
+                  </span>
+                  {question.taxaAcerto !== undefined && (
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 ${
+                      question.taxaAcerto < 40 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                    }`}>
+                      <Target size={12} /> {question.taxaAcerto}% Acerto
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-gray-900 font-medium leading-relaxed line-clamp-2 group-hover:line-clamp-none transition-all">
+                  {question.enunciado}
+                </p>
+
+                <div className="flex items-center gap-6 text-xs text-gray-500 font-bold">
+                  <span className="flex items-center gap-1.5"><History size={14} /> Usada {question.usoTotal} vezes</span>
+                  <span className="flex items-center gap-1.5"><Tag size={14} /> {question.tags.join(', ')}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => handleDuplicateWithVariation(question)}
+                  disabled={isGeneratingVariation === question.id}
+                  className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                  title="Gerar Variação com IA"
+                >
+                  {isGeneratingVariation === question.id ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
+                </button>
+                <button className="p-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all shadow-sm">
+                  <Edit2 size={20} />
+                </button>
+                <button className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+
+        {filteredQuestions.length === 0 && (
+          <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 border-dashed">
+            <Database size={64} className="mx-auto mb-4 text-gray-200" />
+            <h3 className="text-xl font-bold text-gray-900">Nenhuma questão encontrada</h3>
+            <p className="text-gray-500">Tente ajustar seus filtros ou buscar por outro termo.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

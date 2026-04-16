@@ -142,5 +142,89 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin() || isProfessor();
     }
+
+    match /learning_situations/{saId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isProfessor());
+      allow update: if (isAdmin() || isProfessor());
+      allow delete: if (isAdmin() || isProfessor());
+    }
+
+    match /sa_submissions/{submissionId} {
+      allow read: if isOwner(resource.data.studentId) || isAdmin() || isProfessor();
+      allow create: if isAluno() && isOwner(request.resource.data.studentId);
+      allow update: if (isAdmin() || isProfessor()) || (isAluno() && isOwner(resource.data.studentId));
+      allow delete: if isAdmin();
+    }
+
+    match /student_chat_messages/{messageId} {
+      allow read: if isOwner(resource.data.studentId) || isAdmin();
+      allow create: if isAluno() && isOwner(request.resource.data.studentId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /import_batches/{batchId} {
+      allow read: if isAdmin() || isProfessor();
+      allow create: if isAdmin() || isProfessor();
+      allow update: if isAdmin() || isProfessor();
+      allow delete: if isAdmin();
+    }
+
+    match /teacher_generated_contents/{contentId} {
+      allow read: if isOwner(resource.data.createdBy) || isAdmin();
+      allow create: if isAdmin() || isProfessor();
+      allow update, delete: if isOwner(resource.data.createdBy) || isAdmin();
+    }
+
+    match /teacher_monthly_limits/{limitId} {
+      allow read, write: if isAuthenticated() && (limitId.startsWith(request.auth.uid) || isAdmin());
+    }
+
+    match /activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /activity_submissions/{submissionId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.studentId) || isAdmin() || isProfessor());
+      allow create: if isAluno() && isOwner(request.resource.data.studentId);
+      allow update: if isAdmin() || isProfessor() || (isAluno() && isOwner(resource.data.studentId));
+      allow delete: if isAdmin() || isProfessor();
+    }
+
+    match /submission_history/{historyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    match /rubrics/{rubricId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /calendar_events/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isProfessor();
+      allow update, delete: if isAdmin() || (isProfessor() && resource.data.createdBy == request.auth.uid);
+    }
+
+    match /forum_comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || resource.data.userId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated(); // Allow system/others to create notifications
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
   }
 }
