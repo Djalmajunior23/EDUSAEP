@@ -40,6 +40,9 @@ import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTim
 import { classifyLearningProfile } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
+import { PredictionService, PerformancePrediction } from '../../services/predictionService';
+import { WorkloadOptimizer, WorkloadHealth } from '../../services/workloadOptimizer';
+import { PedagogicalEngine, StudentSignals, TeacherContext } from '../../services/pedagogicalEngine';
 
 interface StudentInsightsProps {
   studentId: string;
@@ -54,6 +57,9 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
   const [classAverages, setClassAverages] = useState<any[]>([]);
   const [diagnosticData, setDiagnosticData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [predictions, setPredictions] = useState<PerformancePrediction[]>([]);
+  const [workload, setWorkload] = useState<WorkloadHealth | null>(null);
+  const [pedagogicalDecision, setPedagogicalDecision] = useState<any>(null);
   const [generatingProfile, setGeneratingProfile] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -180,6 +186,18 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
     // Fetch class averages
     getClassCompetencyAverages().then(setClassAverages);
 
+    // Fetch new advanced analytics
+    const fetchAdvancedData = async () => {
+      const preds = await PredictionService.predictPerformance(studentId);
+      setPredictions(preds);
+      const wl = await WorkloadOptimizer.analyzeWorkload(studentId);
+      setWorkload(wl);
+      
+      // If we have profile data, we could even use the pedagogical engine here
+      // But we need StudentSignals which requires more data aggregation
+    };
+    fetchAdvancedData();
+
     return () => {
       profileUnsubscribe();
       predictionUnsubscribe();
@@ -221,7 +239,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
       </div>
 
       {/* Top Stats & Prediction */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -253,25 +271,6 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
               {profile?.cognitive_level || 'Estilo de Aprendizagem Predominante'}
             </p>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-            <div className="flex gap-2 flex-wrap">
-              {profile?.behavioral_traits?.map((trait: string, i: number) => (
-                <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-[10px] text-gray-600 dark:text-gray-400">
-                  {trait}
-                </span>
-              ))}
-              {!profile && (
-                <span className="text-xs text-gray-400 italic">Clique em gerar para analisar seu perfil.</span>
-              )}
-            </div>
-            {profile?.recommendations && (
-              <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
-                <p className="text-xs text-emerald-800 dark:text-emerald-200 italic">
-                  "{profile.recommendations}"
-                </p>
-              </div>
-            )}
-          </div>
         </motion.div>
 
         <motion.div 
@@ -289,19 +288,15 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
           <div>
             <div className="flex items-baseline gap-2">
               <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {prediction?.probabilityOfSuccess ? `${prediction.probabilityOfSuccess}%` : '--'}
+                {predictions[0]?.predictedScore || '--'}
               </h3>
-              <span className={`text-xs font-bold ${
-                prediction?.riskLevel === 'Baixo' ? 'text-emerald-500' : 
-                prediction?.riskLevel === 'Médio' ? 'text-amber-500' : 'text-red-500'
+              <span className={`text-[10px] font-black uppercase ${
+                predictions[0]?.trend === 'UP' ? 'text-emerald-500' : 'text-amber-500'
               }`}>
-                Risco {prediction?.riskLevel || '---'}
+                Score Projetado
               </span>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Probabilidade de Aprovação</p>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-            <p className="text-[10px] text-gray-400 italic">Baseado em 12 métricas de desempenho</p>
+            <p className="text-[10px] text-gray-400 font-medium">Confiança: {((predictions[0]?.confidence || 0) * 100).toFixed(0)}%</p>
           </div>
         </motion.div>
 
@@ -315,17 +310,38 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl text-purple-600">
               <Award size={24} />
             </div>
-            <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Engajamento</span>
+            <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Carga de Trabalho</span>
           </div>
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Alta</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Nível de Participação Semanal</p>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {workload?.pressureScore || 0}%
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Nível de Pressão Acadêmica</p>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-            <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
-              <div className="bg-purple-500 h-full w-[85%] rounded-full"></div>
+          <div className="mt-4 w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+             <div className="bg-purple-500 h-full transition-all" style={{ width: `${workload?.pressureScore || 0}%` }}></div>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-orange-100 dark:border-orange-900/30 flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-2xl text-orange-600">
+              <Clock size={24} />
             </div>
+            <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">Tempo de Estudo</span>
           </div>
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {workload?.estimatedHoursRemaining || 0}h
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Restantes para metas</p>
+          </div>
+          <p className="text-[8px] text-gray-400 mt-2 font-medium">Recomendação: {workload?.suggestedAction || 'Atividades em dia'}</p>
         </motion.div>
       </div>
 

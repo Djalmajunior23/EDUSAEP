@@ -567,6 +567,134 @@
       },
       "required": ["userId", "title", "url", "type", "reason", "createdAt"]
     },
+    "Activity": {
+      "title": "Pedagogical Activity",
+      "description": "An activity created by a professor for students.",
+      "type": "object",
+      "properties": {
+        "professorId": { "type": "string" },
+        "turmaId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["exercise", "project", "research", "essay"] },
+        "status": { "type": "string", "enum": ["draft", "published", "closed"] },
+        "rubricId": { "type": "string", "description": "Optional rubric for grading." },
+        "deadline": { "type": "string", "format": "date-time" },
+        "xpReward": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professorId", "turmaId", "title", "type", "status", "createdAt"]
+    },
+    "ActivitySubmission": {
+      "title": "Activity Submission",
+      "description": "A student's delivery for a pedagogical activity.",
+      "type": "object",
+      "properties": {
+        "activityId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "content": { "type": "string", "description": "Submission text or links." },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "delivered", "graded", "needs_revision"] },
+        "grade": { "type": "number" },
+        "professorFeedback": { "type": "string" },
+        "rubricEvaluation": { "type": "object", "description": "Criterion-by-criterion evaluation." },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "gradedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["activityId", "studentId", "status", "submittedAt"]
+    },
+    "Rubric": {
+      "title": "Grading Rubric",
+      "description": "A set of criteria for grading activities.",
+      "type": "object",
+      "properties": {
+        "professorId": { "type": "string" },
+        "title": { "type": "string" },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "weight": { "type": "number" },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": { "type": "string" },
+                    "points": { "type": "number" },
+                    "description": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professorId", "title", "criteria", "createdAt"]
+    },
+    "LearningPath": {
+      "title": "Learning Path",
+      "description": "A personalized trail of resources and activities.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "title": { "type": "string" },
+        "objective": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string", "enum": ["content", "exercise", "exam", "activity"] },
+              "refId": { "type": "string" },
+              "status": { "type": "string", "enum": ["locked", "available", "completed"] },
+              "order": { "type": "number" }
+            }
+          }
+        },
+        "progress": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "title", "steps", "progress", "createdAt"]
+    },
+    "SystemEvent": {
+      "title": "System Event",
+      "description": "Audit log and event-driven triggers.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Event type (e.g., activity.submitted)." },
+        "payload": { "type": "object" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "payload", "timestamp"]
+    },
+    "StudentPortfolio": {
+      "title": "Student Portfolio",
+      "description": "A record of evidence and achievements.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "refId": { "type": "string" },
+              "comment": { "type": "string" },
+              "date": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "evidence", "updatedAt"]
+    },
     "SmartGoal": {
       "title": "Smart Goal",
       "description": "Negotiated weekly micro-goals.",
@@ -777,6 +905,30 @@
     "/import_inconsistencies/{inconsistencyId}": {
       "schema": "ImportInconsistency",
       "description": "Inconsistencies found during import."
+    },
+    "/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Pedagogical activity documents."
+    },
+    "/activity_submissions/{submissionId}": {
+      "schema": "ActivitySubmission",
+      "description": "Student submissions for activities."
+    },
+    "/rubrics/{rubricId}": {
+      "schema": "Rubric",
+      "description": "Grading rubric documents."
+    },
+    "/learning_paths/{pathId}": {
+      "schema": "LearningPath",
+      "description": "Personalized learning path documents."
+    },
+    "/system_events/{eventId}": {
+      "schema": "SystemEvent",
+      "description": "System audit and event log documents."
+    },
+    "/portfolios/{portfolioId}": {
+      "schema": "StudentPortfolio",
+      "description": "Student portfolio documents."
     }
   }
 }

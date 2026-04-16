@@ -1777,3 +1777,65 @@ export async function generateDiscursiveQuestion(
     atualizadoEm: new Date().toISOString()
   };
 }
+
+export async function generateStudyPlan(data: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um Especialista em Aprendizagem Adaptativa.
+            Com base no histórico de desempenho abaixo, crie um plano de estudos focado em melhoria contínua.
+            
+            DADOS:
+            ${JSON.stringify(data)}
+            
+            O plano deve conter:
+            1. Tópicos prioritários (com justificativa)
+            2. Recomendações de estudo
+            3. Metas de curto prazo
+            4. Explicação (Justificativa pedagógica da IA para transparência)
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "priorityTopics": [{ "topic": string, "reason": string }],
+              "recommendations": string[],
+              "goals": string[],
+              "explanation": "string"
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction('aluno', 'plano_estudo'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  const result = safeParseJson(response.text, {
+    priorityTopics: [],
+    recommendations: ["Revisar conteúdos básicos"],
+    goals: ["Aumentar acurácia geral"],
+    explanation: "Recomendação baseada no histórico de desempenho e gaps de competência detectados."
+  });
+
+  // Log explanation for transparency (Module 4)
+  if (result.explanation) {
+    try {
+      await addDoc(collection(db, 'ai_explanations'), {
+        targetId: data.studentId || 'unknown',
+        reasoning: result.explanation,
+        dataUsed: ['exam_submissions', 'performance_stats'],
+        timestamp: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn("Failed to log explanation", e);
+    }
+  }
+
+  return result;
+}

@@ -20,6 +20,13 @@ import { CommunicationCenter } from './components/communication/CommunicationCen
 import { NotificationCenter } from './components/notifications/NotificationCenter';
 import { StudentActivitiesManager } from './components/student/StudentActivitiesManager';
 import { AdminAIProviderManager } from './components/admin/AdminAIProviderManager';
+import { ClassHealthDashboard } from './components/analytics/ClassHealthDashboard';
+import { PedagogicalRulesManager } from './components/admin/PedagogicalRulesManager';
+import { StudentJourneyTimeline } from './components/student/StudentJourneyTimeline';
+import { InstitutionalTemplateManager } from './components/admin/InstitutionalTemplateManager';
+import { FeatureFlagManager } from './components/admin/FeatureFlagManager';
+import { PedagogicalGoalsTracker } from './components/student/PedagogicalGoalsTracker';
+import { CorrectionPlanView } from './components/student/CorrectionPlanView';
 import { BIDashboardView } from './components/dashboard/BIDashboardView';
 import { DataImportView } from './components/admin/DataImportView';
 import { ClassesManagementView } from './components/admin/ClassesManagementView';
@@ -103,7 +110,11 @@ import {
   Archive,
   ArchiveRestore,
   BarChart2,
-  Layout
+  Layout,
+  Activity,
+  Map as MapIcon,
+  Library,
+  Shield
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -197,6 +208,9 @@ import { exportExamToGoogleForms, exportQuestionsToGoogleForms } from './service
 
 import { GoogleFormsExportView } from './components/professor/GoogleFormsExportView';
 import { RecommendationsView } from './components/student/RecommendationsView';
+import { ActivityManager } from './components/professor/ActivityManager';
+import { ActivityList } from './components/student/ActivityList';
+import { HeatmapLearning } from './components/shared/HeatmapLearning';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -1610,8 +1624,6 @@ function TasksView({ user }: { user: User | null }) {
   );
 }
 
-
-
 function ProfessorDashboardView({ user, userProfile }: { user: User | null, userProfile: UserProfile | null }) {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
@@ -1621,20 +1633,17 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
     recentActivity: [] as any[]
   });
   const [loading, setLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'activities' | 'heatmap'>('overview');
 
   useEffect(() => {
     if (!user) return;
 
     const fetchStats = async () => {
       try {
-        // Fetch total students
         const studentsQuery = query(collection(db, 'users'), where('role', '==', 'aluno'));
         const studentsSnap = await getDocs(studentsQuery);
-        
-        // Fetch diagnostics for stats
         const diagQuery = query(collection(db, 'diagnostics'), orderBy('createdAt', 'desc'), limit(50));
         const diagSnap = await getDocs(diagQuery);
-        
         const diags = diagSnap.docs.map(doc => doc.data());
         const totalExams = diags.length;
         const totalScore = diags.reduce((acc, curr) => acc + (curr.result?.summary?.acuracia_geral * 100 || 0), 0);
@@ -1657,7 +1666,7 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
   }, [user]);
   
   return (
-    <div className="space-y-8 py-8">
+    <div className="space-y-10 py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Painel do Professor</h1>
@@ -1673,9 +1682,8 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
         </div>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
             <Users size={24} />
           </div>
@@ -1684,7 +1692,7 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
             <p className="text-2xl font-black text-gray-900 dark:text-white">{loading ? '...' : stats.totalStudents}</p>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center">
             <BookOpen size={24} />
           </div>
@@ -1693,7 +1701,7 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
             <p className="text-2xl font-black text-gray-900 dark:text-white">{loading ? '...' : stats.totalExams}</p>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center">
             <TrendingUp size={24} />
           </div>
@@ -1704,167 +1712,174 @@ function ProfessorDashboardView({ user, userProfile }: { user: User | null, user
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <LayoutDashboard size={20} className="text-emerald-600" />
-            Ações Rápidas
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/exams')}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-            >
-              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
-                <BookOpen size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">Gestão de Simulados</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Crie e gerencie avaliações padrão SAEP.</p>
-              </div>
-              <div className="mt-auto flex items-center gap-2 text-emerald-600 text-xs font-bold">
-                Gerenciar <ArrowRight size={14} />
-              </div>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/questions-bank')}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-            >
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center">
-                <Database size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">Banco de Questões</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Acesse e organize questões por competência.</p>
-              </div>
-              <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
-                Acessar <ArrowRight size={14} />
-              </div>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/professor-insights')}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-            >
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center">
-                <TrendingUp size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">Insights da Turma</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Análise de desempenho e planos de aula IA.</p>
-              </div>
-              <div className="mt-auto flex items-center gap-2 text-purple-600 text-xs font-bold">
-                Analisar <ArrowRight size={14} />
-              </div>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/cognitive-analysis')}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-            >
-              <div className="w-12 h-12 bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center">
-                <Brain size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">Erros Cognitivos</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Análise profunda das dificuldades dos alunos.</p>
-              </div>
-              <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
-                Analisar <ArrowRight size={14} />
-              </div>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/question-optimizer')}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-            >
-              <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center">
-                <Zap size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">Otimizador de Questões</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Refine itens com alta taxa de erro via IA.</p>
-              </div>
-              <div className="mt-auto flex items-center gap-2 text-amber-600 text-xs font-bold">
-                Otimizar <ArrowRight size={14} />
-              </div>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/consolidated-report')}
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-            >
-              <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
-                <BarChart2 size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">Relatório Consolidado</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Desempenho geral de todos os alunos.</p>
-              </div>
-              <div className="mt-auto flex items-center gap-2 text-indigo-600 text-xs font-bold">
-                Visualizar <ArrowRight size={14} />
-              </div>
-            </motion.button>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <History size={20} className="text-emerald-600" />
-            Atividade Recente
-          </h2>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-sm text-gray-500">Carregando atividade...</p>
-              </div>
-            ) : stats.recentActivity.length === 0 ? (
-              <div className="p-8 text-center text-gray-500 italic text-sm">
-                Nenhuma atividade recente encontrada.
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {stats.recentActivity.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => navigate(`/aluno/${item.id}`)}
-                    className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left flex items-center justify-between group"
-                  >
-                    <div>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{item.aluno}</p>
-                      <p className="text-[10px] text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-emerald-600">{(item.result?.summary?.acuracia_geral * 100)?.toFixed(1)}%</p>
-                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Acerto</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={() => navigate('/history')}
-              className="w-full p-3 bg-gray-50 dark:bg-gray-700/50 text-xs font-bold text-gray-500 hover:text-emerald-600 transition-colors border-t border-gray-100 dark:border-gray-700"
-            >
-              Ver Histórico Completo
-            </button>
-          </div>
-        </div>
+      <div className="flex items-center gap-2 p-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl w-fit">
+        {[
+          { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+          { id: 'activities', label: 'Atividades', icon: CheckSquare },
+          { id: 'heatmap', label: 'Monitoramento Heatmap', icon: Target }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id as any)}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeSubTab === tab.id 
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none' 
+                : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      <AnimatePresence mode="wait">
+        {activeSubTab === 'overview' && (
+          <motion.div
+            key="overview"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+          >
+            <div className="lg:col-span-2 space-y-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <LayoutDashboard size={20} className="text-emerald-600" />
+                Ações Rápidas
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/exams')}
+                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+                >
+                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
+                    <BookOpen size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Gestão de Simulados</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Crie e gerencie avaliações padrão SAEP.</p>
+                  </div>
+                  <div className="mt-auto flex items-center gap-2 text-emerald-600 text-xs font-bold">
+                    Gerenciar <ArrowRight size={14} />
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/questions-bank')}
+                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+                >
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center">
+                    <Database size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Banco de Questões</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Acesse e organize questões por competência.</p>
+                  </div>
+                  <div className="mt-auto flex items-center gap-2 text-blue-600 text-xs font-bold">
+                    Acessar <ArrowRight size={14} />
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/cognitive-analysis')}
+                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+                >
+                  <div className="w-12 h-12 bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center">
+                    <Brain size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Erros Cognitivos</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Análise profunda das dificuldades dos alunos.</p>
+                  </div>
+                  <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
+                    Analisar <ArrowRight size={14} />
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/tri-analysis')}
+                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+                >
+                  <div className="w-12 h-12 bg-cyan-100 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-xl flex items-center justify-center">
+                    <Target size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Análise TRI</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Parâmetros psicométricos das questões.</p>
+                  </div>
+                  <div className="mt-auto flex items-center gap-2 text-cyan-600 text-xs font-bold">
+                    Analisar <ArrowRight size={14} />
+                  </div>
+                </motion.button>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <History size={20} className="text-emerald-600" />
+                Atividade Recente
+              </h2>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                {loading ? (
+                  <div className="p-8 text-center">
+                    <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-sm text-gray-500">Carregando atividade...</p>
+                  </div>
+                ) : stats.recentActivity.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 italic text-sm">
+                    Nenhuma atividade recente encontrada.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {stats.recentActivity.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => navigate(`/aluno/${item.id}`)}
+                        className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left flex items-center justify-between group"
+                      >
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{item.aluno}</p>
+                          <p className="text-[10px] text-gray-500">{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Recent'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-emerald-600">{(item.result?.summary?.acuracia_geral * 100)?.toFixed(1)}%</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Acerto</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button 
+                  onClick={() => navigate('/history')}
+                  className="w-full p-3 bg-gray-50 dark:bg-gray-700/50 text-xs font-bold text-gray-500 hover:text-emerald-600 transition-colors border-t border-gray-100 dark:border-gray-700"
+                >
+                  Ver Histórico Completo
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeSubTab === 'activities' && (
+          <motion.div key="activities" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <ActivityManager />
+          </motion.div>
+        )}
+
+        {activeSubTab === 'heatmap' && (
+          <motion.div key="heatmap" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <HeatmapLearning />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -2014,6 +2029,24 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/student-activities')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+            <CheckSquare size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Minhas Atividades</h3>
+            <p className="text-xs text-gray-500">Acesse e entregue atividades propostas.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-indigo-600 text-xs font-bold">
+            Ver Atividades <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => navigate('/adaptive-exam/Geral')}
           className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
         >
@@ -2030,52 +2063,46 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
         </motion.button>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Meus Resultados Importados</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <PedagogicalGoalsTracker userId={user?.uid || ''} />
         
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-          </div>
-        ) : diagnostics.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4">
-            {diagnostics.map((diag) => (
-              <motion.div
-                key={diag.id}
-                whileHover={{ scale: 1.01 }}
-                onClick={() => navigate(`/dashboard/${diag.id}`)}
-                className="p-4 border border-gray-100 rounded-xl hover:bg-gray-50 cursor-pointer flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
-                    <FileText size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">Diagnóstico de {diag.aluno}</h4>
-                    <p className="text-xs text-gray-500">
-                      {diag.createdAt?.seconds ? new Date(diag.createdAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date(diag.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-emerald-600">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+            <History size={20} className="text-emerald-500" />
+            Últimos Resultados
+          </h3>
+          
+          <div className="space-y-4">
+            {diagnostics.length > 0 ? (
+              diagnostics.slice(0, 3).map((diag) => (
+                <motion.div
+                  key={diag.id}
+                  whileHover={{ scale: 1.01 }}
+                  onClick={() => navigate(`/aluno/${diag.id}`)}
+                  className="p-4 border border-gray-100 rounded-2xl hover:bg-gray-50 cursor-pointer flex items-center justify-between group transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold text-xs">
                       {Math.round(diag.result.summary.acuracia_ponderada * 100)}%
                     </div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider">Média</div>
+                    <div>
+                      <h4 className="font-bold text-gray-800 text-sm group-hover:text-emerald-600 transition-colors">Diagnóstico</h4>
+                      <p className="text-[10px] text-gray-400 font-medium">
+                        {diag.createdAt?.seconds ? new Date(diag.createdAt.seconds * 1000).toLocaleDateString() : new Date(diag.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <ChevronRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
-                </div>
-              </motion.div>
-            ))}
+                  <ChevronRight size={16} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                </motion.div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-gray-400 text-sm italic">
+                Nenhum resultado ainda.
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="mt-8 p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 text-center">
-            <BarChart3 size={48} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum diagnóstico disponível</h3>
-            <p className="text-gray-500">Seus professores ainda não publicaram nenhum resultado para você.</p>
-          </div>
-        )}
+          <button onClick={() => navigate('/history')} className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:underline">Ver Histórico Completo</button>
+        </div>
       </div>
     </div>
   );
@@ -2110,9 +2137,71 @@ function StudentInsightsView({ user, userProfile: _userProfile, selectedModel }:
 }
 
 function ProfessorInsightsView({ userProfile, selectedModel }: { userProfile: UserProfile | null, selectedModel: string }) {
+  const [activeView, setActiveView] = useState<'overview' | 'health' | 'grouping'>('overview');
+
   return (
-    <div className="py-8">
-      <ProfessorInsights userProfile={userProfile} selectedModel={selectedModel} />
+    <div className="py-8 space-y-8">
+      <div className="flex items-center gap-2 p-1 bg-gray-100/50 rounded-2xl w-fit">
+        {[
+          { id: 'overview', label: 'Estatísticas de BI', icon: BarChart3 },
+          { id: 'health', label: 'Saúde da Turma', icon: Activity },
+          { id: 'grouping', label: 'Agrupamentos IA', icon: Users },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveView(tab.id as any)}
+            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeView === tab.id 
+                ? 'bg-white text-emerald-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeView === 'overview' && (
+        <ProfessorInsights userProfile={userProfile} selectedModel={selectedModel} />
+      )}
+      
+      {activeView === 'health' && (
+        <ClassHealthDashboard />
+      )}
+
+      {activeView === 'grouping' && (
+        <div className="space-y-6">
+           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+             <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-xl font-bold">Agrupamento Inteligente</h3>
+                  <p className="text-sm text-gray-500">Alunos agrupados automaticamente por necessidade pedagógica.</p>
+                </div>
+                <button className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all">
+                  Rodar Novo Agrupamento
+                </button>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { name: 'Crítico - Reforço Imediato', count: 4, intervention: 'Retomar Competência 1' },
+                  { name: 'Excelência - Adicional', count: 7, intervention: 'Desafios Avançados' },
+                ].map(group => (
+                  <div key={group.name} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">{group.name}</span>
+                      <span className="text-xs font-bold text-gray-400">{group.count} alunos</span>
+                    </div>
+                    <div className="p-3 bg-white rounded-xl text-xs text-emerald-600 font-medium border border-emerald-50">
+                      Intervenção Sugerida: {group.intervention}
+                    </div>
+                  </div>
+                ))}
+             </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2156,6 +2245,14 @@ function GamificationDashboardView({ user: _user, userProfile: _userProfile }: {
   return (
     <div className="py-8">
       <Gamification />
+    </div>
+  );
+}
+
+function CorrectionPlansRoute({ user }: { user: any }) {
+  return (
+    <div className="py-8">
+      <CorrectionPlanView studentId={user?.uid || ''} />
     </div>
   );
 }
@@ -7387,7 +7484,9 @@ function AppContent() {
         { id: 'student-activities', label: 'Minhas Atividades', icon: CheckSquare, path: '/student-activities', description: 'Entregas e Notas' },
         { id: 'exercises', label: 'Exercícios', icon: CheckSquare, path: '/exercises', description: 'Prática e Aprendizado' },
         { id: 'student-sa', label: 'Situações de Aprendizagem', icon: BookOpen, path: '/student-sa', description: 'Desafios Práticos' },
+        { id: 'correction-plans', label: 'Planos de Acerto', icon: FileText, path: '/correction-plans', description: 'Recuperação de Erros' },
         { id: 'learning-path', label: 'Minha Trilha', icon: Map, path: '/learning-path', description: 'Caminho Personalizado' },
+        { id: 'student-journey', label: 'Minha Jornada', icon: MapIcon, path: '/student-journey', description: 'Evolução e Linha do Tempo' },
         { id: 'gamification', label: 'Minhas Conquistas', icon: Trophy, path: '/gamification', description: 'Nível e Medalhas' },
         { id: 'calendar', label: 'Calendário', icon: Calendar, path: '/calendar', description: 'Prazos e Eventos' },
         { id: 'communication', label: 'Comunicação', icon: MessageSquare, path: '/communication', description: 'Avisos e Fórum' },
@@ -7410,9 +7509,10 @@ function AppContent() {
     }
     return [
       { type: 'header', label: 'Painel Principal' },
-      { id: 'dashboard', label: 'Painel do Professor', icon: LayoutDashboard, path: '/dashboard' },
-      { id: 'bi-analysis', label: 'Análise BI', icon: TrendingUp, path: '/bi-analysis', description: 'Insights da Turma' },
-      { id: 'advanced-dashboard', label: 'Dashboard Power BI', icon: BarChart2, path: '/advanced-dashboard', description: 'Visão Executiva' },
+      { id: 'dashboard', label: 'Meu Painel', icon: LayoutDashboard, path: '/dashboard' },
+      { id: 'class-health', label: 'Saúde da Turma', icon: Activity, path: '/class-health', description: 'Métricas de Maturidade' },
+      { id: 'heatmap', label: 'Monitoramento Heatmap', icon: Target, path: '/heatmap', description: 'Visão Geral TRI' },
+      { id: 'activity-manager', label: 'Minhas Atividades', icon: CheckSquare, path: '/activity-manager', description: 'Atribuição e Correção' },
       
       { type: 'header', label: 'Gestão de Dados' },
       { id: 'data-import', label: 'Importação n8n', icon: Database, path: '/data-import', description: 'Integração SIAC' },
@@ -7435,6 +7535,8 @@ function AppContent() {
       { id: 'generate-discursive', label: 'Gerar Discursivas IA', icon: FileText, path: '/generate-discursive', description: 'Questões Abertas' },
       { id: 'learning-situation', label: 'Gerador de SA', icon: BrainCircuit, path: '/learning-situation', description: 'Gerador SA' },
       { id: 'observatory', label: 'Observatório', icon: Telescope, path: '/observatory', description: 'Visão Pedagógica' },
+      { id: 'pedagogical-rules', label: 'Regras do Sistema', icon: Zap, path: '/pedagogical-rules', description: 'Central de Regras' },
+      { id: 'institutional-templates', label: 'Templates Base', icon: Library, path: '/institutional-templates', description: 'Padronização' },
       { id: 'teacher-activities', label: 'Entregas e Correções', icon: CheckSquare, path: '/teacher-activities', description: 'Gestão de Atividades' },
       { id: 'teacher-rubrics', label: 'Rubricas de Avaliação', icon: CheckSquare, path: '/teacher-rubrics', description: 'Critérios de Correção' },
       { id: 'calendar', label: 'Calendário', icon: Calendar, path: '/calendar', description: 'Prazos e Eventos' },
@@ -7448,7 +7550,7 @@ function AppContent() {
       { id: 'chat', label: 'Chat IA', icon: MessageSquare, path: '/chat' },
       { id: 'communication', label: 'Comunicação', icon: MessageSquare, path: '/communication', description: 'Avisos e Fórum' },
       { id: 'admin-users', label: 'Gestão', icon: Users, path: '/admin-users' },
-      { id: 'ai-governance', label: 'Governança IA', icon: ShieldCheck, path: '/ai-governance', description: 'Custos e Auditoria' },
+      { id: 'ai-governance', label: 'Governança IA', icon: Shield, path: '/system-governance', description: 'Custos e Feature Flags' },
       { id: 'ai-providers', label: 'Provedores IA', icon: Settings, path: '/ai-providers', description: 'Gestão de Chaves' },
       { id: 'smart-content', label: 'Gerador IA', icon: Sparkles, path: '/smart-content', description: 'Conteúdo Inteligente' },
       
@@ -8419,6 +8521,7 @@ function AppContent() {
               <Route path="/student-sa" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentLearningSituationsView userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/learning-path" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentLearningPathView userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/gamification" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><StudentGamificationView userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/correction-plans" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><CorrectionPlansRoute user={user} /></ProtectedRoute>} />
               <Route path="/student-chatbot" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><div className="max-w-4xl mx-auto"><StudentLearningChatbot userProfile={userProfile} /></div></ProtectedRoute>} />
               <Route path="/import-students" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><StudentImportUploader userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/import-exercises" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ExerciseImportUploader userProfile={userProfile} /></ProtectedRoute>} />
@@ -8436,6 +8539,14 @@ function AppContent() {
               <Route path="/observatory" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ClassObservatoryView /></ProtectedRoute>} />
               <Route path="/teacher-activities" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><TeacherActivitiesManager userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/teacher-rubrics" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><TeacherRubricsManager userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/activity-manager" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ActivityManager /></ProtectedRoute>} />
+              <Route path="/heatmap" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><HeatmapLearning /></ProtectedRoute>} />
+              <Route path="/pedagogical-rules" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['admin', 'professor']}><PedagogicalRulesManager /></ProtectedRoute>} />
+              <Route path="/class-health" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}><ClassHealthDashboard /></ProtectedRoute>} />
+              <Route path="/student-journey" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><StudentJourneyTimeline userId={user.uid} /></ProtectedRoute>} />
+              <Route path="/institutional-templates" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['admin', 'professor']}><InstitutionalTemplateManager /></ProtectedRoute>} />
+              <Route path="/system-governance" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['admin']}><FeatureFlagManager /></ProtectedRoute>} />
+              <Route path="/student-activities" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'admin']}><ActivityList userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/calendar" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><CalendarView userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/communication" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><CommunicationCenter userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><NotificationCenter userProfile={userProfile} /></ProtectedRoute>} />

@@ -192,6 +192,26 @@ service cloud.firestore {
       allow delete: if isAdmin() || isProfessor();
     }
 
+    match /rubrics/{rubricId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /learning_paths/{pathId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.studentId) || isAdmin() || isProfessor());
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /system_events/{eventId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Broadly allowed for system logs, but should be handled by server/n8n usually
+    }
+
+    match /portfolios/{portfolioId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.studentId) || isAdmin() || isProfessor());
+      allow write: if isAdmin() || isProfessor() || (isAluno() && isOwner(resource.data.studentId));
+    }
+
     match /submission_history/{historyId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
