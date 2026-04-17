@@ -5,7 +5,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { db } from '../../firebase';
 import { collection, query, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import { exportExamToGoogleForms, syncFormResponses } from '../../services/googleFormsService';
+import { exportQuestionsToGoogleForms, exportExamToGoogleForms, syncFormResponses } from '../../services/googleFormsService';
 import { 
   Share2, FileText, ExternalLink, CheckCircle2, 
   AlertCircle, Loader2, Search, Filter, 
@@ -216,7 +216,7 @@ export function GoogleFormsExportView({ user, userProfile }: { user: any, userPr
                 onClick={async () => {
                   setImporting(true);
                   try {
-                    const result = await (await import('../../services/googleFormsService')).exportQuestionsToGoogleForms(
+                    const result = await exportQuestionsToGoogleForms(
                       `Importação ${new Date().toLocaleDateString()}`,
                       importedQuestions
                     );

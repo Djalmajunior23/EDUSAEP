@@ -970,15 +970,21 @@ function ReportsView({ history }: { history: any[] }) {
     }
 
     if (startDate) {
-      const [year, month, day] = startDate.split('-').map(Number);
-      const start = new Date(year, month - 1, day, 0, 0, 0);
-      filtered = filtered.filter(h => getDate(h.createdAt) >= start);
+      const parts = startDate.split('-');
+      if(parts.length === 3) {
+      	const [year, month, day] = parts.map(Number);
+      	const start = new Date(year, month - 1, day, 0, 0, 0);
+      	filtered = filtered.filter(h => getDate(h.createdAt) >= start);
+      }
     }
 
     if (endDate) {
-      const [year, month, day] = endDate.split('-').map(Number);
-      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-      filtered = filtered.filter(h => getDate(h.createdAt) <= end);
+      const parts = endDate.split('-');
+      if(parts.length === 3) {
+      	const [year, month, day] = parts.map(Number);
+      	const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      	filtered = filtered.filter(h => getDate(h.createdAt) <= end);
+      }
     }
 
     // Sort by date

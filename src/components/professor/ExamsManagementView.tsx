@@ -71,9 +71,72 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
   const [isSaving, setIsSaving] = useState(false);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
 
+  // Generative State
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
   useEffect(() => {
     fetchExams();
   }, [filterType]);
+
+  const handleGenerateFromTopic = async () => {
+    if (!generatePrompt.trim()) {
+      toast.error('Informe um tema ou instrução para gerar a avaliação.');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      toast.info('Gerando questões com IA... Isso pode levar alguns segundos.');
+      const questionsTextResult = await parseQuestionsFromText(`Crie um simulado baseado nisso: ${generatePrompt}`, selectedModel, userProfile?.role);
+      
+      if (!questionsTextResult || questionsTextResult.length === 0) {
+        throw new Error('Nenhuma questão gerada.');
+      }
+
+      const batch = writeBatch(db);
+      const questionIds: string[] = [];
+
+      for (const q of questionsTextResult) {
+        const qRef = doc(collection(db, 'questions'));
+        batch.set(qRef, {
+          ...q,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          usoTotal: 0
+        });
+        questionIds.push(qRef.id);
+      }
+
+      const examRef = doc(collection(db, 'exams'));
+      batch.set(examRef, {
+        title: `Avaliação: ${generatePrompt.substring(0, 30)}...`,
+        description: `Avaliação gerada por IA sobre: ${generatePrompt}`,
+        type: filterType === 'all' ? 'simulado' : filterType as any,
+        status: 'rascunho',
+        questions: questionIds,
+        totalQuestions: questionIds.length,
+        totalPoints: questionIds.length * 10,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      });
+
+      await batch.commit();
+      setShowGenerateModal(false);
+      setGeneratePrompt('');
+      toast.success("Avaliação gerada com sucesso!");
+      fetchExams();
+    } catch (error: any) {
+      console.error('Generation Error:', error);
+      toast.error(`Erro ao gerar: ${error.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -300,6 +363,12 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
           <p className="text-gray-500 mt-1">Crie avaliações, acompanhe resultados e exporte para o Google Forms.</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={() => setShowGenerateModal(true)}
+            className="px-6 py-3 bg-purple-50 text-purple-600 rounded-2xl font-bold hover:bg-purple-100 transition-all flex items-center gap-2 shadow-sm"
+          >
+            <Sparkles size={20} /> IA Generativa
+          </button>
           <input 
             type="file" 
             id="exam-import" 
@@ -582,6 +651,68 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
                   className="flex-1 py-3 text-white font-bold bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
                 >
                   Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* GENERATE MODAL */}
+      <AnimatePresence>
+        {showGenerateModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Sparkles className="text-purple-600" />
+                  Gerar Avaliação com IA
+                </h3>
+                <button onClick={() => setShowGenerateModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Tema ou Instrução para a Prova</label>
+                  <textarea
+                    rows={4}
+                    value={generatePrompt}
+                    onChange={(e) => setGeneratePrompt(e.target.value)}
+                    placeholder="Ex: Crie um simulado com 5 questões de múltipla escolha sobre lógica de programação, com foco em estruturas de repetição (for e while)."
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none resize-none"
+                  />
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="text-purple-600 shrink-0 mt-0.5" size={18} />
+                  <p className="text-sm text-purple-900">
+                    A IA irá gerar as questões e montar a avaliação automaticamente com as questões já cadastradas no banco de forma vinculada.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleGenerateFromTopic}
+                  disabled={isGenerating || !generatePrompt.trim()}
+                  className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Gerando (isto pode levar alguns minutos)...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      Gerar Avaliação
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>

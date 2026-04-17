@@ -305,10 +305,10 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
   // Process data for charts
   const processChartData = () => {
     const errorCounts: Record<string, number> = {
-      'Interpretação': 0,
-      'Conceito': 0,
-      'Atenção': 0,
-      'Lógica': 0
+      'conceitual': 0,
+      'interpretação': 0,
+      'distração': 0,
+      'execução': 0
     };
 
     let filteredAnalyses = analyses;
@@ -665,9 +665,9 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
                     <div key={idx} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
-                          ${err.category === 'Interpretação' ? 'bg-blue-100 text-blue-700' :
-                            err.category === 'Conceito' ? 'bg-emerald-100 text-emerald-700' :
-                            err.category === 'Atenção' ? 'bg-amber-100 text-amber-700' :
+                          ${err.category === 'interpretação' ? 'bg-blue-100 text-blue-700' :
+                            err.category === 'conceitual' ? 'bg-emerald-100 text-emerald-700' :
+                            err.category === 'distração' ? 'bg-amber-100 text-amber-700' :
                             'bg-red-100 text-red-700'
                           }`}>
                           {err.category}

@@ -25,7 +25,11 @@ export async function stageImportedData(rawData: any[]): Promise<StagedData[]> {
 export const importService = {
   async parseFile(file: File): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      const fileExt = file.name.split('.').pop()?.toLowerCase();
+      if (!file) return reject(new Error("File is not provided."));
+      if (!file.name || typeof file.name !== 'string') return reject(new Error("Invalid file."));
+
+      const parts = file.name.split('.');
+      const fileExt = parts.pop()?.toLowerCase();
 
       if (fileExt === 'csv') {
         Papa.parse(file, {

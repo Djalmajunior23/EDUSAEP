@@ -14,6 +14,8 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/fi
 import { getNextAdaptiveQuestion, SAEPQuestion } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
+import { QuestionRenderer } from '../common/QuestionRenderer';
+import { Question } from '../../types';
 
 interface AdaptiveExamProps {
   examId: string;
@@ -221,7 +223,7 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
             exit={{ opacity: 0, x: -20 }}
             className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800"
           >
-            <div className="mb-8">
+            <div className="mb-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${
                   currentQuestion.dificuldade === 'fácil' ? 'bg-emerald-100 text-emerald-600' :
@@ -229,67 +231,17 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
                 }`}>
                   {currentQuestion.dificuldade}
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono">{currentQuestion.temaNome}</span>
+                <span className="text-[10px] text-gray-400 font-mono uppercase tracking-widest">{currentQuestion.temaNome}</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 leading-relaxed">
-                {currentQuestion.enunciado}
-              </h3>
             </div>
 
-            <div className="space-y-3 mb-8">
-              {currentQuestion.alternativas.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => !showFeedback && setSelectedOption(option.id)}
-                  disabled={showFeedback}
-                  className={`w-full p-4 rounded-2xl text-left transition-all flex items-center justify-between group ${
-                    selectedOption === option.id
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none'
-                      : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  } ${
-                    showFeedback && option.id === currentQuestion.respostaCorreta
-                      ? 'ring-2 ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
-                      : ''
-                  } ${
-                    showFeedback && selectedOption === option.id && option.id !== currentQuestion.respostaCorreta
-                      ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                      : ''
-                  }`}
-                >
-                  <span className="text-sm"><span className="font-bold mr-2">{option.id})</span> {option.texto}</span>
-                  {showFeedback && option.id === currentQuestion.respostaCorreta && (
-                    <CheckCircle2 size={20} />
-                  )}
-                  {showFeedback && selectedOption === option.id && option.id !== currentQuestion.respostaCorreta && (
-                    <XCircle size={20} />
-                  )}
-                </button>
-              ))}
-            </div>
+            <QuestionRenderer 
+              question={currentQuestion as unknown as Question}
+              showCorrectAnswer={showFeedback}
+              onSelect={(optionId) => !showFeedback && setSelectedOption(optionId)}
+            />
 
-            {showFeedback ? (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 mb-8"
-              >
-                <div className="flex items-center gap-2 mb-2 text-gray-900 dark:text-white font-bold text-sm">
-                  <AlertCircle size={18} className="text-emerald-600" />
-                  Explicação da IA
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-                  {currentQuestion.comentarioGabarito}
-                </p>
-                {selectedOption && currentQuestion.justificativasAlternativas[selectedOption] && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Por que esta alternativa?</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{currentQuestion.justificativasAlternativas[selectedOption]}</p>
-                  </div>
-                )}
-              </motion.div>
-            ) : null}
-
-            <div className="flex justify-end">
+            <div className="flex justify-end mt-8">
               {!showFeedback ? (
                 <button
                   onClick={handleAnswer}

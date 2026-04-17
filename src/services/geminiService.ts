@@ -365,6 +365,137 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
   }
 }
 
+export async function generateQuestionVariation(originalQuestion: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any> {
+  const prompt = `
+Aja como um especialista em avaliação educacional de alto nível.
+Sua tarefa é criar uma VARIAÇÃO da questão fornecida.
+
+REGRAS ESTABELECIDAS:
+1. Mantenha o MESMO CONCEITO avaliado, a mesma habilidade cognitiva (Taxonomia de Bloom) e o mesmo nível de dificuldade.
+2. Mude o CONTEXTO do problema (a história, o cenário ou o estudo de caso).
+3. Se a questão for de exatas/cálculo, mude OBRIGATORIAMENTE os dados numéricos e a resposta matemática final de acordo com a nova história. Se não for cálculo, mude completamente os exemplos mencionados.
+4. Mantenha a mesma quantidade de alternativas e preserve o mesmo formato.
+5. Retorne os dados estritamente em um JSON estruturado.
+
+QUESTÃO ORIGINAL:
+Enunciado: ${originalQuestion.enunciado}
+Competência Opcional: ${originalQuestion.competenciaNome || ''}
+Alternativas: ${originalQuestion.alternativas?.map((a: any) => `${a.id}) ${a.texto}`).join(' | ')}
+Resposta Correta: ${originalQuestion.respostaCorreta}
+Dificuldade: ${originalQuestion.dificuldade}
+
+Seja criativo no contexto, garantindo que o candidato precise entender o conceito original para resolver e não apenas decorar.
+  `;
+
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          questionUid: { type: Type.STRING, description: "Um identificador unico e randomico" },
+          competenciaNome: { type: Type.STRING },
+          temaNome: { type: Type.STRING },
+          dificuldade: { type: Type.STRING, enum: ["fácil", "médio", "difícil"] },
+          bloom: { type: Type.STRING },
+          enunciado: { type: Type.STRING, description: "O novo enunciado com contexto diferente." },
+          alternativas: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
+                texto: { type: Type.STRING }
+              },
+              required: ["id", "texto"]
+            }
+          },
+          respostaCorreta: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
+          comentarioGabarito: { type: Type.STRING },
+          tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["enunciado", "alternativas", "respostaCorreta", "dificuldade", "competenciaNome"]
+      }
+    }
+  });
+
+  const parsed = safeParseJson(response.text, null);
+  if (!parsed || !parsed.enunciado) {
+    throw new Error("A IA retornou um formato inválido ao gerar a variação.");
+  }
+  return parsed;
+}
+
+export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any[]> {
+  const prompt = `
+Aja como um especialista em avaliação educacional de alto nível.
+Sua tarefa é criar ${count} VARIAÇÕES diferentes da questão fornecida.
+
+REGRAS ESTABELECIDAS:
+1. Mantenha o MESMO CONCEITO avaliado, a mesma habilidade cognitiva (Taxonomia de Bloom) e o mesmo nível de dificuldade.
+2. Mude o CONTEXTO do problema (a história, o cenário ou o estudo de caso) em cada variação para que todas as ${count} sejam distintas entre si e distintas da original.
+3. Se a questão for de exatas/cálculo, mude OBRIGATORIAMENTE os dados numéricos e a resposta matemática final em cada variação.
+4. Mantenha a mesma quantidade de alternativas e preserve o mesmo formato para cada questão gerada.
+5. Retorne os dados estritamente como um ARRAY JSON contendo as ${count} questões estruturadas.
+
+QUESTÃO ORIGINAL:
+Enunciado: ${originalQuestion.enunciado}
+Competência Opcional: ${originalQuestion.competenciaNome || ''}
+Alternativas: ${originalQuestion.alternativas?.map((a: any) => `${a.id}) ${a.texto}`).join(' | ')}
+Resposta Correta: ${originalQuestion.respostaCorreta}
+Dificuldade: ${originalQuestion.dificuldade}
+
+Seja criativo nos contextos, garantindo que o candidato precise entender o conceito original para resolver e não apenas decorar.
+  `;
+
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            questionUid: { type: Type.STRING, description: "Um identificador unico e randomico" },
+            competenciaNome: { type: Type.STRING },
+            temaNome: { type: Type.STRING },
+            dificuldade: { type: Type.STRING, enum: ["fácil", "médio", "difícil"] },
+            bloom: { type: Type.STRING },
+            enunciado: { type: Type.STRING, description: "O novo enunciado com contexto diferente." },
+            alternativas: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
+                  texto: { type: Type.STRING }
+                },
+                required: ["id", "texto"]
+              }
+            },
+            respostaCorreta: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
+            comentarioGabarito: { type: Type.STRING },
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["enunciado", "alternativas", "respostaCorreta", "dificuldade", "competenciaNome"]
+        }
+      }
+    }
+  });
+
+  const parsed = safeParseJson(response.text, []);
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("A IA retornou um formato inválido ao gerar as variações.");
+  }
+  return parsed;
+}
+
 export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any[]> {
   // Split text into chunks of ~15,000 characters to avoid output token limits
   const chunkSize = 15000;
@@ -889,6 +1020,130 @@ export async function classifyLearningProfile(behavioralData: any, modelName: st
   return safeParseJson(response.text, {});
 }
 
+export interface AdvancedQuestionParams {
+  topic: string;
+  discipline: string;
+  competency: string;
+  level: 'fácil' | 'médio' | 'difícil';
+  bloom: 'lembrar' | 'compreender' | 'aplicar' | 'analisar' | 'avaliar' | 'criar';
+  type: 'multipla_escolha' | 'discursiva' | 'estudo_caso' | 'analitica';
+  includeCode?: boolean;
+  includeImage?: boolean;
+  includeTable?: boolean;
+  includeDiagram?: boolean;
+  language?: string;
+  marketContext?: boolean;
+  count?: number;
+}
+
+/**
+ * Gera questões avançadas com suporte a múltiplos recursos (código, imagens, tabelas, etc.)
+ */
+export async function generateAdvancedQuestion(params: AdvancedQuestionParams, modelName: string = "gemini-3-flash-preview"): Promise<any[]> {
+  const prompt = `
+Aja como um Arquiteto de Software Sênior e Especialista em Avaliação Educacional.
+Gere ${params.count || 1} questão(ões) do tipo "${params.type}" para a disciplina "${params.discipline}" sobre o tema "${params.topic}".
+
+REQUISITOS TÉCNICOS:
+- Competência: ${params.competency}
+- Nível de Dificuldade: ${params.level}
+- Taxonomia de Bloom: ${params.bloom}
+- Contexto de Mercado: ${params.marketContext ? 'OBRIGATÓRIO (Cenário profissional real)' : 'Opcional'}
+${params.includeCode ? `- Incluir BLOCO DE CÓDIGO na linguagem: ${params.language || 'Pseudocódigo'}` : ''}
+${params.includeImage ? `- Projetar para incluir uma IMAGEM (Descreva o que deve estar na imagem no campo caption e use um placeholder no content se necessário)` : ''}
+${params.includeTable ? `- Incluir uma TABELA de dados relevante` : ''}
+${params.includeDiagram ? `- Incluir um DIAGRAMA técnico (fluxograma, UML, arquitetura)` : ''}
+
+FORMATO DE RESPOSTA:
+Retorne um ARRAY de objetos seguindo estritamente este esquema:
+{
+  "questionUid": "string",
+  "tipoQuestao": "${params.type === 'discursiva' ? 'discursiva' : 'multipla_escolha'}",
+  "enunciado": "Texto rico do enunciado",
+  "assets": [
+    {
+      "id": "string",
+      "type": "image | code | table | diagram | case_study",
+      "content": "Conteúdo do recurso (Para code, o código bruto; Para table/diagram, JSON string com headers e rows; Para image, uma descrição detalhada)",
+      "title": "Título do recurso",
+      "caption": "Legenda pedagógica",
+      "language": "lingua do código se aplicável"
+    }
+  ],
+  "alternativas": [ {"id": "A", "texto": "...", "feedback": "..."} ],
+  "respostaCorreta": "A",
+  "respostaEsperada": "Para discursivas, o padrão de resposta",
+  "rubricaAvaliacao": "Critérios de correção",
+  "comentarioGabarito": "Explicação completa",
+  "comentarioPedagogico": "Dica de estudo",
+  "dificuldade": "${params.level}",
+  "bloom": "${params.bloom}",
+  "tags": ["lista", "de", "tags"],
+  "tempoEstimado": number (segundos)
+}
+  `;
+
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'banco_questoes'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            questionUid: { type: Type.STRING },
+            tipoQuestao: { type: Type.STRING, enum: ['multipla_escolha', 'discursiva', 'verdadeiro_falso', 'lacuna', 'ordenacao', 'associacao'] },
+            enunciado: { type: Type.STRING },
+            assets: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  type: { type: Type.STRING, enum: ['image', 'code', 'table', 'diagram', 'case_study'] },
+                  content: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  caption: { type: Type.STRING },
+                  language: { type: Type.STRING }
+                },
+                required: ['id', 'type', 'content']
+              }
+            },
+            alternativas: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  texto: { type: Type.STRING },
+                  feedback: { type: Type.STRING }
+                },
+                required: ['id', 'texto']
+              }
+            },
+            respostaCorreta: { type: Type.STRING },
+            respostaEsperada: { type: Type.STRING },
+            rubricaAvaliacao: { type: Type.STRING },
+            comentarioGabarito: { type: Type.STRING },
+            comentarioPedagogico: { type: Type.STRING },
+            dificuldade: { type: Type.STRING },
+            bloom: { type: Type.STRING },
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            tempoEstimado: { type: Type.NUMBER }
+          },
+          required: ['enunciado', 'tipoQuestao', 'dificuldade', 'bloom']
+        }
+      }
+    }
+  });
+
+  return safeParseJson(response.text, []);
+}
+
 export interface CognitiveErrorResult {
   errors: Array<{
     questionId: string;
@@ -916,8 +1171,15 @@ export async function analyzeCognitiveErrors(submissionData: any, questions: any
             QUESTÕES DO SIMULADO:
             ${JSON.stringify(questions)}
             
-            Classifique cada erro em: Interpretação, Conceito, Atenção ou Lógica.
-            Forneça uma explicação detalhada do erro e uma sugestão de intervenção pedagógica.`
+            Classifique cada erro estritamente em uma destas quatro categorias:
+            1. 'conceitual': Lacunas teóricas ou falta de domínio do conteúdo base.
+            2. 'interpretação': Erro ao traduzir o problema ou entender o comando da questão.
+            3. 'distração': Erros bobos, leitura rápida ou falta de atenção aos detalhes.
+            4. 'execução': O aluno sabe o conceito e interpretou bem, mas errou no processo de resolução ou cálculo.
+            
+            Para cada erro, forneça:
+            - explicacao_detalhada: O que exatamente o aluno errou.
+            - sugestao_intervencao: Uma correção específica e prática para esta categoria de erro.`
           }
         ]
       }
@@ -926,6 +1188,24 @@ export async function analyzeCognitiveErrors(submissionData: any, questions: any
       systemInstruction: getSystemInstruction(userRole, 'analise_desempenho'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          errors: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                questionId: { type: Type.STRING },
+                category: { type: Type.STRING, enum: ['conceitual', 'interpretação', 'distração', 'execução'] },
+                explicacao_detalhada: { type: Type.STRING },
+                sugestao_intervencao: { type: Type.STRING }
+              },
+              required: ['category', 'explicacao_detalhada', 'sugestao_intervencao']
+            }
+          }
+        }
+      }
     }
   });
 
@@ -1226,6 +1506,14 @@ export interface SAEPQuestion {
   perfilGeracao: string;
   tipoQuestao: string;
   enunciado: string;
+  assets?: Array<{
+    id: string;
+    type: 'image' | 'code' | 'table' | 'diagram' | 'case_study';
+    content: string;
+    title?: string;
+    caption?: string;
+    language?: string;
+  }>;
   alternativas: { id: string, texto: string }[];
   respostaCorreta: string;
   comentarioGabarito: string;
@@ -1607,17 +1895,18 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
         role: "user",
         parts: [
           {
-            text: `Aja como um motor de Teste Adaptativo Computadorizado (CAT).
-            O aluno tem uma proficiência estimada de ${proficiency} (escala 0-100).
-            Gere uma questão de múltipla escolha para a competência "${competency}" que seja adequada para este nível de proficiência.
+            text: `Aja como um motor de Teste Adaptativo Computadorizado (CAT) de alta performance.
+            O aluno tem uma proficiência estimada de ${proficiency}/100 na competência "${competency}".
+            Gere uma questão inédita (Padrão SAEP/SENAI) adequada para este nível.
             
-            REGRAS:
-            1. Se proficiência < 30: Nível Fácil.
-            2. Se proficiência 30-70: Nível Médio.
-            3. Se proficiência > 70: Nível Difícil.
-            4. NÃO repita questões do histórico: ${JSON.stringify(history.map(h => h.text).slice(-5))}.
+            REGRAS DE CONTEÚDO:
+            1. Se proficiência < 33: Nível FÁCIL (Conceitos básicos, identificação).
+            2. Se proficiência 33-66: Nível MÉDIO (Aplicação, análise simples, contextualização técnica).
+            3. Se proficiência > 66: Nível DIFÍCIL (Análise crítica, síntese, resolução de problemas complexos).
+            4. INCLUA RECURSOS RICOS (assets) para níveis Médio e Difícil: Snippets de código, tabelas de dados ou descrições de cenários/estudos de caso.
+            5. NÃO repita questões do histórico: ${JSON.stringify(history.map(h => h.enunciado).slice(-5))}.
             
-            RETORNE O JSON COMPLETO CONFORME O PADRÃO FIRESTORE ESPECIFICADO NAS INSTRUÇÕES DO SISTEMA.`
+            RETORNE O JSON COMPLETO NO FORMATO SAEPQuestion.`
           }
         ]
       }
@@ -1634,11 +1923,26 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
           competenciaNome: { type: Type.STRING },
           temaId: { type: Type.STRING },
           temaNome: { type: Type.STRING },
-          dificuldade: { type: Type.STRING },
+          dificuldade: { type: Type.STRING, enum: ['fácil', 'médio', 'difícil'] },
           bloom: { type: Type.STRING },
           perfilGeracao: { type: Type.STRING },
           tipoQuestao: { type: Type.STRING },
           enunciado: { type: Type.STRING },
+          assets: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                type: { type: Type.STRING, enum: ['image', 'code', 'table', 'diagram', 'case_study'] },
+                content: { type: Type.STRING },
+                title: { type: Type.STRING },
+                caption: { type: Type.STRING },
+                language: { type: Type.STRING }
+              },
+              required: ['id', 'type', 'content']
+            }
+          },
           alternativas: {
             type: Type.ARRAY,
             items: {

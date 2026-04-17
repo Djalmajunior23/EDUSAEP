@@ -56,11 +56,14 @@ export function PedagogicalIntelligenceHub() {
     </div>
   );
 
-  const radarData = errorMap.map(entry => ({
-    subject: entry.skillId.split('-')[1] || entry.skillId,
-    A: entry.errorFrequency,
-    fullMark: 100,
-  }));
+  const radarData = errorMap.map(entry => {
+    const defaultSubject = typeof entry.skillId === 'string' ? entry.skillId : 'Unknown';
+    return {
+      subject: typeof entry.skillId === 'string' && entry.skillId.includes('-') ? entry.skillId.split('-')[1] || defaultSubject : defaultSubject,
+      A: entry.errorFrequency || 0,
+      fullMark: 100,
+    };
+  });
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">

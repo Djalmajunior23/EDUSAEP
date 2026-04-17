@@ -26,37 +26,27 @@ import {
   FileSpreadsheet,
   X,
   Save,
-  ExternalLink
+  ExternalLink,
+  Zap
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { generateContentWrapper, getSystemInstruction, parseQuestionsFromText } from '../../services/geminiService';
+import { generateContentWrapper, getSystemInstruction, parseQuestionsFromText, generateQuestionVariation, generateMultipleQuestionVariations } from '../../services/geminiService';
 import { exportQuestionsToGoogleForms } from '../../services/googleFormsService';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
+import { Question } from '../../types';
+import { AdvancedQuestionGenerator } from './AdvancedQuestionGenerator';
+import { QuestionRenderer } from '../common/QuestionRenderer';
+import { Eye, ChevronDown as ChevronDownIcon, ChevronUp as ChevronUpIcon } from 'lucide-react';
+import { cn } from '../../lib/utils';
+
 // Configuração do worker do PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-
-interface Question {
-  id?: string;
-  questionUid: string;
-  enunciado: string;
-  alternativas: { id: string; texto: string }[];
-  respostaCorreta: string;
-  dificuldade: 'fácil' | 'médio' | 'difícil';
-  bloom: string;
-  competenciaNome: string;
-  temaNome: string;
-  tags: string[];
-  usoTotal: number;
-  taxaAcerto?: number;
-  status: 'rascunho' | 'publicado';
-  origem?: string;
-}
 
 interface Competency {
   id: string;
@@ -70,6 +60,8 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [filterCompetency, setFilterCompetency] = useState('all');
   const [isGeneratingVariation, setIsGeneratingVariation] = useState<string | null>(null);
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
+  const [showAdvancedGenerator, setShowAdvancedGenerator] = useState(false);
   
   // Import State
   const [isImporting, setIsImporting] = useState(false);
@@ -80,6 +72,14 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
   const [tempQuestions, setTempQuestions] = useState<any[]>([]);
   const [disciplines, setDisciplines] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Editing states
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editedQuestion, setEditedQuestion] = useState<Partial<Question>>({});
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Variation states
+  const [variationModalConfig, setVariationModalConfig] = useState<{isOpen: boolean, question: Question | null, count: number}>({isOpen: false, question: null, count: 5});
 
   useEffect(() => {
     fetchQuestions();
@@ -93,6 +93,41 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       setDisciplines(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Error fetching disciplines:", error);
+    }
+  };
+
+  const handleEditClick = (quest: Question) => {
+    setEditingQuestionId(quest.id!);
+    setEditedQuestion(quest);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingQuestionId) return;
+    setIsSavingEdit(true);
+    try {
+      const docRef = doc(db, 'questions', editingQuestionId);
+      await updateDoc(docRef, {
+        ...editedQuestion,
+        updatedAt: serverTimestamp()
+      });
+      toast.success("Questão atualizada com sucesso!");
+      setEditingQuestionId(null);
+      fetchQuestions();
+    } catch (error) {
+      console.error("Error updating question:", error);
+      toast.error("Erro ao atualizar questão.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async (questId: string) => {
+    try {
+      await deleteDoc(doc(db, 'questions', questId));
+      toast.success("Questão apagada!");
+      fetchQuestions();
+    } catch (e) {
+      toast.error("Erro ao apagar questão.");
     }
   };
 
@@ -294,49 +329,42 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     }
   };
 
-  const handleDuplicateWithVariation = async (original: Question) => {
-    if (!original.id) return;
+  const handleMultipleVariations = async () => {
+    const original = variationModalConfig.question;
+    const count = variationModalConfig.count;
+    if (!original || !original.id) return;
+
+    setVariationModalConfig(prev => ({ ...prev, isOpen: false }));
     setIsGeneratingVariation(original.id);
     
     try {
-      const prompt = `
-        Aja como um especialista em avaliação.
-        Crie uma VARIAÇÃO da seguinte questão, mantendo a mesma competência (${original.competenciaNome}) e nível de dificuldade (${original.dificuldade}), mas alterando o cenário, os valores ou a abordagem do enunciado.
-        
-        QUESTÃO ORIGINAL:
-        Enunciado: ${original.enunciado}
-        Alternativas: ${original.alternativas.map(a => `${a.id}) ${a.texto}`).join(' | ')}
-        Resposta Correta: ${original.respostaCorreta}
-        
-        Retorne a nova questão no formato JSON seguindo o padrão do sistema.
-      `;
-
-      const response = await generateContentWrapper({
-        model: selectedModel || 'gemini-3-flash-preview',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: getSystemInstruction('professor', 'banco_questoes'),
-          responseMimeType: 'application/json'
-        }
-      });
-
-      const newQuestion = JSON.parse(response.text);
+      toast.info(`A IA está gerando ${count} variações contextuais da questão...`);
+      const newQuestions = await generateMultipleQuestionVariations(original, count, selectedModel, 'professor');
       
-      await addDoc(collection(db, 'questions'), {
-        ...newQuestion,
-        origem: 'ia_variacao',
-        originalQuestionId: original.id,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        usoTotal: 0,
-        status: 'rascunho'
+      const batch = writeBatch(db);
+      const questionsCol = collection(db, 'questions');
+
+      newQuestions.forEach(newQ => {
+        const newDocRef = doc(questionsCol);
+        batch.set(newDocRef, {
+          ...original,
+          ...newQ,
+          origem: 'ia_variacao_lote',
+          originalQuestionId: original.id,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          usoTotal: 0,
+          status: 'rascunho'
+        });
       });
 
-      toast.success("Variação gerada com sucesso e salva como rascunho!");
+      await batch.commit();
+
+      toast.success(`${newQuestions.length} variações geradas com sucesso e salvas como rascunho!`);
       fetchQuestions();
     } catch (error) {
-      console.error("Error generating variation:", error);
-      toast.error("Erro ao gerar variação da questão.");
+      console.error("Error generating variations:", error);
+      toast.error("Erro ao gerar variações da questão.");
     } finally {
       setIsGeneratingVariation(null);
     }
@@ -390,6 +418,12 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
             className="px-4 py-3 bg-white text-gray-700 border border-gray-200 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center gap-2"
           >
             <ExternalLink size={20} /> Exportar Forms
+          </button>
+          <button 
+            onClick={() => setShowAdvancedGenerator(true)}
+            className="px-4 py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
+          >
+            <BrainCircuit size={20} /> Geração Avançada
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -550,31 +584,61 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
                       <Target size={12} /> {question.taxaAcerto}% Acerto
                     </span>
                   )}
+                  {question.assets && question.assets.length > 0 && (
+                    <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
+                      <Zap size={12} /> Multimídia
+                    </span>
+                  )}
                 </div>
 
-                <p className="text-gray-900 font-medium leading-relaxed line-clamp-2 group-hover:line-clamp-none transition-all">
-                  {question.enunciado}
-                </p>
+                <div className="flex flex-col gap-2">
+                  <p className={cn(
+                    "text-gray-900 font-bold leading-relaxed transition-all",
+                    expandedQuestionId !== question.id ? "line-clamp-2" : ""
+                  )}>
+                    {question.enunciado}
+                  </p>
+                  
+                  <AnimatePresence>
+                    {expandedQuestionId === question.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 pt-4 border-t border-gray-50"
+                      >
+                        <QuestionRenderer question={question as any} showCorrectAnswer={true} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
-                <div className="flex items-center gap-6 text-xs text-gray-500 font-bold">
+                <div className="flex items-center gap-6 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                   <span className="flex items-center gap-1.5"><History size={14} /> Usada {question.usoTotal} vezes</span>
                   <span className="flex items-center gap-1.5"><Tag size={14} /> {question.tags.join(', ')}</span>
+                  <button 
+                    onClick={() => setExpandedQuestionId(expandedQuestionId === question.id ? null : question.id || null)}
+                    className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 transition-colors"
+                  >
+                    {expandedQuestionId === question.id ? <ChevronUpIcon size={14} /> : <Eye size={14} />}
+                    {expandedQuestionId === question.id ? 'Fechar Detalhes' : 'Visualizar Rich Content'}
+                  </button>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
                 <button 
-                  onClick={() => handleDuplicateWithVariation(question)}
+                  onClick={() => setVariationModalConfig({ isOpen: true, question, count: 5 })}
                   disabled={isGeneratingVariation === question.id}
                   className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                  title="Gerar Variação com IA"
+                  title="Gerar Múltiplas Variações com IA"
                 >
                   {isGeneratingVariation === question.id ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
                 </button>
-                <button className="p-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all shadow-sm">
+                <button onClick={() => handleEditClick(question)} className="p-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all shadow-sm">
                   <Edit2 size={20} />
                 </button>
-                <button className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                <button onClick={() => handleDelete(question.id!)} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm">
                   <Trash2 size={20} />
                 </button>
               </div>
@@ -590,6 +654,133 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
           </div>
         )}
       </div>
+
+      {/* Edit Question Modal */}
+      <AnimatePresence>
+        {editingQuestionId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-xl font-bold flex items-center gap-2"><Edit2 size={24} className="text-indigo-600"/> Editar Questão</h3>
+                <button onClick={() => setEditingQuestionId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
+              </div>
+              <div className="p-6 overflow-y-auto space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Enunciado</label>
+                  <textarea 
+                    value={editedQuestion.enunciado || ''}
+                    onChange={e => setEditedQuestion({...editedQuestion, enunciado: e.target.value})}
+                    className="w-full p-3 rounded-xl border border-gray-200 min-h-[100px]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Dificuldade</label>
+                  <select 
+                    value={editedQuestion.dificuldade || 'médio'}
+                    onChange={e => setEditedQuestion({...editedQuestion, dificuldade: e.target.value as any})}
+                    className="w-full p-3 rounded-xl border border-gray-200 bg-white"
+                  >
+                    <option value="fácil">Fácil</option>
+                    <option value="médio">Médio</option>
+                    <option value="difícil">Difícil</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">Alternativas</label>
+                  {editedQuestion.alternativas?.map((alt, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <span className="font-bold text-gray-500">{alt.id})</span>
+                      <input 
+                        type="text" 
+                        value={alt.texto}
+                        onChange={e => {
+                          const newAlts = [...editedQuestion.alternativas!];
+                          newAlts[idx] = { ...newAlts[idx], texto: e.target.value };
+                          setEditedQuestion({...editedQuestion, alternativas: newAlts});
+                        }}
+                        className="flex-1 p-2 border border-gray-200 rounded-lg text-sm"
+                      />
+                      <button 
+                        onClick={() => setEditedQuestion({...editedQuestion, respostaCorreta: alt.id})}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg ${editedQuestion.respostaCorreta === alt.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+                      >
+                        Correta?
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                <button onClick={() => setEditingQuestionId(null)} className="px-6 py-2 rounded-xl font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button disabled={isSavingEdit} onClick={handleSaveEdit} className="px-6 py-2 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-2">
+                  {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+                  Salvar Alterações
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Variation Configuration Modal */}
+      <AnimatePresence>
+        {variationModalConfig.isOpen && variationModalConfig.question && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-xl font-bold flex items-center gap-2"><Sparkles size={24} className="text-indigo-600"/> Variações (IA)</h3>
+                <button onClick={() => setVariationModalConfig(prev => ({...prev, isOpen: false }))} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
+              </div>
+              <div className="p-6 overflow-y-auto space-y-4">
+                <div className="bg-indigo-50 p-4 rounded-xl text-indigo-800 text-sm mb-4">
+                  O Gemini analisará a taxonomia desta questão e gerará novas versões mantendo o conceito original, mas mudando o cenário ou dados numéricos.
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Quantidade de Variações:</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="10"
+                    value={variationModalConfig.count}
+                    onChange={e => setVariationModalConfig(prev => ({...prev, count: parseInt(e.target.value) || 1}))}
+                    className="w-full p-3 rounded-xl border border-gray-200"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">Gera de 1 a 10 versões diferentes da mesma pergunta.</p>
+                </div>
+              </div>
+              <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                <button onClick={() => setVariationModalConfig(prev => ({...prev, isOpen: false }))} className="px-6 py-2 rounded-xl font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button onClick={handleMultipleVariations} className="px-6 py-2 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-2">
+                  <Sparkles size={16} /> 
+                  Gerar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Advanced Question Generator Modal */}
+      {showAdvancedGenerator && (
+        <AdvancedQuestionGenerator
+          competencies={disciplines}
+          currentDiscipline="Geral"
+          onClose={() => setShowAdvancedGenerator(false)}
+          onQuestionsGenerated={async (newQuestions) => {
+            await saveImportedQuestions(newQuestions);
+            fetchQuestions();
+          }}
+        />
+      )}
     </div>
   );
 }

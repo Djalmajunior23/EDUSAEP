@@ -102,8 +102,12 @@ export function ConsolidatedReportView({ history, onReset }: ConsolidatedReportV
         average: t.accuracy / t.count
       }))
       .sort((a, b) => {
-        const [dayA, monthA] = a.date.split('/');
-        const [dayB, monthB] = b.date.split('/');
+        if (!a.date || !b.date || typeof a.date !== 'string' || typeof b.date !== 'string') return 0;
+        const partsA = a.date.split('/');
+        const partsB = b.date.split('/');
+        if (partsA.length < 2 || partsB.length < 2) return 0;
+        const [dayA, monthA] = partsA;
+        const [dayB, monthB] = partsB;
         return new Date(2024, parseInt(monthA)-1, parseInt(dayA)).getTime() - new Date(2024, parseInt(monthB)-1, parseInt(dayB)).getTime();
       });
 

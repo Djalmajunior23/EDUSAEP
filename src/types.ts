@@ -33,6 +33,16 @@ export interface Discipline {
   createdAt?: any;
 }
 
+export interface QuestionAsset {
+  id: string;
+  type: 'image' | 'code' | 'table' | 'diagram' | 'case_study';
+  content: string; // URL for images, raw text for code/case study, JSON string for tables/diagrams
+  title?: string;
+  caption?: string;
+  language?: string; // For code blocks (e.g., 'javascript', 'sql')
+  metadata?: any;
+}
+
 export interface Question {
   id?: string;
   questionUid: string;
@@ -40,29 +50,33 @@ export interface Question {
   competenciaNome: string;
   temaId: string;
   temaNome: string;
-  dificuldade: string;
-  bloom: string;
+  habilidade?: string;
+  dificuldade: 'fácil' | 'médio' | 'difícil';
+  bloom: 'lembrar' | 'compreender' | 'aplicar' | 'analisar' | 'avaliar' | 'criar';
   perfilGeracao: string;
-  tipoQuestao: string;
+  tipoQuestao: 'multipla_escolha' | 'discursiva' | 'verdadeiro_falso' | 'lacuna' | 'ordenacao' | 'associacao';
   enunciado: string;
-  alternativas?: Array<{ id: string; texto: string }>;
-  respostaCorreta?: string;
-  respostaEsperada?: string;
-  criteriosAvaliacao?: Array<{ criterio: string; pontuacao: number; descricao: string }>;
+  assets?: QuestionAsset[]; // Integrated assets (code, images, etc.)
+  alternativas?: Array<{ id: string; texto: string; feedback?: string }>;
+  respostaCorreta?: string; // ID for multiple choice
+  respostaEsperada?: string; // Sample answer for discursive
+  rubricaAvaliacao?: string; // Guidelines for manual scoring
+  criteriosAvaliacao?: string[]; // Detailed criteria for evaluators
   comentarioGabarito?: string;
   comentarioPedagogico?: string;
   justificativasAlternativas?: Record<string, string>;
   contextoHash: string;
   tags: string[];
-  status: string;
+  status: 'rascunho' | 'publicado';
   revisadaPorProfessor: boolean;
   usoTotal: number;
+  taxaAcerto?: number;
   ultimaUtilizacao?: any;
+  tempoEstimado?: number; // In seconds
   origem: string;
-  criadoEm: any;
-  atualizadoEm: any;
   createdBy?: string;
   createdAt?: any;
+  atualizadoEm?: any;
   note?: string;
   feedback?: string;
 }
