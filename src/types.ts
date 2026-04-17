@@ -152,3 +152,89 @@ export interface AssessmentItem {
   source: 'platform' | 'siac' | 'external';
   content: string;
 }
+
+// ============================================================================
+// CORE EDUCATIONAL INTELLIGENCE TYPES (20 ADVANCED MODULES)
+// ============================================================================
+
+export interface CognitiveLoadMetric {
+  studentId: string;
+  timestamp: string;
+  activeActivities: number;
+  averageDifficulty: number;
+  timeSpentRecentMs: number;
+  fatigueIndex: number; // 0 to 1
+  status: 'optimal' | 'moderate' | 'overloaded';
+  suggestedAction?: string;
+}
+
+export interface FalseLearningDetection {
+  studentId: string;
+  competencyId: string;
+  suspicionScore: number; // 0 to 100
+  inconsistencyPattern: string; // e.g., "High score on Hard, failed Easy"
+  guessingProbability: number;
+  detectedAt: string;
+}
+
+export interface LearningRhythm {
+  studentId: string;
+  classification: 'lento' | 'medio' | 'rapido';
+  velocityCalculatedAt: string;
+  recommendedActivityVolume: number;
+  historicalVelocity: { date: string; v: number }[];
+}
+
+export interface ErrorMapEntry {
+  competencyId: string;
+  skillId: string;
+  errorFrequency: number;
+  affectedStudentsIds: string[];
+  cognitiveRootCause: 'conceptual' | 'attention' | 'interpretation' | 'execution';
+  suggestedInterventions: string[];
+}
+
+// ============================================================================
+// INNOVATION AI MODULES (20 NEW FEATURES)
+// ============================================================================
+
+export interface InvisibleGapDetection {
+  studentId: string;
+  targetCompetencyId: string;
+  missingPrerequisiteId: string;
+  confidenceScore: number;
+  evidence: string[]; // e.g. ["Failed 3 consecutive items depending on X"]
+}
+
+export interface StudentConsistencyMetric {
+  studentId: string;
+  consistencyScore: number; // 0 to 100
+  trend: 'stable' | 'oscillating' | 'declining' | 'improving';
+  volatilityIndex: number; 
+  lastCalculatedAt: string;
+}
+
+export interface ResponseTimeAnalysis {
+  studentId: string;
+  questionId: string;
+  timeSpentSeconds: number;
+  expectedTimeSeconds: number;
+  classification: 'fast_guess' | 'normal' | 'struggling' | 'mastery';
+}
+
+export interface KnowledgeRetentionMetric {
+  studentId: string;
+  competencyId: string;
+  retentionRate: number; // %
+  decayCurvePredicted: number[]; // projected retention over next 7 days
+  needsImmediateSpacedRepetition: boolean;
+}
+
+export interface AutomatedPBLDefinition {
+  title: string;
+  scenario: string;
+  problemStatement: string;
+  competenciesCovered: string[];
+  evaluationRubric: { criteria: string, weight: number }[];
+  complexityLevel: 'iniciante' | 'intermediario' | 'avancado';
+}

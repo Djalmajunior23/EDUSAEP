@@ -1,12 +1,81 @@
 // src/components/admin/ClassesManagementView.tsx
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Class } from '../../types';
-import { Plus, Pencil, Trash2, X, Check, Search, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Search, Users, AlertCircle, Loader2 } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
+
+// Sub-component to list students for a specific class
+function StudentListModal({ classId, className, onClose }: { classId: string, className: string, onClose: () => void }) {
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const q = query(collection(db, 'users'), where('role', '==', 'aluno'), where('turmaId', '==', classId));
+        const snap = await getDocs(q);
+        setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error fetching students:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStudents();
+  }, [classId]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] flex flex-col"
+      >
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Users className="text-indigo-600" /> Alunos da Turma
+            </h3>
+            <p className="text-sm text-gray-500">{className}</p>
+          </div>
+          <button onClick={onClose} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 text-gray-400">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+          {loading ? (
+            <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-600" /></div>
+          ) : students.length === 0 ? (
+            <p className="text-center text-gray-500 p-8">Nenhum aluno vinculado a esta turma ainda.</p>
+          ) : (
+            <ul className="space-y-3">
+              {students.map(student => (
+                <li key={student.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-gray-900">{student.name || student.displayName || 'Sem nome'}</p>
+                    <p className="text-xs text-gray-500">{student.email}</p>
+                  </div>
+                  {student.matricula && (
+                    <span className="text-xs font-mono bg-white px-2 py-1 rounded border border-gray-200">
+                      {student.matricula}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 export function ClassesManagementView() {
   const [classes, setClasses] = useState<Class[]>([]);
@@ -15,6 +84,8 @@ export function ClassesManagementView() {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Class>>({});
   const [isCreating, setIsCreating] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<string | null>(null);
+  const [classToShowStudents, setClassToShowStudents] = useState<Class | null>(null);
 
   useEffect(() => {
     fetchClasses();
@@ -85,16 +156,17 @@ export function ClassesManagementView() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    // if (!window.confirm('Tem certeza que deseja excluir esta turma?')) return;
-    toast.info('Excluindo turma...');
+  const confirmDelete = async () => {
+    if (!classToDelete) return;
     try {
-      await deleteDoc(doc(db, 'classes', id));
+      await deleteDoc(doc(db, 'classes', classToDelete));
       toast.success('Turma excluída com sucesso!');
       fetchClasses();
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'classes');
       toast.error('Erro ao excluir turma.');
+    } finally {
+      setClassToDelete(null);
     }
   };
 
@@ -248,17 +320,26 @@ export function ClassesManagementView() {
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button 
+                          onClick={() => setClassToShowStudents(c)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Ver Alunos"
+                        >
+                          <Users size={18} />
+                        </button>
+                        <button 
                           onClick={() => {
                             setIsEditing(c.id);
                             setEditForm(c);
                           }}
                           className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Editar Turma"
                         >
                           <Pencil size={18} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(c.id)}
+                          onClick={() => setClassToDelete(c.id)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Excluir Turma"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -271,6 +352,53 @@ export function ClassesManagementView() {
           </tbody>
         </table>
       </div>
+
+      <AnimatePresence>
+        {classToShowStudents && (
+          <StudentListModal 
+            classId={classToShowStudents.id} 
+            className={`${classToShowStudents.name} (${classToShowStudents.period})`}
+            onClose={() => setClassToShowStudents(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {classToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Excluir Turma?</h3>
+              <p className="text-gray-500 mb-6 text-sm">
+                Tem certeza? Esta ação apagará o cadastro da turma, mas os alunos continuarão ativos no sistema.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setClassToDelete(null)}
+                  className="flex-1 py-3 text-gray-700 font-bold bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 text-white font-bold bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

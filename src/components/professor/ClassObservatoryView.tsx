@@ -19,7 +19,8 @@ import {
   FileText,
   X,
   CheckCircle2,
-  Calendar
+  Calendar,
+  Filter
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -38,6 +39,8 @@ import {
 import { getClassObservatoryData, ClassObservatoryData } from '../../services/dashboardService';
 import { generateInterventionPlan } from '../../services/geminiService';
 import { toast } from 'sonner';
+import { db } from '../../firebase';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 export function ClassObservatoryView() {
   const [data, setData] = useState<ClassObservatoryData | null>(null);
@@ -45,14 +48,31 @@ export function ClassObservatoryView() {
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [interventionPlan, setInterventionPlan] = useState<any>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  
+  const [classes, setClasses] = useState<any[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
+
+  useEffect(() => {
+    fetchClasses();
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedClassId]);
+
+  const fetchClasses = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'classes')));
+      setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Erro ao carregar turmas", error);
+    }
+  };
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const observatoryData = await getClassObservatoryData();
+      const observatoryData = await getClassObservatoryData(selectedClassId);
       setData(observatoryData);
     } catch (error) {
       toast.error("Erro ao carregar dados do observatório.");
@@ -77,7 +97,7 @@ export function ClassObservatoryView() {
     }
   };
 
-  if (loading) return (
+  if (loading && !data) return (
     <div className="flex flex-col items-center justify-center p-20 space-y-4">
       <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
       <p className="text-gray-500 font-medium">Sincronizando dados pedagógicos...</p>
@@ -91,21 +111,39 @@ export function ClassObservatoryView() {
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       {/* Header */}
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
         <div>
           <h2 className="text-3xl font-black text-gray-900 flex items-center gap-3">
             <Telescope className="text-indigo-600" size={32} /> Observatório da Turma
           </h2>
           <p className="text-gray-500 mt-1">Visão macro do desempenho, engajamento e riscos pedagógicos.</p>
         </div>
-        <div className="flex gap-4">
-          <div className="bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
-            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Média da Turma</p>
-            <p className="text-2xl font-black text-indigo-700">{data.engagementMetrics.averageGrade}%</p>
+        
+        <div className="flex flex-col md:flex-row gap-4 items-end md:items-center w-full xl:w-auto">
+          {/* Class Selector */}
+          <div className="relative w-full md:w-64">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" size={18} />
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-indigo-900 font-medium appearance-none"
+            >
+              <option value="all">Todas as Turmas (Global)</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.name} {c.period ? `(${c.period})` : ''}</option>
+              ))}
+            </select>
           </div>
-          <div className="bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
-            <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Taxa de Entrega</p>
-            <p className="text-2xl font-black text-emerald-700">{data.engagementMetrics.averageSubmissionRate}%</p>
+
+          <div className="flex gap-4 w-full md:w-auto">
+            <div className="flex-1 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100 flex flex-col justify-center">
+              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Média da Turma</p>
+              <p className="text-2xl font-black text-indigo-700">{data.engagementMetrics?.averageGrade?.toFixed(1) || 0}%</p>
+            </div>
+            <div className="flex-1 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100 flex flex-col justify-center">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Taxa de Entrega</p>
+              <p className="text-2xl font-black text-emerald-700">{data.engagementMetrics?.averageSubmissionRate?.toFixed(1) || 0}%</p>
+            </div>
           </div>
         </div>
       </div>

@@ -1839,3 +1839,73 @@ export async function generateStudyPlan(data: any, modelName: string = "gemini-3
 
   return result;
 }
+
+// ============================================================================
+// NOVEL INNOVATION AI MODULES (20 NEW FEATURES)
+// ============================================================================
+
+// Módulo 4: Explicação Contrária (Ensinar através do erro)
+export async function generateContraryExplanation(questionText: string, incorrectAnswer: string) {
+  const prompt = `Aja como um Tutor Socrático. O aluno escolheu a alternativa incorreta para a seguinte questão:
+  
+  QUESTÃO: ${questionText}
+  RESPOSTA INCORRETA DADA: ${incorrectAnswer}
+  
+  Sua tarefa é usar a ESTRATÉGIA DA EXPLICAÇÃO CONTRÁRIA:
+  1. Identifique o erro conceitual que leva a escolher essa alternativa.
+  2. Prove por que esse raciocínio resulta num absurdo ou numa contradição lógica/histórica/científica.
+  3. Convide o aluno a refazer o pensamento.
+  Não dê a resposta certa diretamente.
+  
+  Retorne um JSON: { "explanation": "string", "cognitiveTrapDetected": "string" }`;
+
+  const response = await generateContentWrapper({
+    model: "gemini-3-flash-preview",
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: { responseMimeType: "application/json", temperature: 0.2 }
+  });
+
+  return safeParseJson(response.text, { explanation: "Infelizmente parece que houve um conflito." });
+}
+
+// Módulo 18: ABP Automatizada (Aprendizagem Baseada em Projetos)
+export async function generateAutomatedPBL(competenciesCovered: string[], context: string) {
+  const prompt = `Aja como Desenvolvedor Curricular Avançado. Crie um Projeto de Aprendizagem (ABP / PBL) de aplicação no mundo real para ensino médio/fundamental usando estas competências: ${competenciesCovered.join(', ')} e o contexto: ${context}
+  
+  RETORNE JSON:
+  {
+    "title": "Título Atrativo do Projeto",
+    "scenario": "Cenário contextual do mundo real",
+    "problemStatement": "Qual é o problema central a ser resolvido pelos alunos?",
+    "steps": ["Etapa 1", "Etapa 2"],
+    "evaluationRubric": [
+      { "criteria": "Nome do critério", "weight": "Peso em inteiros" }
+    ],
+    "complexityLevel": "avancado"
+  }`;
+
+  const response = await generateContentWrapper({
+    model: "gemini-3-flash-preview",
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: { responseMimeType: "application/json", temperature: 0.7 }
+  });
+
+  return safeParseJson(response.text, { title: "Projeto não gerado." });
+}
+
+// Módulo 3: Conflito Cognitivo
+export async function generateCognitiveConflictScenario(topic: string) {
+    const prompt = `Aja como Tutor do EDUSAEP. Para testar o aprendizado profundo do aluno no tema '${topic}', gere um cenário de CONFLITO COGNITIVO. 
+    Apresente uma afirmação aparentemente verdadeira e lógica baseada no senso comum, mas que é falha cientificamente/historicamente, e peça para ele encontrar o "furo na matriz" do seu argumento, com 4 alternativas.
+    
+    RETORNE JSON: { "scenario": "texto", "apparentTruth": "texto ilusório", "alternatives": ["A","B","C","D"], "correctOptionIndex": number, "explanationIfWrong": "string" }`;
+  
+    const response = await generateContentWrapper({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { responseMimeType: "application/json", temperature: 0.5 }
+    });
+  
+    return safeParseJson(response.text, null);
+  }
+

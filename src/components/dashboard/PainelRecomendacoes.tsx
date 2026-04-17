@@ -1,20 +1,48 @@
 // src/components/dashboard/PainelRecomendacoes.tsx
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { AlertCircle, Target } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function PainelRecomendacoes() {
+  const { user, isProfessor, isAdmin } = useAuth();
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
+
     const fetchRecommendations = async () => {
-      const q = query(collection(db, 'recomendacoes_pedagogicas'), orderBy('data_geracao', 'desc'));
-      const snapshot = await getDocs(q);
-      setRecommendations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(true);
+      try {
+        let q;
+        if (isProfessor || isAdmin) {
+          // Professors/Admins see recent ones from everyone
+          q = query(
+            collection(db, 'recomendacoes_pedagogicas'), 
+            orderBy('dataGeracao', 'desc'),
+            limit(50)
+          );
+        } else {
+          // Students see only their own
+          q = query(
+            collection(db, 'recomendacoes_pedagogicas'), 
+            where('userId', '==', user.uid),
+            orderBy('dataGeracao', 'desc')
+          );
+        }
+        
+        const snapshot = await getDocs(q);
+        setRecommendations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
+      } catch (error) {
+        console.error("Erro ao carregar recomendações:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchRecommendations();
-  }, []);
+  }, [user, isProfessor, isAdmin]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -37,9 +65,10 @@ export function PainelRecomendacoes() {
             <div className="flex items-start gap-3">
               <AlertCircle size={20} className="mt-0.5" />
               <div>
-                <p className="font-bold uppercase text-xs mb-1">{rec.tipo_recomendacao}</p>
-                <p className="font-medium">{rec.descricao}</p>
-                <p className="text-xs mt-2 opacity-75">{new Date(rec.data_geracao).toLocaleDateString()}</p>
+                <p className="font-bold uppercase text-xs mb-1">Recomendação {rec.prioridade}</p>
+                <p className="font-medium">{rec.diagnostico}</p>
+                <p className="text-sm text-gray-600 mt-2">{rec.planoEstudo}</p>
+                <p className="text-xs mt-2 opacity-75">{rec.dataGeracao?.toDate ? rec.dataGeracao.toDate().toLocaleDateString() : 'Recente'}</p>
               </div>
             </div>
           </div>

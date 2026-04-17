@@ -8,6 +8,9 @@ import https from "https";
 
 dotenv.config();
 
+// Globally allow self-signed certificates for n8n/external integrations
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Create a custom agent that ignores self-signed certificate errors

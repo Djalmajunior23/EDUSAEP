@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Map, 
+  Map as MapIcon, 
   ChevronRight, 
   CheckCircle2, 
   Circle, 
@@ -34,7 +34,7 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
       const q = query(
         collection(db, 'exam_submissions'),
         where('studentId', '==', userProfile.uid),
-        orderBy('createdAt', 'desc'),
+        orderBy('completedAt', 'desc'),
         limit(3)
       );
       const snap = await getDocs(q);
@@ -69,7 +69,7 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
   if (!path || !path.fases) return (
     <div className="bg-white p-12 rounded-3xl shadow-sm border border-gray-100 text-center space-y-6 max-w-2xl mx-auto">
       <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto">
-        <Map className="text-indigo-600" size={40} />
+        <MapIcon className="text-indigo-600" size={40} />
       </div>
       <h3 className="text-2xl font-black text-gray-900">Sua Trilha está em Branco</h3>
       <p className="text-gray-500">
@@ -87,7 +87,7 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100">
-            <Map size={32} />
+            <MapIcon size={32} />
           </div>
           <div>
             <h2 className="text-3xl font-black text-gray-900">Trilha de Aprendizagem</h2>

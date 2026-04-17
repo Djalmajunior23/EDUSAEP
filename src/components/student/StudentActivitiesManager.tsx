@@ -304,10 +304,20 @@ export function StudentActivitiesManager({ userProfile }: { userProfile: any }) 
                   type="file" 
                   multiple 
                   onChange={(e) => {
+                    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
                     if (e.target.files) {
                       const filesArray = Array.from(e.target.files);
+                      
+                      const oversizedFiles = filesArray.filter(f => f.size > MAX_SIZE);
+                      if (oversizedFiles.length > 0) {
+                        toast.error(`O limite de tamanho de arquivo é de 5MB. Arquivo(s) excedente(s): ${oversizedFiles.map(f => f.name).join(', ')}`);
+                        e.target.value = ''; // Reset input
+                        return;
+                      }
+
                       if (filesArray.length > selectedActivity.maxAttachments) {
                         toast.error(`Máximo de ${selectedActivity.maxAttachments} arquivos permitidos.`);
+                        e.target.value = ''; // Reset input
                         return;
                       }
                       setAttachments(filesArray);
@@ -316,11 +326,19 @@ export function StudentActivitiesManager({ userProfile }: { userProfile: any }) 
                   className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
                 {attachments.length > 0 && (
-                  <div className="mt-2 text-sm text-gray-500">
-                    {attachments.map((f, i) => <div key={i}>{f.name} ({(f.size / 1024).toFixed(1)} KB)</div>)}
+                  <div className="mt-2 text-sm text-gray-500 space-y-1">
+                    {attachments.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <CheckCircle2 size={12} className="text-emerald-500" />
+                        {f.name} ({(f.size / 1024 / 1024).toFixed(2)} MB)
+                      </div>
+                    ))}
                   </div>
                 )}
-                <p className="text-xs text-amber-600 mt-2">* Nota: O upload real de arquivos requer configuração do Firebase Storage. Esta é uma simulação de interface.</p>
+                <p className="text-[10px] text-gray-500 mt-2 font-medium">Limite máximo por arquivo: 5MB</p>
+                <p className="text-xs text-amber-600 mt-2 font-medium flex items-center gap-1 leading-tight italic bg-amber-50 p-2 rounded-lg border border-amber-100">
+                  <AlertCircle size={14} /> Nota: O upload real de arquivos requer configuração do Firebase Storage. Esta é uma simulação de interface.
+                </p>
               </div>
             )}
 

@@ -61,9 +61,24 @@ export interface ClassObservatoryData {
   evolution: { period: string; classAverage: number }[];
 }
 
-export async function getClassObservatoryData(): Promise<ClassObservatoryData> {
+export async function getClassObservatoryData(turmaId?: string): Promise<ClassObservatoryData> {
   try {
-    const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+    let studentQuery = query(collection(db, 'users'), where('role', '==', 'aluno'));
+    if (turmaId && turmaId !== 'all') {
+      studentQuery = query(collection(db, 'users'), where('role', '==', 'aluno'), where('turmaId', '==', turmaId));
+    }
+    const usersSnap = await getDocs(studentQuery);
+    
+    // If no students match the class, return empty but valid structure
+    if (usersSnap.empty) {
+      return {
+        studentsAtRisk: [],
+        engagementMetrics: { averageSubmissionRate: 0, forumParticipation: 0, averageGrade: 0 },
+        competencyHeatmap: [],
+        evolution: []
+      };
+    }
+    
     const activitiesSnap = await getDocs(collection(db, 'activities'));
     const activitySubmissionsSnap = await getDocs(collection(db, 'activity_submissions'));
     const forumCommentsSnap = await getDocs(collection(db, 'forum_comments'));

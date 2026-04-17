@@ -65,27 +65,36 @@ export const exportExamToGoogleForms = async (examId: string, examData: any, web
     
     // 3. Update exam with external form info
     if (result.publicUrl) {
-      await updateDoc(doc(db, 'exams', examId), {
-        externalFormId: result.formId || 'pending',
-        publicUrl: result.publicUrl,
-        applicationMode: 'hybrid',
-        updatedAt: serverTimestamp()
-      });
-      
-      // Also create a record in simulado_forms for tracking
-      await addDoc(collection(db, 'simulado_forms'), {
-        simuladoId: examId,
-        provider: 'google_forms',
-        externalFormId: result.formId,
-        publicUrl: result.publicUrl,
-        status: 'active',
-        createdAt: serverTimestamp()
-      });
+      try {
+        await updateDoc(doc(db, 'exams', examId), {
+          externalFormId: result.formId || 'pending',
+          publicUrl: result.publicUrl,
+          applicationMode: 'hybrid',
+          updatedAt: serverTimestamp()
+        });
+        
+        // Also create a record in simulado_forms for tracking
+        await addDoc(collection(db, 'simulado_forms'), {
+          simuladoId: examId,
+          provider: 'google_forms',
+          externalFormId: result.formId,
+          publicUrl: result.publicUrl,
+          status: 'active',
+          createdAt: serverTimestamp()
+        });
+      } catch (fError) {
+        handleFirestoreError(fError, OperationType.UPDATE, 'exams');
+        throw fError;
+      }
     }
 
     return result;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, 'exams');
+    // If it's already a Firestore error thrown above, don't wrap it again
+    if (err instanceof Error && err.message.startsWith('{')) {
+      throw err;
+    }
+    console.error("Export error:", err);
     throw err;
   }
 };

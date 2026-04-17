@@ -177,10 +177,29 @@ export function ActivityList({ userProfile }: { userProfile: any }) {
                     className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl text-sm mb-4 outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <div className="flex items-center justify-between">
-                    <button className="flex items-center gap-2 text-gray-500 text-xs font-medium hover:text-emerald-600">
-                      <Plus size={14} />
-                      Anexar Arquivo
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 text-gray-500 text-xs font-medium hover:text-emerald-600 cursor-pointer">
+                        <Plus size={14} />
+                        Anexar Arquivo
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const MAX_SIZE = 5 * 1024 * 1024;
+                            if (e.target.files?.[0]) {
+                              const file = e.target.files[0];
+                              if (file.size > MAX_SIZE) {
+                                toast.error('O arquivo excede o limite de 5MB.');
+                                e.target.value = '';
+                                return;
+                              }
+                              toast.success(`Arquivo ${file.name} selecionado.`);
+                            }
+                          }}
+                        />
+                      </label>
+                      <span className="text-[10px] text-gray-400 font-medium">(Máx 5MB)</span>
+                    </div>
                     <div className="flex gap-3">
                       <button 
                         onClick={() => setIsSubmitting(null)}

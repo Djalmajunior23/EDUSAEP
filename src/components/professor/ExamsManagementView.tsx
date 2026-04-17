@@ -41,7 +41,7 @@ interface Exam {
   id?: string;
   title: string;
   description: string;
-  type: 'simulado' | 'avaliacao' | 'recuperacao';
+  type: 'simulado' | 'avaliacao' | 'recuperacao' | 'exercicio';
   status: 'rascunho' | 'publicado' | 'encerrado';
   dueDate: string;
   duration: number; // minutes
@@ -64,6 +64,12 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
   const [isExporting, setIsExporting] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+
+  // New States for Edit / Delete / Create
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentExam, setCurrentExam] = useState<Partial<Exam> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [examToDelete, setExamToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -170,16 +176,72 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
     }
   };
 
-  const handleDeleteExam = async (id: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir este simulado?")) return;
+  const handleCreate = () => {
+    setCurrentExam({
+      title: '',
+      description: '',
+      type: filterType === 'all' ? 'simulado' : filterType,
+      status: 'rascunho',
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      duration: 120,
+      totalQuestions: 0,
+      totalPoints: 100,
+      questions: []
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (exam: Exam) => {
+    setCurrentExam({
+      ...exam,
+      dueDate: exam.dueDate ? exam.dueDate.split('T')[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // formats string for input date
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentExam || !user) return;
+
+    setIsSaving(true);
+    try {
+      if (currentExam.id) {
+        await updateDoc(doc(db, 'exams', currentExam.id), {
+          ...currentExam,
+          updatedAt: serverTimestamp()
+        });
+        toast.success("Avaliação atualizada!");
+      } else {
+        await addDoc(collection(db, 'exams'), {
+          ...currentExam,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        toast.success("Avaliação criada!");
+      }
+      setIsModalOpen(false);
+      fetchExams();
+    } catch (error) {
+      console.error("Error saving exam:", error);
+      toast.error("Erro ao salvar avaliação.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!examToDelete) return;
     
     try {
-      await deleteDoc(doc(db, 'exams', id));
+      await deleteDoc(doc(db, 'exams', examToDelete));
       toast.success("Simulado excluído com sucesso.");
       fetchExams();
     } catch (error) {
       console.error("Error deleting exam:", error);
       toast.error("Erro ao excluir simulado.");
+    } finally {
+      setExamToDelete(null);
     }
   };
 
@@ -252,7 +314,10 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
             {isImporting ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
             Importar
           </label>
-          <button className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2">
+          <button 
+            onClick={handleCreate}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+          >
             <Plus size={20} /> Novo Simulado
           </button>
         </div>
@@ -331,11 +396,14 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
                 >
                   {isExporting === exam.id ? <Loader2 size={18} className="animate-spin" /> : <ExternalLink size={18} />}
                 </button>
-                <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">
+                <button 
+                  onClick={() => handleEdit(exam)}
+                  className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                >
                   <Edit2 size={18} />
                 </button>
                 <button 
-                  onClick={() => handleDeleteExam(exam.id!)}
+                  onClick={() => setExamToDelete(exam.id!)}
                   className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                 >
                   <Trash2 size={18} />
@@ -375,6 +443,152 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
           </div>
         )}
       </div>
+
+      {/* CREATE / EDIT MODAL */}
+      <AnimatePresence>
+        {isModalOpen && currentExam && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {currentExam.id ? 'Editar Avaliação' : 'Nova Avaliação'}
+                </h3>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 text-gray-400">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveExam} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Título</label>
+                  <input
+                    required
+                    type="text"
+                    value={currentExam.title || ''}
+                    onChange={e => setCurrentExam({ ...currentExam, title: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Ex: Simulado ENEM 2024"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Descrição</label>
+                  <textarea
+                    rows={3}
+                    value={currentExam.description || ''}
+                    onChange={e => setCurrentExam({ ...currentExam, description: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                    placeholder="Descrição da avaliação..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Tipo</label>
+                    <select
+                      value={currentExam.type || 'simulado'}
+                      onChange={e => setCurrentExam({ ...currentExam, type: e.target.value as any })}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                      <option value="simulado">Simulado</option>
+                      <option value="exercicio">Exercício</option>
+                      <option value="avaliacao">Avaliação</option>
+                      <option value="recuperacao">Recuperação</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Status</label>
+                    <select
+                      value={currentExam.status || 'rascunho'}
+                      onChange={e => setCurrentExam({ ...currentExam, status: e.target.value as any })}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                      <option value="rascunho">Rascunho</option>
+                      <option value="publicado">Publicado</option>
+                      <option value="encerrado">Encerrado</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Data Limite</label>
+                    <input
+                      required
+                      type="date"
+                      value={currentExam.dueDate || ''}
+                      onChange={e => setCurrentExam({ ...currentExam, dueDate: e.target.value })}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Duração (minutos)</label>
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      value={currentExam.duration || 0}
+                      onChange={e => setCurrentExam({ ...currentExam, duration: parseInt(e.target.value) })}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="w-full mt-4 py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                  {isSaving ? 'Salvando...' : 'Salvar Avaliação'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {examToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Excluir Avaliação?</h3>
+              <p className="text-gray-500 mb-6 text-sm">
+                Tem certeza? Esta ação é irreversível e pode afetar as notas dos alunos que já responderam a esta avaliação.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setExamToDelete(null)}
+                  className="flex-1 py-3 text-gray-700 font-bold bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 text-white font-bold bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

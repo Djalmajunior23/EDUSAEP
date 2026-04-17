@@ -751,6 +751,48 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["type", "message", "severity", "status", "createdAt"]
+    },
+    "QuestionMetric": {
+      "title": "Question Metric",
+      "description": "Analytics data for the question bank (Module 6).",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "totalAnswers": { "type": "number" },
+        "correctCount": { "type": "number" },
+        "difficultyReal": { "type": "number" },
+        "discriminationIndex": { "type": "number" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "lastAnalyzed": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "totalAnswers"]
+    },
+    "PedagogicalTemplate": {
+      "title": "Pedagogical Template",
+      "description": "Standardized templates for the institution (Module 7).",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["activity", "rubric", "simulado", "feedback", "learning_situation"] },
+        "name": { "type": "string" },
+        "content": { "type": "string", "description": "JSON string of the template structure." },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "name", "content"]
+    },
+    "EvidencePortfolioItem": {
+      "title": "Evidence Portfolio Item",
+      "description": "Student evidence portfolio (Module 8).",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "evidenceUrl": { "type": "string" },
+        "competencies": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "title", "competencies"]
     }
   },
   "firestore": {
@@ -929,6 +971,18 @@
     "/portfolios/{portfolioId}": {
       "schema": "StudentPortfolio",
       "description": "Student portfolio documents."
+    },
+    "/question_metrics/{metricId}": {
+      "schema": "QuestionMetric",
+      "description": "Analytics data for the question bank (Module 6)."
+    },
+    "/institutional_templates/{templateId}": {
+      "schema": "PedagogicalTemplate",
+      "description": "Standardized templates for the institution (Module 7)."
+    },
+    "/evidence_portfolio/{portfolioId}": {
+      "schema": "EvidencePortfolioItem",
+      "description": "Student evidence portfolio items (Module 8)."
     }
   }
 }

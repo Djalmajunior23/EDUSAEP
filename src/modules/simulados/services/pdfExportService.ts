@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import { DiagnosticResult } from '../../../services/geminiService';
 import { UserProfile } from '../../../App';
 
@@ -167,79 +167,53 @@ export const pdfExportService = {
       const scrollX = window.scrollX;
       const scrollY = window.scrollY;
 
-      // Scroll to top to ensure html2canvas captures correctly
+      // Scroll to top to ensure capturing works correctly
       window.scrollTo(0, 0);
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
+      // Using html-to-image to bypass the Tailwind oklch parsing bug present in html2canvas
+      const dataUrl = await htmlToImage.toJpeg(element, {
+        quality: 0.95,
         backgroundColor: '#FFFFFF',
-        scrollX: 0,
-        scrollY: 0,
-        onclone: (_clonedDoc, clonedElement) => {
-          // Fix for SVGs in html2canvas
-          const svgs = clonedElement.querySelectorAll('svg');
-          svgs.forEach(svg => {
-            const svgRect = svg.getBoundingClientRect();
-            if (svgRect.width > 0 && svgRect.height > 0) {
-              svg.setAttribute('width', svgRect.width.toString());
-              svg.setAttribute('height', svgRect.height.toString());
-            }
-            if (!svg.getAttribute('xmlns')) {
-              svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-            }
-          });
-
-          // Ensure cloned element is visible and has correct layout for capture
-          if (clonedElement instanceof HTMLElement) {
-            clonedElement.style.overflow = 'visible';
-            clonedElement.style.height = 'auto';
-            clonedElement.style.width = `${element.offsetWidth}px`;
-            clonedElement.style.position = 'relative';
-            clonedElement.style.display = 'block';
-            
-            // Remove any sticky or fixed positioning that might break capture
-            const stickyElements = clonedElement.querySelectorAll('*');
-            stickyElements.forEach(el => {
-              if (el instanceof HTMLElement) {
-                const style = window.getComputedStyle(el);
-                if (style.position === 'sticky' || style.position === 'fixed') {
-                  el.style.position = 'relative';
-                }
-              }
-            });
-          }
+        pixelRatio: 2,
+        style: {
+          transform: 'none',
+          boxShadow: 'none'
+        },
+        filter: (node) => {
+          // You can filter out elements here if needed
+          return true;
         }
       });
       
       // Restore scroll position
       window.scrollTo(scrollX, scrollY);
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      
-      if (!imgData || imgData === 'data:,') {
+      if (!dataUrl || dataUrl === 'data:,') {
         throw new Error('Falha ao capturar imagem do elemento. O canvas está vazio.');
       }
 
+      // Create PDF and calculate image dimensions to match A4
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      // html-to-image scales based on pixelRatio. Rect tells us the virtual size.
+      const elWidth = element.offsetWidth || rect.width;
+      const elHeight = element.offsetHeight || rect.height;
+      const pdfHeight = (elHeight * pdfWidth) / elWidth;
       const pageHeight = pdf.internal.pageSize.getHeight();
       
       let heightLeft = pdfHeight;
       let position = 0;
 
       // Add first page
-      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+      pdf.addImage(dataUrl, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
       heightLeft -= pageHeight;
 
       // Add subsequent pages if content is longer than one page
       while (heightLeft > 0) {
         position = position - pageHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+        pdf.addImage(dataUrl, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
         heightLeft -= pageHeight;
       }
 

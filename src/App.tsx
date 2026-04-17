@@ -202,6 +202,7 @@ import { TRIDashboardView } from './components/professor/TRIDashboardView';
 import { handleFirestoreError, OperationType } from './services/errorService';
 
 
+import { PedagogicalIntelligenceHub } from './components/professor/PedagogicalIntelligenceHub';
 import { AdvancedDashboard } from './components/professor/AdvancedDashboard';
 import { generateStudentRecommendation, getLatestRecommendation, Recommendation } from './services/recommendationService';
 import { exportExamToGoogleForms, exportQuestionsToGoogleForms } from './services/googleFormsService';
@@ -7343,6 +7344,9 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+import { ObservatorioAlunoView } from './components/observatory/ObservatorioAlunoView';
+import { EvidencePortfolioView } from './components/portfolio/EvidencePortfolioView';
+
 export default function App() {
   return (
     <HashRouter>
@@ -7479,15 +7483,16 @@ function AppContent() {
       const items: any[] = [
         { type: 'header', label: 'Principal' },
         { id: 'student-dashboard', label: 'Meu Painel', icon: LayoutDashboard, path: '/student-dashboard' },
+        { id: 'student-observatory', label: 'Observatório 360', icon: Telescope, path: '/student-observatory', description: 'Visão Geral do Aluno' },
         { type: 'header', label: 'Módulos de Aprendizado' },
         { id: 'student-exams', label: 'Simulados', icon: BookOpen, path: '/student-exams', description: 'Diagnóstico e Avaliação' },
         { id: 'student-activities', label: 'Minhas Atividades', icon: CheckSquare, path: '/student-activities', description: 'Entregas e Notas' },
+        { id: 'evidence-portfolio', label: 'Portfólio', icon: Archive, path: '/evidence-portfolio', description: 'Acervo de Evidências' },
         { id: 'exercises', label: 'Exercícios', icon: CheckSquare, path: '/exercises', description: 'Prática e Aprendizado' },
         { id: 'student-sa', label: 'Situações de Aprendizagem', icon: BookOpen, path: '/student-sa', description: 'Desafios Práticos' },
         { id: 'correction-plans', label: 'Planos de Acerto', icon: FileText, path: '/correction-plans', description: 'Recuperação de Erros' },
-        { id: 'learning-path', label: 'Minha Trilha', icon: Map, path: '/learning-path', description: 'Caminho Personalizado' },
+        { id: 'learning-path', label: 'Minha Trilha', icon: MapIcon, path: '/learning-path', description: 'Caminho Personalizado' },
         { id: 'student-journey', label: 'Minha Jornada', icon: MapIcon, path: '/student-journey', description: 'Evolução e Linha do Tempo' },
-        { id: 'gamification', label: 'Minhas Conquistas', icon: Trophy, path: '/gamification', description: 'Nível e Medalhas' },
         { id: 'calendar', label: 'Calendário', icon: Calendar, path: '/calendar', description: 'Prazos e Eventos' },
         { id: 'communication', label: 'Comunicação', icon: MessageSquare, path: '/communication', description: 'Avisos e Fórum' },
         { type: 'header', label: 'Suporte IA' },
@@ -7502,7 +7507,9 @@ function AppContent() {
       ];
       
       if (userProfile.gamificationEnabled) {
-        items.splice(5, 0, { id: 'gamification', label: 'Gamificação', icon: Trophy, path: '/gamification', description: 'Jogos e Revisão SAEP' });
+        items.splice(items.findIndex(i => i.id === 'learning-path') + 1, 0, { id: 'gamification', label: 'Gamificação', icon: Trophy, path: '/gamification', description: 'Jogos e Revisão SAEP' });
+      } else {
+        items.splice(items.findIndex(i => i.id === 'communication'), 0, { id: 'gamification-stats', label: 'Meus Pontos', icon: Trophy, path: '/gamification' });
       }
       
       return items;
@@ -7510,6 +7517,7 @@ function AppContent() {
     return [
       { type: 'header', label: 'Painel Principal' },
       { id: 'dashboard', label: 'Meu Painel', icon: LayoutDashboard, path: '/dashboard' },
+      { id: 'intelligence', label: 'Central de Inteligência', icon: BrainCircuit, path: '/intelligence', description: '20 Módulos de IA Educacional' },
       { id: 'class-health', label: 'Saúde da Turma', icon: Activity, path: '/class-health', description: 'Métricas de Maturidade' },
       { id: 'heatmap', label: 'Monitoramento Heatmap', icon: Target, path: '/heatmap', description: 'Visão Geral TRI' },
       { id: 'activity-manager', label: 'Minhas Atividades', icon: CheckSquare, path: '/activity-manager', description: 'Atribuição e Correção' },
@@ -8547,6 +8555,8 @@ function AppContent() {
               <Route path="/institutional-templates" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['admin', 'professor']}><InstitutionalTemplateManager /></ProtectedRoute>} />
               <Route path="/system-governance" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['admin']}><FeatureFlagManager /></ProtectedRoute>} />
               <Route path="/student-activities" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'admin']}><ActivityList userProfile={userProfile} /></ProtectedRoute>} />
+              <Route path="/student-observatory" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><ObservatorioAlunoView /></ProtectedRoute>} />
+              <Route path="/evidence-portfolio" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno']}><EvidencePortfolioView /></ProtectedRoute>} />
               <Route path="/calendar" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><CalendarView userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/communication" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><CommunicationCenter userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['aluno', 'professor', 'admin']}><NotificationCenter userProfile={userProfile} /></ProtectedRoute>} />
@@ -8731,6 +8741,12 @@ function AppContent() {
             <Route path="/tasks" element={
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <TasksView user={user} />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/intelligence" element={
+              <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
+                <PedagogicalIntelligenceHub />
               </ProtectedRoute>
             } />
 
