@@ -284,6 +284,11 @@ service cloud.firestore {
       allow update, delete: if isAluno() && isOwner(resource.data.studentId) || isAdmin();
     }
 
+    match /class_dashboard_stats/{classId} {
+      allow read: if isProfessor() || isAdmin();
+      allow write: if isAdmin(); // Should be updated by service/function
+    }
+
     // Default catch-all (MOVE TO END)
     match /{document=**} {
       allow read, write: if isAdmin();

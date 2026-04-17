@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { observatoryService, StudentObservatoryData } from '../../services/observatoryService';
+import { PedagogicalInterventionService } from '../../services/analytics/pedagogicalInterventionService';
 import { MapaCompetencias } from './MapaCompetencias';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as LineTooltip, ResponsiveContainer } from 'recharts';
-import { Target, AlertTriangle, TrendingUp, TrendingDown, Minus, BookOpen, Clock } from 'lucide-react';
+import { Target, AlertTriangle, TrendingUp, TrendingDown, Minus, BookOpen, Clock, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function ObservatorioAlunoView() {
   const { userProfile, user } = useAuth();
   const [data, setData] = useState<StudentObservatoryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -96,13 +98,39 @@ export function ObservatorioAlunoView() {
       </div>
 
       {data.riskData.factors.length > 0 && (
-        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-md">
-          <h4 className="text-sm font-medium text-orange-800 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" /> Fatores de Atenção
-          </h4>
-          <ul className="mt-2 text-sm text-orange-700 list-disc list-inside">
-             {data.riskData.factors.map((f, i) => <li key={i}>{f}</li>)}
-          </ul>
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-medium text-orange-800 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> Fatores de Atenção
+            </h4>
+            <ul className="mt-2 text-sm text-orange-700 list-disc list-inside">
+               {data.riskData.factors.map((f, i) => <li key={i}>{f}</li>)}
+            </ul>
+          </div>
+          <button
+            disabled={isGenerating}
+            onClick={async () => {
+              setIsGenerating(true);
+              try {
+                // Assuming we take the first competency for now as a demo
+                const comp = data.competencies[0];
+                await PedagogicalInterventionService.detectAndGenerateRecovery(
+                  user!.uid,
+                  comp.name,
+                  data
+                );
+                alert("Trilha de recuperação gerada com sucesso!");
+              } catch (error) {
+                alert("Erro ao gerar trilha de recuperação.");
+              } finally {
+                setIsGenerating(false);
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium text-sm whitespace-nowrap"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isGenerating ? 'Gerando...' : 'Gerar Ação de Recuperação'}
+          </button>
         </div>
       )}
 

@@ -46,9 +46,8 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
     bloom: 'aplicar',
     type: 'multipla_escolha',
     includeCode: false,
-    includeImage: false,
-    includeTable: false,
-    includeDiagram: false,
+    resourceType: 'none',
+    includeCaseStudy: false,
     language: 'javascript',
     marketContext: true,
     count: 1
@@ -72,6 +71,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
         temaNome: params.topic,
         temaId: 'gen-ai',
         perfilGeracao: 'avançada',
+        isAiGenerated: true,
         status: 'rascunho',
         revisadaPorProfessor: false,
         usoTotal: 0,
@@ -191,6 +191,29 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                           </select>
                         </div>
                       </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Contexto de Mercado (Opcional)</label>
+                        <input 
+                          type="text"
+                          value={params.marketContextDescription || ''}
+                          onChange={(e) => setParams({...params, marketContextDescription: e.target.value})}
+                          placeholder="Ex: Problema específico de cibersegurança em fintechs..."
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Detalhes do Estudo de Caso (Opcional)</label>
+                        <input 
+                          type="text"
+                          value={params.caseStudyDescription || ''}
+                          onChange={(e) => setParams({...params, caseStudyDescription: e.target.value})}
+                          placeholder="Ex: Análise das vulnerabilidades detectadas..."
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
+                        />
+                      </div>
+
                     </div>
                   </div>
 
@@ -245,6 +268,21 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                           )} />
                         </button>
                       </div>
+                      <div className="flex items-center justify-between p-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Incluir Estudo de Caso</span>
+                        <button 
+                          onClick={() => setParams({...params, includeCaseStudy: !params.includeCaseStudy})}
+                          className={cn(
+                            "w-12 h-6 rounded-full transition-all relative",
+                            params.includeCaseStudy ? "bg-emerald-500" : "bg-gray-300"
+                          )}
+                        >
+                          <div className={cn(
+                            "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                            params.includeCaseStudy ? "left-7" : "left-1"
+                          )} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -276,17 +314,23 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { id: 'includeCode', label: 'Snippet de Código', icon: Code, color: 'text-blue-500' },
-                    { id: 'includeImage', label: 'Análise de Imagem', icon: ImageIcon, color: 'text-purple-500' },
-                    { id: 'includeTable', label: 'Tabela de Dados', icon: TableIcon, color: 'text-amber-500' },
-                    { id: 'includeDiagram', label: 'Diagrama Técnico', icon: LayoutIcon, color: 'text-indigo-500' },
+                    { id: 'includeCode', label: 'Snippet de Código', icon: Code, color: 'text-blue-500', isToggle: true },
+                    { id: 'image', label: 'Imagem', icon: ImageIcon, color: 'text-purple-500', isToggle: false },
+                    { id: 'diagram', label: 'Diagrama', icon: LayoutIcon, color: 'text-indigo-500', isToggle: false },
+                    { id: 'both', label: 'Ambos (Img+Diag)', icon: BrainCircuit, color: 'text-amber-500', isToggle: false },
                   ].map((resource) => (
                     <button
                       key={resource.id}
-                      onClick={() => setParams({...params, [resource.id]: !((params as any)[resource.id])})}
+                      onClick={() => {
+                        if (resource.isToggle) {
+                          setParams({...params, includeCode: !params.includeCode});
+                        } else {
+                          setParams({...params, resourceType: resource.id as any});
+                        }
+                      }}
                       className={cn(
                         "p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 text-center",
-                        (params as any)[resource.id]
+                        (resource.isToggle ? params.includeCode : params.resourceType === resource.id)
                           ? "bg-emerald-50 border-emerald-500 shadow-inner"
                           : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-emerald-200"
                       )}
@@ -299,9 +343,8 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                       </div>
                       <div>
                         <span className="block font-bold dark:text-white">{resource.label}</span>
-                        <span className="text-[10px] text-gray-400 font-medium">IA irá estruturar o recurso</span>
                       </div>
-                      {(params as any)[resource.id] && (
+                      {(resource.isToggle ? params.includeCode : params.resourceType === resource.id) && (
                         <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white">
                           <Check size={14} />
                         </div>
@@ -310,6 +353,19 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                   ))}
                 </div>
 
+                {params.resourceType && params.resourceType !== 'none' && (
+                  <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 space-y-4">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Detalhes do recurso visual (Opcional)</label>
+                    <input 
+                      type="text"
+                      value={params.resourceDescription || ''}
+                      onChange={(e) => setParams({...params, resourceDescription: e.target.value})}
+                      placeholder="Ex: Diagrama mostrando a arquitetura de uma rede em nuvem..."
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
+                    />
+                  </div>
+                )}
+                
                 {params.includeCode && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
@@ -350,6 +406,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                 </div>
               </motion.div>
             )}
+
 
             {step === 3 && (
               <motion.div 

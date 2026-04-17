@@ -73,6 +73,7 @@ export interface Question {
   taxaAcerto?: number;
   ultimaUtilizacao?: any;
   tempoEstimado?: number; // In seconds
+  isAiGenerated?: boolean; // New marker for AI-generated questions
   origem: string;
   createdBy?: string;
   createdAt?: any;

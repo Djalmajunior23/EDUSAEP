@@ -59,6 +59,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [filterCompetency, setFilterCompetency] = useState('all');
+  const [filterAiOnly, setFilterAiOnly] = useState(false);
   const [isGeneratingVariation, setIsGeneratingVariation] = useState<string | null>(null);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [showAdvancedGenerator, setShowAdvancedGenerator] = useState(false);
@@ -375,7 +376,8 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
                          q.competenciaNome.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDifficulty = filterDifficulty === 'all' || q.dificuldade === filterDifficulty;
     const matchesCompetency = filterCompetency === 'all' || q.competenciaNome === filterCompetency;
-    return matchesSearch && matchesDifficulty && matchesCompetency;
+    const matchesAi = !filterAiOnly || q.isAiGenerated;
+    return matchesSearch && matchesDifficulty && matchesCompetency && matchesAi;
   });
 
   const competencies = Array.from(new Set(questions.map(q => q.competenciaNome)));
@@ -550,6 +552,10 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
+        <label className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl">
+          <input type="checkbox" checked={filterAiOnly} onChange={e => setFilterAiOnly(e.target.checked)} />
+          <span className="text-sm font-bold text-gray-700">Apenas IA</span>
+        </label>
       </div>
 
       {/* Questions List */}
@@ -577,6 +583,11 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
                   <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
                     <BrainCircuit size={12} /> {question.bloom}
                   </span>
+                  {question.isAiGenerated && (
+                     <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
+                      <Sparkles size={12} /> IA
+                    </span>
+                  )}
                   {question.taxaAcerto !== undefined && (
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 ${
                       question.taxaAcerto < 40 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'

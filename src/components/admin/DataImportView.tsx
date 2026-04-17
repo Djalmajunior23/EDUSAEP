@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 
 export function DataImportView() {
   const [file, setFile] = useState<File | null>(null);
+  const [importName, setImportName] = useState('');
+  const [importDate, setImportDate] = useState('');
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -24,6 +26,8 @@ export function DataImportView() {
 
   const handleUpload = async () => {
     if (!file) return;
+    if (!importName.trim()) { toast.error('O nome da importação é obrigatório.'); return; }
+    if (!importDate) { toast.error('A data da importação é obrigatória.'); return; }
     
     setStatus('uploading');
     setIsAnalyzing(true);
@@ -38,6 +42,8 @@ export function DataImportView() {
       // Save metadata to Firestore
       const importRef = await addDoc(collection(db, 'importacoes'), {
         origem: 'Upload Manual (SIAC)',
+        nome: importName,
+        data: importDate,
         arquivo_nome: file.name,
         data_importacao: serverTimestamp(),
         status: 'Processando',
@@ -87,6 +93,16 @@ export function DataImportView() {
       </div>
 
       <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Nome da Importação</label>
+            <input type="text" value={importName} onChange={(e) => setImportName(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg" placeholder="Ex: Notas 1º Bimestre" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Data da Importação</label>
+            <input type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg" />
+          </div>
+        </div>
         <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:bg-gray-50 transition-colors">
           <input
             type="file"

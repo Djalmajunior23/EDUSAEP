@@ -789,6 +789,53 @@ export async function generateLearningPath(studentData: any, modelName: string =
   return safeParseJson(response.text, {});
 }
 
+export async function generateRecoveryTrack(params: { studentId: string, competencyId: string, diagnosticData: any }, modelName: string = "gemini-3-flash-preview"): Promise<{ riskLevel: string, summary: string, activities: any[], interventions: string[] }> {
+  const { studentId, competencyId, diagnosticData } = params;
+  
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como um Tutor de IA Especialista em Intervenções Pedagógicas.
+            Um aluno (ID: ${studentId}) apresentou dificuldades na competência (ID: ${competencyId}).
+            
+            DADOS DO DIAGNÓSTICO:
+            ${JSON.stringify(diagnosticData)}
+            
+            Com base nisso, gere uma trilha de recuperação rápida contendo:
+            1. Uma avaliação do risco de aprendizagem.
+            2. Um plano de atividades extras personalizadas.
+            3. Sugestões de intervenções para o professor realizar em sala.
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "riskLevel": "Baixo" | "Médio" | "Alto",
+              "summary": "Resumo detalhado...",
+              "activities": [{"competency": "...", "activityType": "...", "description": "..."}],
+              "interventions": ["Sugestão 1", "Sugestão 2"]
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'smart_content'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, { 
+    riskLevel: 'Médio', 
+    summary: 'Trilha gerada automaticamente.', 
+    activities: [], 
+    interventions: [] 
+  });
+}
+
 export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
   const response = await generateContentWrapper({
     model: modelName,
@@ -1027,10 +1074,12 @@ export interface AdvancedQuestionParams {
   level: 'fácil' | 'médio' | 'difícil';
   bloom: 'lembrar' | 'compreender' | 'aplicar' | 'analisar' | 'avaliar' | 'criar';
   type: 'multipla_escolha' | 'discursiva' | 'estudo_caso' | 'analitica';
+  marketContextDescription?: string; // Optional specific context
+  resourceDescription?: string; // Optional specific description for image/diagram
+  caseStudyDescription?: string; // Optional specific case study description
   includeCode?: boolean;
-  includeImage?: boolean;
-  includeTable?: boolean;
-  includeDiagram?: boolean;
+  resourceType?: 'image' | 'diagram' | 'both' | 'none';
+  includeCaseStudy?: boolean;
   language?: string;
   marketContext?: boolean;
   count?: number;
@@ -1048,11 +1097,10 @@ REQUISITOS TÉCNICOS:
 - Competência: ${params.competency}
 - Nível de Dificuldade: ${params.level}
 - Taxonomia de Bloom: ${params.bloom}
-- Contexto de Mercado: ${params.marketContext ? 'OBRIGATÓRIO (Cenário profissional real)' : 'Opcional'}
+- Contexto de Mercado: ${params.marketContext ? (params.marketContextDescription ? `OBRIGATÓRIO: Use especificamente este contexto: ${params.marketContextDescription}` : 'OBRIGATÓRIO: Crie um cenário profissional real e aplicável.') : 'Opcional'}
+- Estudo de Caso: ${params.includeCaseStudy ? (params.caseStudyDescription ? `OBRIGATÓRIO: Estruture a questão como um Estudo de Caso focado em: ${params.caseStudyDescription}` : 'OBRIGATÓRIO: Estruture a questão como um Estudo de Caso completo.') : 'Opcional'}
 ${params.includeCode ? `- Incluir BLOCO DE CÓDIGO na linguagem: ${params.language || 'Pseudocódigo'}` : ''}
-${params.includeImage ? `- Projetar para incluir uma IMAGEM (Descreva o que deve estar na imagem no campo caption e use um placeholder no content se necessário)` : ''}
-${params.includeTable ? `- Incluir uma TABELA de dados relevante` : ''}
-${params.includeDiagram ? `- Incluir um DIAGRAMA técnico (fluxograma, UML, arquitetura)` : ''}
+${params.resourceType && params.resourceType !== 'none' ? `- Incluir recurso visual: ${params.resourceType === 'both' ? 'Imagem AND Diagrama' : params.resourceType}. ${params.resourceDescription ? `Detalhes específicos que devem aparecer: ${params.resourceDescription}` : ''}` : ''}
 
 FORMATO DE RESPOSTA:
 Retorne um ARRAY de objetos seguindo estritamente este esquema:
@@ -1064,7 +1112,7 @@ Retorne um ARRAY de objetos seguindo estritamente este esquema:
     {
       "id": "string",
       "type": "image | code | table | diagram | case_study",
-      "content": "Conteúdo do recurso (Para code, o código bruto; Para table/diagram, JSON string com headers e rows; Para image, uma descrição detalhada)",
+      "content": "Conteúdo do recurso",
       "title": "Título do recurso",
       "caption": "Legenda pedagógica",
       "language": "lingua do código se aplicável"

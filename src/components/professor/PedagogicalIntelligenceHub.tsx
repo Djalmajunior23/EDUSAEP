@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { GeneratedAssetsView } from './GeneratedAssetsView';
 import { 
   BrainCircuit, 
   Activity, 
@@ -12,7 +13,8 @@ import {
   BookOpen, 
   Loader2,
   RefreshCw,
-  Gauge
+  Gauge,
+  Layers
 } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
@@ -25,6 +27,7 @@ export function PedagogicalIntelligenceHub() {
   const [loading, setLoading] = useState(true);
   const [errorMap, setErrorMap] = useState<ErrorMapEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAssetsView, setShowAssetsView] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -144,6 +147,16 @@ export function PedagogicalIntelligenceHub() {
 
         {/* Right Column: Other Modules Highlights */}
         <div className="space-y-6">
+          <button 
+            onClick={() => setShowAssetsView(true)}
+            className="w-full text-left bg-emerald-50 p-6 rounded-3xl border border-emerald-100 hover:border-emerald-300 transition-all"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-emerald-600 text-white rounded-xl"><Layers size={20} /></div>
+              <h3 className="font-bold text-emerald-950">Recursos de IA (Bank)</h3>
+            </div>
+            <p className="text-sm text-emerald-900/70">Gerencie todos os assets técnicos (código, imagens, diagramas) gerados.</p>
+          </button>
           
           {/* MODULE 16: Detecção de Falso Aprendizado */}
           <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-3xl border border-indigo-100/50">
@@ -203,6 +216,7 @@ export function PedagogicalIntelligenceHub() {
             <MetricCard title="ABP Automática (Mod. 18)" value="Disponível" subtitle="Composição IA" color="indigo" />
          </div>
       </div>
+      {showAssetsView && <GeneratedAssetsView onClose={() => setShowAssetsView(false)} />}
     </div>
   );
 }

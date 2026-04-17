@@ -184,7 +184,7 @@ export function QuestionRenderer({
         <div className="space-y-4">
           <textarea
             value={selectedAnswer || ''}
-            onChange={(e) => onAnswerChange?.(e.target.value)}
+            onChange={(e) => onSelect?.(e.target.value)}
             disabled={showCorrectAnswer}
             placeholder="Digite sua resposta analítica aqui..."
             className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl min-h-[150px] focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
@@ -217,7 +217,7 @@ export function QuestionRenderer({
               <button
                 key={alt.id}
                 disabled={showCorrectAnswer}
-                onClick={() => onAnswerChange?.(alt.id)}
+                onClick={() => onSelect?.(alt.id)}
                 className={cn(
                   "p-4 rounded-2xl border text-left transition-all flex items-start gap-4",
                   isSelected 
