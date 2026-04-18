@@ -8760,13 +8760,19 @@ function AppContent() {
               <ProtectedRoute userProfile={userProfile} allowedRoles={['professor', 'admin']}>
                 <AdvancedDashboard 
                   userProfile={userProfile}
+                  selectedModel={selectedModel}
                   stats={{
                     totalStudents: 42,
                     totalExams: 156,
                     averageScore: 0.68,
                     successRate: 0.74,
                     evolutionRate: 0.12,
-                    criticalCompetencies: ['Banco de Dados', 'Lógica de Programação']
+                    criticalCompetencies: ['Banco de Dados', 'Lógica de Programação'],
+                    riskClusters: [
+                      { name: 'Risco Elevado', count: 5, description: 'Alunos com baixo engajamento' },
+                      { name: 'Em Atenção', count: 12, description: 'Desempenho abaixo da média' },
+                      { name: 'Avançados', count: 25, description: 'Alunos com alta performance' }
+                    ]
                   }}
                   disciplinePerformance={[
                     { name: 'Lógica', score: 75 },

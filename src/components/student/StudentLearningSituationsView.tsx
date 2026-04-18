@@ -45,6 +45,21 @@ export function StudentLearningSituationsView({ userProfile }: { userProfile: an
     }
   };
 
+  useEffect(() => {
+    if (selectedSA) {
+      const savedDraft = localStorage.getItem(`sa_draft_${userProfile.uid}_${selectedSA.id}`);
+      if (savedDraft) {
+        setSubmissionContent(savedDraft);
+      }
+    }
+  }, [selectedSA, userProfile.uid]);
+
+  const handleSaveDraft = () => {
+    if (!selectedSA) return;
+    localStorage.setItem(`sa_draft_${userProfile.uid}_${selectedSA.id}`, submissionContent);
+    toast.success('Rascunho salvo!');
+  };
+
   const handleSubmit = async () => {
     if (!selectedSA || !submissionContent.trim()) {
       toast.error('Preencha sua resposta antes de enviar.');
@@ -72,6 +87,7 @@ export function StudentLearningSituationsView({ userProfile }: { userProfile: an
         [selectedSA.id!]: { id: docRef.id, ...newSubmission }
       }));
       
+      localStorage.removeItem(`sa_draft_${userProfile.uid}_${selectedSA.id}`);
       toast.success('Atividade entregue com sucesso!');
       setSelectedSA(null);
       setSubmissionContent('');
@@ -138,14 +154,22 @@ export function StudentLearningSituationsView({ userProfile }: { userProfile: an
                   placeholder="Escreva sua resposta ou cole o link do seu trabalho aqui... (Suporta Markdown)"
                   className="w-full h-48 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {submitting ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
-                  Enviar Atividade
-                </button>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                    Enviar Atividade
+                  </button>
+                  <button
+                    onClick={handleSaveDraft}
+                    className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold flex items-center gap-2 hover:bg-gray-200"
+                  >
+                    Salvar Rascunho
+                  </button>
+                </div>
               </div>
             )}
           </div>

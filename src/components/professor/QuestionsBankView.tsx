@@ -682,13 +682,36 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
               </div>
               <div className="p-6 overflow-y-auto space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Enunciado</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-bold text-gray-700">Enunciado (Markdown)</label>
+                    <button 
+                      onClick={() => {
+                        const tableTemplate = "\n\n| Item | Valor A | Valor B |\n| :--- | :---: | :---: |\n| Parâmetro 1 | 100 | 200 |\n| Parâmetro 2 | Ativo | Inativo |\n\n";
+                        setEditedQuestion({...editedQuestion, enunciado: (editedQuestion.enunciado || '') + tableTemplate});
+                      }}
+                      className="text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg"
+                    >
+                      <Table size={12} /> Inserir Tabela Comparativa
+                    </button>
+                  </div>
                   <textarea 
                     value={editedQuestion.enunciado || ''}
                     onChange={e => setEditedQuestion({...editedQuestion, enunciado: e.target.value})}
-                    className="w-full p-3 rounded-xl border border-gray-200 min-h-[100px]"
+                    placeholder="Suporta Markdown e Tabelas..."
+                    className="w-full p-3 rounded-xl border border-gray-200 min-h-[120px] font-mono text-sm"
                   />
                 </div>
+
+                {/* Preview Section within Edit Modal */}
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3 text-[10px] font-black uppercase text-gray-400">
+                    <Eye size={12} /> Pré-visualização do Enunciado
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border border-gray-200">
+                    <QuestionRenderer question={{ ...editedQuestion as any, assets: [] }} showCorrectAnswer={false} className="space-y-0" />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Dificuldade</label>
                   <select 

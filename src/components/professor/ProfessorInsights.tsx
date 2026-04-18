@@ -24,7 +24,7 @@ import {
 } from 'recharts';
 import { db, auth } from '../../firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { generateLessonPlan, LessonPlanResult, generateSIPA, SIPAResult } from '../../services/geminiService';
+import { generateLessonPlan, LessonPlanResult, generateInterventionStrategy, InterventionStrategyResult } from '../../services/geminiService';
 import { LessonPlan } from './LessonPlan';
 import { UserProfile } from '../../types';
 import { n8nEvents } from '../../services/n8nService';
@@ -37,7 +37,7 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
   const [classData, setClassData] = useState<any[]>([]);
   const [lessonPlan, setLessonPlan] = useState<LessonPlanResult | null>(null);
   const [activityNotes, setActivityNotes] = useState<Record<number, string>>({});
-  const [sipaResult, setSipaResult] = useState<SIPAResult | null>(null);
+  const [sipaResult, setSipaResult] = useState<InterventionStrategyResult | null>(null);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [isGeneratingSIPA, setIsGeneratingSIPA] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
         { name: 'João Silva', level: 'Crítico', score: 35 },
         { name: 'Maria Oliveira', level: 'Atenção', score: 52 }
       ];
-      const result = await generateSIPA(classData, studentsAtRisk, selectedModel, userProfile?.role as any || 'professor');
+      const result = await generateInterventionStrategy(classData, studentsAtRisk, selectedModel, userProfile?.role as any || 'professor');
       setSipaResult(result);
       
       // Save to Firestore

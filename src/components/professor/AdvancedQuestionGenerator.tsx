@@ -46,7 +46,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
     bloom: 'aplicar',
     type: 'multipla_escolha',
     includeCode: false,
-    resourceType: 'none',
+    resourceTypes: [],
     includeCaseStudy: false,
     language: 'javascript',
     marketContext: true,
@@ -312,25 +312,26 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                   <p className="text-gray-500">Selecione quais elementos a IA deve injetar na questão para torná-la rica e contextualizada.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[
-                    { id: 'includeCode', label: 'Snippet de Código', icon: Code, color: 'text-blue-500', isToggle: true },
-                    { id: 'image', label: 'Imagem', icon: ImageIcon, color: 'text-purple-500', isToggle: false },
-                    { id: 'diagram', label: 'Diagrama', icon: LayoutIcon, color: 'text-indigo-500', isToggle: false },
-                    { id: 'both', label: 'Ambos (Img+Diag)', icon: BrainCircuit, color: 'text-amber-500', isToggle: false },
+                    { id: 'image', label: 'Imagem', icon: ImageIcon, color: 'text-purple-500' },
+                    { id: 'diagram', label: 'Diagrama', icon: LayoutIcon, color: 'text-indigo-500' },
+                    { id: 'table', label: 'Tabela', icon: TableIcon, color: 'text-pink-500' },
+                    { id: 'code', label: 'Código', icon: Code, color: 'text-blue-500' },
+                    { id: 'case_study', label: 'Estudo de Caso', icon: Archive, color: 'text-amber-500' },
                   ].map((resource) => (
                     <button
                       key={resource.id}
                       onClick={() => {
-                        if (resource.isToggle) {
-                          setParams({...params, includeCode: !params.includeCode});
-                        } else {
-                          setParams({...params, resourceType: resource.id as any});
-                        }
+                        const currentTypes = params.resourceTypes || [];
+                        const newTypes = currentTypes.includes(resource.id as any)
+                          ? currentTypes.filter(t => t !== resource.id)
+                          : [...currentTypes, resource.id as any];
+                        setParams({...params, resourceTypes: newTypes});
                       }}
                       className={cn(
                         "p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 text-center",
-                        (resource.isToggle ? params.includeCode : params.resourceType === resource.id)
+                        params.resourceTypes?.includes(resource.id as any)
                           ? "bg-emerald-50 border-emerald-500 shadow-inner"
                           : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-emerald-200"
                       )}
@@ -344,7 +345,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                       <div>
                         <span className="block font-bold dark:text-white">{resource.label}</span>
                       </div>
-                      {(resource.isToggle ? params.includeCode : params.resourceType === resource.id) && (
+                      {params.resourceTypes?.includes(resource.id as any) && (
                         <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white">
                           <Check size={14} />
                         </div>
@@ -353,7 +354,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                   ))}
                 </div>
 
-                {params.resourceType && params.resourceType !== 'none' && (
+                {(params.resourceTypes?.includes('image') || params.resourceTypes?.includes('diagram') || params.resourceTypes?.includes('table')) && (
                   <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 space-y-4">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Detalhes do recurso visual (Opcional)</label>
                     <input 
@@ -366,7 +367,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                   </div>
                 )}
                 
-                {params.includeCode && (
+                {params.resourceTypes?.includes('code') && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Question, QuestionAsset } from '../../types';
-import { Code, Image as ImageIcon, Table as TableIcon, FileText, LayoutIcon, ZoomIn, CheckCircle2, Sparkles, XCircle } from 'lucide-react';
+import { Code, Image as ImageIcon, Table as TableIcon, FileText, LayoutIcon, ZoomIn, CheckCircle2, Sparkles, XCircle, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -31,7 +33,7 @@ export function QuestionRenderer({
     switch (asset.type) {
       case 'code':
         return (
-          <div key={asset.id} className="my-4 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div key={asset.id} className="my-4 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm text-left">
             <div className="bg-gray-100 dark:bg-gray-800 px-4 py-2 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400">
                 <Code size={14} />
@@ -65,7 +67,7 @@ export function QuestionRenderer({
                 referrerPolicy="no-referrer"
               />
               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-2 bg-white/80 dark:bg-black/50 backdrop-blur-md rounded-full shadow-lg">
+                <button className="p-2 bg-white/80 dark:bg-black/50 backdrop-blur-md rounded-full shadow-lg text-gray-700">
                   <ZoomIn size={16} />
                 </button>
               </div>
@@ -114,12 +116,12 @@ export function QuestionRenderer({
 
       case 'case_study':
         return (
-          <div key={asset.id} className="my-6 p-6 bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-400 rounded-r-2xl shadow-sm">
-            <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-500 font-bold uppercase tracking-wider text-xs">
+          <div key={asset.id} className="my-6 p-6 bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-400 rounded-r-2xl shadow-sm border-0">
+            <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-500 font-bold uppercase tracking-wider text-xs border-0">
               <FileText size={16} />
               <span>Estudo de Caso / Cenário</span>
             </div>
-            <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed italic">
+            <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed italic border-0">
               {asset.content}
             </div>
           </div>
@@ -128,11 +130,10 @@ export function QuestionRenderer({
       case 'diagram':
         return (
           <div key={asset.id} className="my-4 p-4 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl flex flex-col items-center">
-            <div className="w-full flex items-center gap-2 mb-4 text-indigo-700 dark:text-indigo-400 font-bold text-xs uppercase">
+            <div className="w-full flex items-center gap-2 mb-4 text-indigo-700 dark:text-indigo-400 font-bold text-xs uppercase text-left">
               <LayoutIcon size={16} />
               <span>{asset.title || 'Diagrama Técnico'}</span>
             </div>
-            {/* Merely displaying as image if content is a URL, or as a message if it's a structural representation we can't render yet */}
             {asset.content.startsWith('http') ? (
               <img src={asset.content} alt={asset.title} className="max-h-[300px] object-contain" referrerPolicy="no-referrer" />
             ) : (
@@ -152,7 +153,7 @@ export function QuestionRenderer({
   };
 
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn("space-y-6 text-left", className)}>
       {/* Question Header & Stem */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -169,13 +170,35 @@ export function QuestionRenderer({
           </span>
         </div>
         
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
-          {question.enunciado}
-        </h3>
+        <div className="prose prose-slate dark:prose-invert max-w-none text-left">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({...props}) => <h1 className="text-2xl font-black mb-4 text-gray-900 dark:text-white text-left" {...props} />,
+              h2: ({...props}) => <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-white text-left" {...props} />,
+              h3: ({...props}) => <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white text-left" {...props} />,
+              p: ({...props}) => <p className="text-lg font-medium text-gray-900 dark:text-white leading-relaxed mb-4 text-left" {...props} />,
+              table: ({...props}) => (
+                <div className="my-6 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                  <table className="w-full text-sm text-left border-collapse" {...props} />
+                </div>
+              ),
+              thead: ({...props}) => <thead className="bg-gray-50 dark:bg-gray-800" {...props} />,
+              th: ({...props}) => <th className="px-4 py-3 font-black text-gray-600 dark:text-gray-300 uppercase tracking-widest border-b border-gray-200 dark:border-gray-700 text-[10px] text-left" {...props} />,
+              td: ({...props}) => <td className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-left" {...props} />,
+              tr: ({...props}) => <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors" {...props} />,
+              ul: ({...props}) => <ul className="list-disc pl-5 space-y-2 mb-4 text-left" {...props} />,
+              ol: ({...props}) => <ol className="list-decimal pl-5 space-y-2 mb-4 text-left" {...props} />,
+              li: ({...props}) => <li className="text-gray-700 dark:text-gray-300 text-left" {...props} />,
+            }}
+          >
+            {question.enunciado}
+          </ReactMarkdown>
+        </div>
       </div>
 
       {/* Assets Content */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         {question.assets?.map(renderAsset)}
       </div>
 
@@ -196,12 +219,12 @@ export function QuestionRenderer({
               className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl space-y-2"
             >
               <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Resposta Esperada / Padrão de Resposta:</p>
-              <p className="text-sm text-emerald-800 dark:text-emerald-300 leading-relaxed font-medium">
+              <p className="text-sm text-emerald-800 dark:text-emerald-300 leading-relaxed font-medium text-left">
                 {question.respostaEsperada}
               </p>
               {question.rubricaAvaliacao && (
                 <div className="mt-2 pt-2 border-t border-emerald-200 dark:border-emerald-700/50">
-                   <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold uppercase">Critérios de Rubrica: {question.rubricaAvaliacao}</p>
+                   <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold uppercase text-left">Critérios de Rubrica: {question.rubricaAvaliacao}</p>
                 </div>
               )}
             </motion.div>
@@ -233,10 +256,10 @@ export function QuestionRenderer({
                 )}>
                   {alt.id}
                 </div>
-                <div className="pt-1 flex-1 leading-relaxed">
+                <div className="pt-1 flex-1 leading-relaxed text-left">
                   {alt.texto}
                   {showCorrectAnswer && isCorrect && (
-                    <div className="mt-2 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                    <div className="mt-2 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 size={12} /> Gabarito Correto
                     </div>
                   )}
@@ -259,8 +282,8 @@ export function QuestionRenderer({
               <Sparkles size={20} />
             </div>
             <div>
-              <p className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-widest mb-1">Nota Pedagógica:</p>
-              <p className="text-sm text-indigo-800 dark:text-indigo-300 leading-relaxed italic">
+              <p className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-widest mb-1 text-left">Nota Pedagógica:</p>
+              <p className="text-sm text-indigo-800 dark:text-indigo-300 leading-relaxed italic text-left">
                 {question.comentarioGabarito}
               </p>
             </div>

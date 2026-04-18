@@ -836,6 +836,69 @@ export async function generateRecoveryTrack(params: { studentId: string, compete
   });
 }
 
+export interface TwinSimulationResult {
+  overview: string;
+  predictedPerformance: number;
+  bottlenecks: string[];
+  engagementConfidence: number;
+  recommendations: string[];
+  detailedProjections: Array<{
+    competency: string;
+    probabilityOfSuccess: number;
+    commonStruggles: string;
+  }>;
+}
+
+export async function simulateDigitalTwin(stats: any, scenario: string, modelName: string = "gemini-3-flash-preview"): Promise<TwinSimulationResult> {
+  const prompt = `
+    Aja como o "Gêmeo Digital Pedagógico" de uma turma do SAEP. 
+    Sua função é SIMULAR o comportamento desta turma diante de um cenário específico e PREVER resultados e dificuldades.
+    
+    ESTATÍSTICAS DA TURMA:
+    ${JSON.stringify(stats)}
+    
+    CENÁRIO DA SIMULAÇÃO:
+    ${scenario}
+    
+    Analise como a turma (com base no histórico de acertos, riscos e competências críticas) reagiria a este cenário.
+    
+    RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+    {
+      "overview": "Texto resumindo o impacto geral previsto",
+      "predictedPerformance": 75, // (0-100)
+      "bottlenecks": ["lista de pontos onde a turma vai travar"],
+      "engagementConfidence": 85, // (0-100)
+      "recommendations": ["ações preventivas recomendadas"],
+      "detailedProjections": [
+        {
+          "competency": "nome",
+          "probabilityOfSuccess": 80,
+          "commonStruggles": "por que terão dificuldade aqui"
+        }
+      ]
+    }
+  `;
+
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'smart_content'),
+      responseMimeType: 'application/json',
+      ...DEFAULT_CONFIG
+    }
+  });
+
+  return safeParseJson(response.text, {
+    overview: "Simulação indisponível no momento.",
+    predictedPerformance: 0,
+    bottlenecks: [],
+    engagementConfidence: 0,
+    recommendations: [],
+    detailedProjections: []
+  });
+}
+
 export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
   const response = await generateContentWrapper({
     model: modelName,
@@ -1078,7 +1141,7 @@ export interface AdvancedQuestionParams {
   resourceDescription?: string; // Optional specific description for image/diagram
   caseStudyDescription?: string; // Optional specific case study description
   includeCode?: boolean;
-  resourceType?: 'image' | 'diagram' | 'both' | 'none';
+  resourceTypes?: ('image' | 'diagram' | 'table' | 'code' | 'case_study')[]; // Modified to array
   includeCaseStudy?: boolean;
   language?: string;
   marketContext?: boolean;
@@ -1100,7 +1163,7 @@ REQUISITOS TÉCNICOS:
 - Contexto de Mercado: ${params.marketContext ? (params.marketContextDescription ? `OBRIGATÓRIO: Use especificamente este contexto: ${params.marketContextDescription}` : 'OBRIGATÓRIO: Crie um cenário profissional real e aplicável.') : 'Opcional'}
 - Estudo de Caso: ${params.includeCaseStudy ? (params.caseStudyDescription ? `OBRIGATÓRIO: Estruture a questão como um Estudo de Caso focado em: ${params.caseStudyDescription}` : 'OBRIGATÓRIO: Estruture a questão como um Estudo de Caso completo.') : 'Opcional'}
 ${params.includeCode ? `- Incluir BLOCO DE CÓDIGO na linguagem: ${params.language || 'Pseudocódigo'}` : ''}
-${params.resourceType && params.resourceType !== 'none' ? `- Incluir recurso visual: ${params.resourceType === 'both' ? 'Imagem AND Diagrama' : params.resourceType}. ${params.resourceDescription ? `Detalhes específicos que devem aparecer: ${params.resourceDescription}` : ''}` : ''}
+${params.resourceTypes && params.resourceTypes.length > 0 ? `- Incluir recursos visuais/formatos: ${params.resourceTypes.join(', ')}. ${params.resourceDescription ? `Detalhes específicos que devem aparecer: ${params.resourceDescription}` : ''}` : ''}
 
 FORMATO DE RESPOSTA:
 Retorne um ARRAY de objetos seguindo estritamente este esquema:
@@ -1467,6 +1530,58 @@ export async function predictPerformance(historicalData: any, modelName: string 
   return safeParseJson(response.text, {});
 }
 
+export interface ClassOrchestrationResult {
+  tracks: Array<{
+    groupName: string;
+    studentCount: number;
+    focusCompetency: string;
+    activities: string[];
+    riskLevel: string;
+  }>;
+  overallStrategy: string;
+}
+
+export async function generateClassRecoveryOrchestration(stats: any, modelName: string = "gemini-3-flash-preview"): Promise<ClassOrchestrationResult> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como o Motor de Orquestração Pedagógica do EDUSAEP.
+            Analise os dados da turma e gere trilhas de recuperação personalizadas para os grupos de risco.
+            
+            DADOS DA TURMA:
+            ${JSON.stringify(stats)}
+            
+            RETORNE UM JSON COM:
+            {
+              "tracks": [
+                {
+                  "groupName": string,
+                  "studentCount": number,
+                  "focusCompetency": string,
+                  "activities": string[],
+                  "riskLevel": "Baixo" | "Médio" | "Alto" | "Crítico"
+                }
+              ],
+              "overallStrategy": string
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'analise_desempenho'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, { tracks: [], overallStrategy: "" });
+}
+
 export async function suggestCompetencies(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
@@ -1501,6 +1616,61 @@ export async function suggestCompetencies(questions: any[], modelName: string = 
   });
 
   return safeParseJson(response.text, []);
+}
+
+export interface SIPAResult {
+  projectedGrowth: number;
+  timeToGoal: string;
+  impactByGroup: Array<{
+    group: string;
+    before: number;
+    after: number;
+    delta: string;
+  }>;
+  confidenceScore: number;
+  aiCommentary: string;
+}
+
+export async function generateSIPA(stats: any, intervention: string, modelName: string = "gemini-3-flash-preview"): Promise<SIPAResult> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Aja como o Simulador de Impacto Pedagógico (SIPA) do EDUSAEP.
+            Simule o impacto da intervenção proposta com base nos dados atuais da turma.
+            
+            DADOS ATUAIS:
+            ${JSON.stringify(stats)}
+            
+            INTERVENÇÃO PROPOSTA:
+            ${intervention}
+            
+            RETORNE UM JSON COM:
+            {
+              "projectedGrowth": number (incremental em %),
+              "timeToGoal": string (ex: "3 semanas"),
+              "impactByGroup": [
+                { "group": "Crítico", "before": number, "after": number, "delta": string },
+                ...
+              ],
+              "confidenceScore": number (0-1),
+              "aiCommentary": string
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'analise_desempenho'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, { projectedGrowth: 0, timeToGoal: "", impactByGroup: [], confidenceScore: 0, aiCommentary: "" });
 }
 
 export interface GuessDetectionResult {
@@ -1885,7 +2055,7 @@ export async function analyzeQuestionQuality(question: any, errors: any[], model
   });
 }
 
-export interface SIPAResult {
+export interface InterventionStrategyResult {
   title: string;
   critical_students: string[];
   main_gap: string;
@@ -1894,7 +2064,7 @@ export interface SIPAResult {
   n8n_trigger_payload: any;
 }
 
-export async function generateSIPA(classData: any[], studentsAtRisk: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<SIPAResult> {
+export async function generateInterventionStrategy(classData: any[], studentsAtRisk: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<InterventionStrategyResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
