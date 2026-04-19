@@ -24,12 +24,29 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
 
   const fetchCompetencies = async () => {
     try {
-      const q = query(collection(db, 'disciplines'), orderBy('name'));
-      const snap = await getDocs(q);
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCompetencies(list);
+      // Fetch both disciplines and competencies to ensure the user sees all options
+      const disciplinesSnap = await getDocs(query(collection(db, 'disciplines'), orderBy('name')));
+      const competenciesSnap = await getDocs(query(collection(db, 'competencias'), orderBy('name')));
+      
+      const discList = disciplinesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'discipline' }));
+      const compList = competenciesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'competency' }));
+      
+      // Merge and unique-ify by name
+      const merged = [...discList, ...compList];
+      const uniqueMap = new Map();
+      merged.forEach(item => {
+        const name = (item.nome || item.name || '').trim();
+        if (name && !uniqueMap.has(name)) {
+          uniqueMap.set(name, item);
+        }
+      });
+      
+      setCompetencies(Array.from(uniqueMap.values()).sort((a, b) => 
+        (a.nome || a.name).localeCompare(b.nome || b.name)
+      ));
     } catch (error) {
       console.error("Error fetching competencies:", error);
+      toast.error('Erro ao carregar competências.');
     }
   };
 

@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as htmlToImage from 'html-to-image';
 import { DiagnosticResult } from '../../../services/geminiService';
-import { UserProfile } from '../../../App';
+import { UserProfile } from '../../../types';
 
 export const pdfExportService = {
   async exportDiagnosticReport(result: DiagnosticResult, profile: UserProfile | null) {

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Loader2, Zap, Database, X, Info, BrainCircuit, ListChecks, FileText, CheckCircle2, Target } from 'lucide-react';
+import { Sparkles, Loader2, Zap, Database, X, Info, BrainCircuit, ListChecks, FileText, CheckCircle2, Target, AlertCircle, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { generateDiscursiveQuestion } from '../../services/geminiService';
+import { generateDiscursiveQuestion, validateAndImproveQuestion } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { cn } from '../../lib/utils';
 
@@ -21,7 +21,9 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
   const [competencies, setCompetencies] = useState<any[]>([]);
   const [localModel, setLocalModel] = useState(selectedModel || 'gemini-3-flash-preview');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
+  const [validationResult, setValidationResult] = useState<any | null>(null);
 
   useEffect(() => {
     if (selectedModel) {
@@ -57,6 +59,7 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
 
     setIsGenerating(true);
     setGeneratedQuestion(null);
+    setValidationResult(null);
     try {
       const question = await generateDiscursiveQuestion(prompt, difficulty, localModel, userProfile?.role || 'professor', selectedCompetency);
       setGeneratedQuestion(question);
@@ -66,6 +69,33 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
       toast.error(`Erro ao gerar questão: ${err.message || "Erro desconhecido"}`);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleValidate = async () => {
+    if (!generatedQuestion) return;
+
+    setIsValidating(true);
+    try {
+      const result = await validateAndImproveQuestion(generatedQuestion, selectedCompetency || 'Lógica de Programação', localModel);
+      setValidationResult(result);
+      if (result.status === 'aprovado') {
+        toast.success("A IA aprovou a questão sem ressalvas!");
+      } else {
+        toast.info(`A IA sugeriu melhorias: ${result.status}`);
+      }
+    } catch (err: any) {
+      toast.error("Erro ao validar questão.");
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const applyImprovements = () => {
+    if (validationResult?.improvedQuestion) {
+      setGeneratedQuestion(validationResult.improvedQuestion);
+      setValidationResult(null);
+      toast.success("Melhorias aplicadas!");
     }
   };
 
@@ -80,6 +110,7 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
       });
       toast.success("Questão salva no banco de questões!");
       setGeneratedQuestion(null);
+      setValidationResult(null);
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'questions');
       toast.error("Erro ao salvar questão.");
@@ -295,9 +326,51 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
                     </div>
                   </div>
                 )}
+
+                {validationResult && (
+                  <div className={cn(
+                    "p-6 rounded-2xl border space-y-4",
+                    validationResult.status === 'aprovado' ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20" :
+                    validationResult.status === 'ressalvas' ? "bg-amber-50 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/20" :
+                    "bg-rose-50 border-rose-100 dark:bg-rose-900/10 dark:border-rose-900/20"
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm">
+                        <AlertCircle size={18} />
+                        Análise de Qualidade IA: {validationResult.status.toUpperCase()}
+                      </div>
+                      {validationResult.improvedQuestion && (
+                        <button 
+                          onClick={applyImprovements}
+                          className="px-3 py-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 transition-all border border-indigo-100"
+                        >
+                          Aplicar Melhorias Sugeridas
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 italic">"{validationResult.feedback}"</p>
+                    {validationResult.sugestoes?.length > 0 && (
+                      <ul className="space-y-1">
+                        {validationResult.sugestoes.map((s: string, i: number) => (
+                          <li key={i} className="text-xs text-gray-500 flex items-center gap-2">
+                            <ChevronRight size={12} className="text-indigo-400" /> {s}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-100 dark:border-gray-800">
+                <button 
+                  onClick={handleValidate}
+                  disabled={isValidating || isGenerating}
+                  className="flex-1 py-4 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border-2 border-indigo-100 dark:border-indigo-900/30 rounded-xl font-bold hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isValidating ? <Loader2 className="animate-spin" size={20} /> : <BrainCircuit size={20} />}
+                  {isValidating ? "Validando..." : "Validar Qualidade (IA)"}
+                </button>
                 <button 
                   onClick={saveToBank}
                   className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"

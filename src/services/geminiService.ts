@@ -185,6 +185,32 @@ Gerar sempre em JSON válido, compatível com documento Firestore.
 `;
 }
 
+/**
+ * Converte o formato de contents da API do Gemini para uma string simples,
+ * incluindo a systemInstruction se presente. Utilizado para fallback e APIs externas.
+ */
+function buildPromptString(params: any): string {
+  let prompt = "";
+  const systemInstruction = params.config?.systemInstruction;
+  if (systemInstruction) {
+    prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
+  }
+
+  if (typeof params.contents === 'string') {
+    prompt += params.contents;
+  } else if (Array.isArray(params.contents)) {
+    prompt += params.contents.map((c: any) => {
+      // Formato Gemini API: { role: string, parts: [{ text: string }] }
+      if (c.parts && Array.isArray(c.parts)) {
+        return c.parts.map((p: any) => p.text).join('\n');
+      }
+      return c.text || JSON.stringify(c);
+    }).join('\n');
+  }
+
+  return prompt;
+}
+
 export async function generateContentWrapper(params: any): Promise<any> {
   const provider = getAIProvider();
 
@@ -193,22 +219,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
   const systemInstruction = params.config?.systemInstruction;
 
   if (provider === 'openai' || provider === 'deepseek') {
-    let prompt = "";
-    if (systemInstruction) {
-      prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
-    }
-
-    if (typeof params.contents === 'string') {
-      prompt += params.contents;
-    } else if (Array.isArray(params.contents)) {
-      prompt += params.contents.map((c: any) => {
-        if (c.parts) {
-          return c.parts.map((p: any) => p.text).join('\n');
-        }
-        return c.text || "";
-      }).join('\n');
-    }
-
+    const prompt = buildPromptString(params);
     const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
 
     let fetchResponse;
@@ -283,23 +294,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
       if (isQuotaError) {
         console.warn(`[AI] Gemini quota exceeded, falling back to backend (DeepSeek/Groq)`);
         
-        let prompt = "";
-        const systemInstruction = params.config?.systemInstruction;
-        if (systemInstruction) {
-          prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
-        }
-
-        if (typeof params.contents === 'string') {
-          prompt += params.contents;
-        } else if (Array.isArray(params.contents)) {
-          prompt += params.contents.map((c: any) => {
-            if (c.parts) {
-              return c.parts.map((p: any) => p.text).join('\n');
-            }
-            return c.text || "";
-          }).join('\n');
-        }
-
+        const prompt = buildPromptString(params);
         const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
 
         let fetchResponse;
@@ -343,81 +338,70 @@ export const DEFAULT_CONFIG = {
 };
 
 /**
+ * Helper para desembrulhar JSON quando a IA retorna um objeto contendo a resposta.
+ */
+function unwrapParsedJson(parsed: any): any {
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    if (Array.isArray(parsed.questoes)) return parsed.questoes;
+    if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
+    if (parsed.question && typeof parsed.question === 'object') return parsed.question;
+  }
+  return parsed;
+}
+
+/**
  * Utilitário para limpar e parsear JSON retornado pela IA.
- * Remove blocos de código markdown se presentes.
+ * Remove blocos de código markdown e tenta recuperar strings truncadas.
  */
 export function safeParseJson(text: string | undefined, fallback: any = {}): any {
   if (!text) return fallback;
   
   let cleanJson = text.trim();
   
-  // Remove markdown code blocks if present
-  cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+  // 1. Remove markdown code blocks if present
+  cleanJson = cleanJson.replace(/^```[\w-]*\s*/i, '').replace(/```\s*$/, '').trim();
   
   try {
-    let parsed = JSON.parse(cleanJson);
-    
-    // Post-parse unwrapping
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.questoes)) {
-      return parsed.questoes;
-    }
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
-      if (parsed.question && typeof parsed.question === 'object') return parsed.question;
-    }
-    
-    return parsed;
+    return unwrapParsedJson(JSON.parse(cleanJson));
   } catch (initialError: any) {
-    console.warn("[Gemini] First parse attempt failed, trying to heal JSON...", initialError.message);
+    console.warn("[Gemini] First parse attempt failed, attempting to recover JSON...", initialError.message);
     
+    // 2. Tenta extrair qualquer coisa que pareça um objeto ou array JSON
+    let extractedJson = cleanJson;
+    const jsonMatch = cleanJson.match(/(\[|\{)[\s\S]*(\]|\})/);
+    if (jsonMatch) {
+      extractedJson = jsonMatch[0];
+      try {
+        return unwrapParsedJson(JSON.parse(extractedJson));
+      } catch (e) {
+        // Se falhar, prossegue com o texto extraído para a tentativa de cura de truncamento
+      }
+    }
+
+    // 3. Cura básica para respostas truncadas ou malformadas
     try {
-      // Basic healing for truncated responses or common malformations
-      let healed = cleanJson;
+      let healed = extractedJson;
       
-      // If it looks like it was truncated in the middle of a string
+      // Se parece truncado no meio de uma string
       if ((healed.match(/"/g) || []).length % 2 !== 0) {
         healed += '"';
       }
       
-      // Balance braces and brackets
+      // Balanceia chaves e colchetes
       const openBraces = (healed.match(/{/g) || []).length;
       const closeBraces = (healed.match(/}/g) || []).length;
       const openBrackets = (healed.match(/\[/g) || []).length;
       const closeBrackets = (healed.match(/\]/g) || []).length;
       
-      for (let i = 0; i < openBraces - closeBraces; i++) healed += '}';
-      for (let i = 0; i < openBrackets - closeBrackets; i++) healed += ']';
+      healed += '}'.repeat(Math.max(0, openBraces - closeBraces));
+      healed += ']'.repeat(Math.max(0, openBrackets - closeBrackets));
       
-      let parsed = JSON.parse(healed);
+      const parsed = JSON.parse(healed);
       console.log("[Gemini] JSON healed successfully");
-
-      // Post-parse unwrapping (Duplicate logic from normal flow for consistency)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.questoes)) {
-        return parsed.questoes;
-      }
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
-        if (parsed.question && typeof parsed.question === 'object') return parsed.question;
-      }
-
-      return parsed;
-    } catch (healError) {
-      // If healing fails, try to extract anything that looks like JSON
-      try {
-        const jsonMatch = cleanJson.match(/(\[|\{)[\s\S]*(\]|\})/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-      } catch (extractError) {
-        // Last resort: regex cleanup of the most common issues
-        try {
-           // Remove potential leading/trailing text and try one last time
-           const stripped = cleanJson.substring(cleanJson.indexOf('{'), cleanJson.lastIndexOf('}') + 1);
-           if (stripped) return JSON.parse(stripped);
-        } catch (e) {}
-      }
+      return unwrapParsedJson(parsed);
       
-      console.error("[Gemini] Erro ao parsear JSON:", healError, "Texto original:", text);
+    } catch (healError) {
+      console.error("[Gemini] Erro crítico ao parsear JSON:", healError, "Texto original:", text);
       return fallback;
     }
   }
@@ -2304,18 +2288,22 @@ export async function generateDiscursiveQuestion(
         role: "user",
         parts: [
           {
-            text: `Aja como um especialista em avaliação educacional.
-            Gere uma questão DISCURSIVA (aberta) com base no seguinte prompt do professor: "${prompt}".
-            Nível de dificuldade desejado: ${difficulty}.
-            ${competency ? `Alinhado com a competência: "${competency}".` : ''}
+            text: `Aja como um especialista em avaliação educacional de alto nível (padrão SAEP/SENAI).
+            Gere uma questão DISCURSIVA (aberta) profunda e técnica com base no seguinte prompt do professor: "${prompt}".
             
-            A questão deve ser desafiadora, clara e avaliar competências de alto nível.
-            Além do enunciado, você DEVE fornecer:
-            1. Uma resposta esperada (padrão de resposta).
-            2. Critérios de avaliação detalhados (rubrica) para o professor usar na correção.
-            3. Justificativa do motivo da dificuldade e alinhamento pedagógico.
+            ESPECIFICAÇÕES:
+            - Nível de dificuldade: ${difficulty}.
+            - Competência: "${competency || 'Lógica de Programação e Desenvolvimento'}".
+            - Tipo: Discursiva.
             
-            RETORNE O JSON COMPLETO CONFORME O PADRÃO ESPECIFICADO.`
+            A questão deve incluir:
+            1. Enunciado robusto com contextualização (pode incluir trechos de código se o tema permitir).
+            2. Resposta Esperada (Ideal): Um exemplo de resposta perfeita que o aluno deveria fornecer.
+            3. Critérios de Avaliação (Rubrica): Pelo menos 3 critérios claros com pontuação (ex: Identificação do problema - 30pts, Implementação da lógica - 40pts, Sintaxe e boas práticas - 30pts).
+            4. Comentário do Gabarito: Uma explicação detalhada de porque a resposta ideal é a correta e o que se espera que o aluno demonstre.
+            5. Explicabilidade da IA: Justificativa pedagógica para o nível de Bloom e dificuldade.
+            
+            RETORNE O JSON COMPLETO NO FORMATO SOLICITADO.`
           }
         ]
       }
@@ -2335,6 +2323,7 @@ export async function generateDiscursiveQuestion(
           tipoQuestao: { type: Type.STRING },
           enunciado: { type: Type.STRING },
           respostaEsperada: { type: Type.STRING },
+          comentarioGabarito: { type: Type.STRING },
           criteriosAvaliacao: {
             type: Type.ARRAY,
             items: {
@@ -2362,7 +2351,7 @@ export async function generateDiscursiveQuestion(
         },
         required: [
           "questionUid", "competenciaNome", "temaNome", "dificuldade", "bloom", 
-          "tipoQuestao", "enunciado", "respostaEsperada", "criteriosAvaliacao", "aiExplicabilidade"
+          "tipoQuestao", "enunciado", "respostaEsperada", "comentarioGabarito", "criteriosAvaliacao", "aiExplicabilidade"
         ]
       }
     }
@@ -2385,6 +2374,51 @@ export async function generateDiscursiveQuestion(
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
   };
+}
+
+export async function validateAndImproveQuestion(
+  question: any,
+  targetCompetency: string,
+  modelName: string = 'gemini-3-flash-preview'
+): Promise<any> {
+  const prompt = `Como um Auditor Pedagógico Especialista, analise a seguinte questão discursiva em relação à:
+  1. Clareza do enunciado.
+  2. Relevância pedagógica.
+  3. Alinhamento com a competência alvo: "${targetCompetency}".
+  
+  QUESTÃO:
+  ${JSON.stringify(question, null, 2)}
+  
+  FORCE A ANÁLISE SOBRE:
+  - O enunciado está ambíguo?
+  - Os critérios de avaliação são justos e cobrem o que é pedido?
+  - A resposta esperada está correta e completa?
+  
+  FORNEÇA:
+  - Um status de validação (aprovado, aprovado_com_ressalvas, reprovado).
+  - Um feedback detalhado.
+  - Sugestões específicas de melhoria para o enunciado, resposta esperada ou critérios.
+  - Uma VERSÃO MELHORADA da questão se necessário.
+  
+  RETORNE APENAS UM JSON NO FORMATO:
+  {
+    "status": "aprovado" | "ressalvas" | "melhorar",
+    "feedback": "...",
+    "sugestoes": ["...", "..."],
+    "improvedQuestion": { ...mesma estrutura da questão original mas com melhorias... }
+  }`;
+
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: getSystemInstruction('professor', 'smart_content'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG
+    }
+  });
+
+  return safeParseJson(response.text, {});
 }
 
 export async function generateStudyPlan(data: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {

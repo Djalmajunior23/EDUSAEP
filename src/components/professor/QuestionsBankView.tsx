@@ -89,9 +89,24 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
 
   const fetchDisciplines = async () => {
     try {
-      const q = query(collection(db, 'disciplines'), orderBy('name'));
-      const snap = await getDocs(q);
-      setDisciplines(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const discSnap = await getDocs(query(collection(db, 'disciplines'), orderBy('name')));
+      const compSnap = await getDocs(query(collection(db, 'competencias'), orderBy('name')));
+      
+      const list = [
+        ...discSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        ...compSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      ];
+      
+      // Filter out empty names and duplicates
+      const uniqueMap = new Map();
+      list.forEach(item => {
+        const n = (item.nome || item.name || '').trim();
+        if (n && !uniqueMap.has(n)) {
+          uniqueMap.set(n, item);
+        }
+      });
+      
+      setDisciplines(Array.from(uniqueMap.values()));
     } catch (error) {
       console.error("Error fetching disciplines:", error);
     }
@@ -380,7 +395,12 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     return matchesSearch && matchesDifficulty && matchesCompetency && matchesAi;
   });
 
-  const competencies = Array.from(new Set(questions.map(q => q.competenciaNome)));
+  const filteredCompetencies = useMemo(() => {
+    // Combine names from existing questions AND fetched disciplines/competencies
+    const fromQuestions = questions.map(q => q.competenciaNome);
+    const fromDisciplines = disciplines.map(d => d.nome || d.name);
+    return Array.from(new Set([...fromQuestions, ...fromDisciplines])).filter(Boolean).sort();
+  }, [questions, disciplines]);
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center p-20 space-y-4">
@@ -548,7 +568,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
           className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none"
         >
           <option value="all">Todas Competências</option>
-          {competencies.map(c => (
+          {filteredCompetencies.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>

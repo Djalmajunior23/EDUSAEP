@@ -16,7 +16,7 @@ import { DigitalTwinExplorer } from './DigitalTwinExplorer';
 import { SystemGovernancePortal } from './SystemGovernancePortal';
 import { ErrorEngineeringMap } from './ErrorEngineeringMap';
 import { CognitiveAlertsFeed } from './classroom/CognitiveAlertsFeed';
-import { UserProfile } from '../../App';
+import { UserProfile } from '../../types';
 import { toast } from 'sonner';
 import { generateClassRecoveryOrchestration, ClassOrchestrationResult, generateSIPA, SIPAResult } from '../../services/geminiService';
 import { exportDashboardToPDF, exportStudentsToExcel } from '../../services/exportService';

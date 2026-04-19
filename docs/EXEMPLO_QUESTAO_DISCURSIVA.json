@@ -1,0 +1,38 @@
+{
+  "questionUid": "LOGIC-LOOP-MEDIO-F82B10C4",
+  "competenciaNome": "Lógica de Programação",
+  "temaNome": "Estruturas de Repetição",
+  "dificuldade": "médio",
+  "bloom": "aplicar",
+  "tipoQuestao": "discursiva",
+  "enunciado": "Analise o seguinte trecho de código JavaScript que utiliza uma estrutura de repetição 'for' para processar um array de números:\n\n```javascript\nconst numeros = [10, 25, 40, 55, 70];\nlet resultado = 0;\n\nfor (let i = 0; i < numeros.length; i++) {\n  if (numeros[i] > 30) {\n    resultado += numeros[i];\n  }\n}\n\nconsole.log(resultado);\n```\n\nCom base no código acima, responda:\n1. Qual será o valor final impresso no console?\n2. Explique, passo a passo, como a estrutura de repetição interage com a condição 'if' para chegar a esse resultado.\n3. O que aconteceria com o valor de 'resultado' se a condição fosse alterada para `numeros[i] % 2 === 0`?",
+  "respostaEsperada": "1. O valor impresso será 165 (40 + 55 + 70).\n2. O loop percorre o array 'numeros'. Para cada elemento, o 'if' verifica se é maior que 30. Os números que atendem são 40, 55 e 70. Eles são somados à variável 'resultado' (0 + 40 + 55 + 70 = 165).\n3. Se a condição fosse `numeros[i] % 2 === 0`, o código somaria apenas os números pares (10 + 40 + 70), resultando em 120.",
+  "comentarioGabarito": "A questão avalia a capacidade de rastro de código (code tracing) e compreensão de estruturas de controle de fluxo combinadas (for + if). O aluno deve identificar que o loop itera sobre todos os elementos, mas a acumulação só ocorre para valores específicos.",
+  "criteriosAvaliacao": [
+    {
+      "criterio": "Cálculo do Resultado",
+      "pontuacao": 30,
+      "descricao": "Identificou corretamente o valor final (165)."
+    },
+    {
+      "criterio": "Explicação do Fluxo",
+      "pontuacao": 40,
+      "descricao": "Explicou corretamente a lógica do loop e a filtragem pelo 'if'."
+    },
+    {
+      "criterio": "Análise de Alteração",
+      "pontuacao": 30,
+      "descricao": "Previu corretamente o comportamento com a nova condição de paridade."
+    }
+  ],
+  "aiExplicabilidade": {
+    "justificativaDificuldade": "A questão é média pois exige rastro manual de código e compreensão de lógica booleana dentro de repetição.",
+    "justificativaBloom": "Nível 'Aplicar' pois o aluno utiliza regras de programação em um cenário concreto.",
+    "analiseDistratores": "N/A (Discursiva)",
+    "intencaoPedagogica": "Validar a compreensão básica de iteração e condicionais em algoritmos."
+  },
+  "tags": ["javascript", "for-loop", "lógica", "programação"],
+  "status": "publicado",
+  "revisadaPorProfessor": true,
+  "origem": "IA"
+}

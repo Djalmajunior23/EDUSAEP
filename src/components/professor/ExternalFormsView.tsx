@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
-import { UserProfile } from '../../App';
+import { UserProfile } from '../../types';
 import { cn } from '../../lib/utils';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 

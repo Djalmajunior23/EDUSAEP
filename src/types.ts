@@ -26,10 +26,12 @@ export interface UserProfile {
 
 export interface Discipline {
   id: string;
-  name: string;
-  code: string;
+  code: string; // Ex: UC-001
+  name: string; // The name of the discipline/main competency
+  description?: string;
   area: string;
   status: 'active' | 'inactive';
+  teacherId?: string;
   createdAt?: any;
 }
 
@@ -128,9 +130,22 @@ export interface StudyPlan {
     topic: string;
     reason: string;
     priority: 'Alta' | 'Média' | 'Baixa';
+    details?: string;
   }>;
+  recommendedExercises?: Array<{
+    id: string;
+    title: string;
+    competency: string;
+  }>;
+  competencyAnalysis?: Array<{
+    competency: string;
+    accuracy: number;
+    correct: number;
+    total: number;
+  }>;
+  recommendations?: string[];
   createdAt: any;
-  updatedAt: any;
+  updatedAt?: any;
 }
 
 export interface Class {
@@ -147,17 +162,7 @@ export interface Student {
   classId: string;
 }
 
-export interface Discipline {
-  // Main Competency
-  id: string;
-  code: string; // Ex: UC-001
-  name: string; // The name of the discipline/main competency
-  description?: string;
-  area: string;
-  status: 'active' | 'inactive';
-  teacherId?: string;
-}
-
+// Habilidade / Sub-competência
 export interface Skill {
   // Habilidade / Sub-competência
   id: string;

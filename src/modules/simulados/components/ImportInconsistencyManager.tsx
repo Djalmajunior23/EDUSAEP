@@ -21,7 +21,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { ImportInconsistency } from '../types';
-import { UserProfile } from '../../../App';
+import { UserProfile } from '../../../types';
 import { simuladoService } from '../services/simuladoService';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '../../../services/errorService';
