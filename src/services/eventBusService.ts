@@ -65,7 +65,6 @@ class EventBusService {
 
   private async triggerWebhook(event: any) {
     // Logic to call N8N or other integration endpoints
-    console.log(`[EventBus] Triggering automated workflow for ${event.type}`);
   }
 }
 

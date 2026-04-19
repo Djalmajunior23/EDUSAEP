@@ -12,6 +12,7 @@ import {
 import { db, auth } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getNextAdaptiveQuestion, SAEPQuestion } from '../../services/geminiService';
+import { assessCognitiveState } from '../../services/cognitiveService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
 import { gamificationEngine } from '../../services/gamificationService';
@@ -36,6 +37,7 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [questionStartTime, setQuestionStartTime] = useState(Date.now());
 
   const STORAGE_KEY = `adaptive_exam_progress_${examId}`;
 
@@ -109,7 +111,16 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
   const handleAnswer = async () => {
     if (selectedOption === null || !currentQuestion || !sessionId) return;
 
+    const timeTaken = (Date.now() - questionStartTime) / 1000;
     const isCorrect = selectedOption === currentQuestion.respostaCorreta;
+    
+    // Dispara análise de carga cognitiva
+    assessCognitiveState(auth.currentUser?.uid || 'anon', 'turma-teste', {
+      timeTaken,
+      isCorrect,
+      difficulty: currentQuestion.dificuldade || 'médio'
+    });
+
     const newHistory = [...history, { ...currentQuestion, selectedOption, isCorrect }];
     setHistory(newHistory);
     setShowFeedback(true);
@@ -140,6 +151,7 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
     } else {
       setSelectedOption(null);
       setShowFeedback(false);
+      setQuestionStartTime(Date.now());
       fetchNextQuestion(proficiency, history);
     }
   };

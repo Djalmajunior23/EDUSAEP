@@ -55,6 +55,15 @@ Você está integrado à plataforma educacional chamada **JuniorsStudent**.
 
 ---
 
+## 🚫 REGRAS DE OURO (SISTEMA)
+- **NUNCA** gere textos repetitivos ou em loop (ex: repetir o mesmo prefixo centenas de vezes).
+- **CONCISÃO TÉCNICA**: Seja profundo pedagogicamente mas evite descrições excessivamente longas que possam truncar a resposta JSON.
+- **NÚMEROS**: "tempoEstimado" deve ser um número inteiro razoável (ex: 120-600), nunca uma sequência infinita de zeros.
+- **JSON VÁLIDO**: Feche todas as aspas, chaves e colchetes. Nunca retorne texto fora do bloco JSON.
+- **REFERÊNCIAS**: Use IDs consistentes e curtos.
+
+---
+
 ## 👤 PERFIL DO USUÁRIO
 perfil: ${profile}
 Sua resposta deve se adaptar automaticamente ao perfil do usuário (Professores esperam profundidade técnica e insights de BI; Alunos esperam clareza didática e caminhos de aprendizagem).
@@ -143,6 +152,7 @@ Cada questão deve conter obrigatoriamente os seguintes campos:
 - origem: "ia"
 - criadoEm: "SERVER_TIMESTAMP"
 - atualizadoEm: "SERVER_TIMESTAMP"
+- aiExplicabilidade: Objeto contendo { justificativaDificuldade, justificativaBloom, analiseDistratores, intencaoPedagogica }
 
 ---
 
@@ -338,30 +348,78 @@ export const DEFAULT_CONFIG = {
  */
 export function safeParseJson(text: string | undefined, fallback: any = {}): any {
   if (!text) return fallback;
+  
+  let cleanJson = text.trim();
+  
+  // Remove markdown code blocks if present
+  cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+  
   try {
-    // Remove ```json ... ``` ou ``` ... ```
-    const cleanJson = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
+    let parsed = JSON.parse(cleanJson);
     
-    // Handle the case where the AI returns an object with a 'questoes' array
+    // Post-parse unwrapping
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.questoes)) {
       return parsed.questoes;
     }
-    
-    // Handle the case where the AI returns a single question wrapped in 'questao' or 'question'
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      if (parsed.questao && typeof parsed.questao === 'object') {
-        return parsed.questao;
-      }
-      if (parsed.question && typeof parsed.question === 'object') {
-        return parsed.question;
-      }
+      if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
+      if (parsed.question && typeof parsed.question === 'object') return parsed.question;
     }
     
     return parsed;
-  } catch (error) {
-    console.error("[Gemini] Erro ao parsear JSON:", error, "Texto original:", text);
-    return fallback;
+  } catch (initialError: any) {
+    console.warn("[Gemini] First parse attempt failed, trying to heal JSON...", initialError.message);
+    
+    try {
+      // Basic healing for truncated responses or common malformations
+      let healed = cleanJson;
+      
+      // If it looks like it was truncated in the middle of a string
+      if ((healed.match(/"/g) || []).length % 2 !== 0) {
+        healed += '"';
+      }
+      
+      // Balance braces and brackets
+      const openBraces = (healed.match(/{/g) || []).length;
+      const closeBraces = (healed.match(/}/g) || []).length;
+      const openBrackets = (healed.match(/\[/g) || []).length;
+      const closeBrackets = (healed.match(/\]/g) || []).length;
+      
+      for (let i = 0; i < openBraces - closeBraces; i++) healed += '}';
+      for (let i = 0; i < openBrackets - closeBrackets; i++) healed += ']';
+      
+      let parsed = JSON.parse(healed);
+      console.log("[Gemini] JSON healed successfully");
+
+      // Post-parse unwrapping (Duplicate logic from normal flow for consistency)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.questoes)) {
+        return parsed.questoes;
+      }
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
+        if (parsed.question && typeof parsed.question === 'object') return parsed.question;
+      }
+
+      return parsed;
+    } catch (healError) {
+      // If healing fails, try to extract anything that looks like JSON
+      try {
+        const jsonMatch = cleanJson.match(/(\[|\{)[\s\S]*(\]|\})/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+      } catch (extractError) {
+        // Last resort: regex cleanup of the most common issues
+        try {
+           // Remove potential leading/trailing text and try one last time
+           const stripped = cleanJson.substring(cleanJson.indexOf('{'), cleanJson.lastIndexOf('}') + 1);
+           if (stripped) return JSON.parse(stripped);
+        } catch (e) {}
+      }
+      
+      console.error("[Gemini] Erro ao parsear JSON:", healError, "Texto original:", text);
+      return fallback;
+    }
   }
 }
 
@@ -1190,7 +1248,13 @@ Retorne um ARRAY de objetos seguindo estritamente este esquema:
   "dificuldade": "${params.level}",
   "bloom": "${params.bloom}",
   "tags": ["lista", "de", "tags"],
-  "tempoEstimado": number (segundos)
+  "tempoEstimado": number (segundos),
+  "aiExplicabilidade": {
+    "justificativaDificuldade": "Por que esta questão foi classificada como difícil?",
+    "justificativaBloom": "Qual o motivo da classificação nesta taxonomia?",
+    "analiseDistratores": "Motivo da sugestão de cada alternativa/distrator",
+    "intencaoPedagogica": "Qual objetivo de aprendizagem esta questão visa atingir?"
+  }
 }
   `;
 
@@ -1244,9 +1308,19 @@ Retorne um ARRAY de objetos seguindo estritamente este esquema:
             dificuldade: { type: Type.STRING },
             bloom: { type: Type.STRING },
             tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-            tempoEstimado: { type: Type.NUMBER }
+            tempoEstimado: { type: Type.NUMBER },
+            aiExplicabilidade: {
+              type: Type.OBJECT,
+              properties: {
+                justificativaDificuldade: { type: Type.STRING },
+                justificativaBloom: { type: Type.STRING },
+                analiseDistratores: { type: Type.STRING },
+                intencaoPedagogica: { type: Type.STRING }
+              },
+              required: ['justificativaDificuldade', 'justificativaBloom', 'analiseDistratores', 'intencaoPedagogica']
+            }
           },
-          required: ['enunciado', 'tipoQuestao', 'dificuldade', 'bloom']
+          required: ['enunciado', 'tipoQuestao', 'dificuldade', 'bloom', 'aiExplicabilidade']
         }
       }
     }
@@ -2220,7 +2294,8 @@ export async function generateDiscursiveQuestion(
   prompt: string,
   difficulty: string,
   modelName: string = 'gemini-3-flash-preview',
-  userRole: 'professor' | 'aluno' = 'professor'
+  userRole: 'professor' | 'aluno' = 'professor',
+  competency: string = ''
 ): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
@@ -2232,11 +2307,13 @@ export async function generateDiscursiveQuestion(
             text: `Aja como um especialista em avaliação educacional.
             Gere uma questão DISCURSIVA (aberta) com base no seguinte prompt do professor: "${prompt}".
             Nível de dificuldade desejado: ${difficulty}.
+            ${competency ? `Alinhado com a competência: "${competency}".` : ''}
             
             A questão deve ser desafiadora, clara e avaliar competências de alto nível.
             Além do enunciado, você DEVE fornecer:
             1. Uma resposta esperada (padrão de resposta).
             2. Critérios de avaliação detalhados (rubrica) para o professor usar na correção.
+            3. Justificativa do motivo da dificuldade e alinhamento pedagógico.
             
             RETORNE O JSON COMPLETO CONFORME O PADRÃO ESPECIFICADO.`
           }
@@ -2271,11 +2348,21 @@ export async function generateDiscursiveQuestion(
             }
           },
           comentarioPedagogico: { type: Type.STRING },
-          tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+          tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          aiExplicabilidade: {
+            type: Type.OBJECT,
+            properties: {
+              justificativaDificuldade: { type: Type.STRING },
+              justificativaBloom: { type: Type.STRING },
+              analiseDistratores: { type: Type.STRING },
+              intencaoPedagogica: { type: Type.STRING }
+            },
+            required: ['justificativaDificuldade', 'justificativaBloom', 'analiseDistratores', 'intencaoPedagogica']
+          }
         },
         required: [
           "questionUid", "competenciaNome", "temaNome", "dificuldade", "bloom", 
-          "tipoQuestao", "enunciado", "respostaEsperada", "criteriosAvaliacao"
+          "tipoQuestao", "enunciado", "respostaEsperada", "criteriosAvaliacao", "aiExplicabilidade"
         ]
       }
     }

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { BrainCircuit, Loader2, Save, Sparkles, AlertTriangle } from 'lucide-react';
+import { BrainCircuit, Loader2, Save, Sparkles, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
 import Markdown from 'react-markdown';
 import { db } from '../../firebase';
-import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, increment } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, increment, getDocs, query, orderBy } from 'firebase/firestore';
 import { LearningSituation } from '../../types/edusaep.types';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
 
 export function LearningSituationGenerator({ userProfile, selectedModel }: Props) {
   const [loading, setLoading] = useState(false);
+  const [competencies, setCompetencies] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     tema: '',
     curso: '',
@@ -29,7 +30,19 @@ export function LearningSituationGenerator({ userProfile, selectedModel }: Props
 
   useEffect(() => {
     fetchUsageCount();
+    fetchCompetencies();
   }, [userProfile.uid]);
+
+  const fetchCompetencies = async () => {
+    try {
+      const q = query(collection(db, 'disciplines'), orderBy('name'));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCompetencies(list);
+    } catch (error) {
+      console.error("Error fetching competencies:", error);
+    }
+  };
 
   const fetchUsageCount = async () => {
     if (!userProfile?.uid) return;
@@ -204,13 +217,20 @@ export function LearningSituationGenerator({ userProfile, selectedModel }: Props
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Competência *</label>
-            <input
-              type="text"
-              value={formData.competencia}
-              onChange={e => setFormData({...formData, competencia: e.target.value})}
-              className="w-full p-2 border border-gray-200 rounded-lg"
-              placeholder="Ex: Implementar backend escalável"
-            />
+            <div className="relative">
+              <Target className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <select
+                value={formData.competencia}
+                onChange={e => setFormData({...formData, competencia: e.target.value})}
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+              >
+                <option value="">Selecione uma competência...</option>
+                {competencies.map(c => (
+                  <option key={c.id} value={c.nome || c.name}>{c.nome || c.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Perfil da Turma</label>

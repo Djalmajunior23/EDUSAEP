@@ -34,6 +34,12 @@ export function ExamEditor({ exam, onSave }: { exam: any, onSave: (updatedExam: 
                 setEditedExam({...editedExam, questions: newQuestions});
               }}
             />
+            {q.explanation && (
+              <div className="mt-4 p-3 bg-purple-50 text-purple-800 text-sm rounded-lg border border-purple-100">
+                <p className="font-bold flex items-center gap-2">💡 Raciocínio da IA:</p>
+                <p>{q.explanation}</p>
+              </div>
+            )}
           </div>
         ))}
       </div>

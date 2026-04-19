@@ -3,7 +3,6 @@ import { db } from "../firebase";
 import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-const model = ai.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
 
 export interface CorrectionResult {
   score: number;
@@ -50,8 +49,11 @@ export async function assistCorrection(assessmentId: string, studentId: string, 
     ]
   }`;
 
-  const result = await model.generateContent(prompt);
-  const jsonString = result.response.text().replace(/```json|```/g, '').trim();
+  const result = await ai.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    contents: prompt,
+  });
+  const jsonString = (result.text || "").replace(/```json|```/g, '').trim();
   const correction: CorrectionResult = JSON.parse(jsonString);
 
   // 3. Save Correction to Firestore
@@ -60,6 +62,7 @@ export async function assistCorrection(assessmentId: string, studentId: string, 
     ...correction,
     createdAt: serverTimestamp()
   });
+}
 
 export async function batchAssistCorrection(assessmentId: string, submissionsData: { studentId: string, answers: any[] }[]) {
   const results = await Promise.all(

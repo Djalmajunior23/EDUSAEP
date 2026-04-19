@@ -97,7 +97,6 @@ export function AdminAIProviderManager() {
       const data = await response.json();
       if (data.success) {
         toast.success('Webhook simulado com sucesso! Verifique o n8n.');
-        console.log('n8n Response:', data.n8nResponse);
       } else {
         toast.error(`Erro na simulação: ${data.error}`);
       }

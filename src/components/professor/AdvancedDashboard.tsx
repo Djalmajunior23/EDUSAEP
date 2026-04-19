@@ -15,6 +15,7 @@ import { DigitalTwinCard } from './DigitalTwinCard';
 import { DigitalTwinExplorer } from './DigitalTwinExplorer';
 import { SystemGovernancePortal } from './SystemGovernancePortal';
 import { ErrorEngineeringMap } from './ErrorEngineeringMap';
+import { CognitiveAlertsFeed } from './classroom/CognitiveAlertsFeed';
 import { UserProfile } from '../../App';
 import { toast } from 'sonner';
 import { generateClassRecoveryOrchestration, ClassOrchestrationResult, generateSIPA, SIPAResult } from '../../services/geminiService';
@@ -397,6 +398,7 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
 
             {/* Right Col: High-Res Analytics (4 cols) */}
             <div className="lg:col-span-4 space-y-8">
+              <CognitiveAlertsFeed classId="turma-teste" />
               <section className="bg-white p-8 rounded-[32px] shadow-xl border border-red-100 overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500 cursor-default opacity-[0.03] -translate-y-16 translate-x-16 rounded-full" />
                 <h3 className="font-black text-xl mb-8 text-gray-900 flex items-center gap-2">

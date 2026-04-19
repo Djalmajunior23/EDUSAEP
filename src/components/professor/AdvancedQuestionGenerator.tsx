@@ -66,7 +66,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
       
       const enrichedQuestions: Question[] = genned.map((q: any) => ({
         ...q,
-        competenciaId: competencies.find(c => c.nome === params.competency)?.id || 'unknown',
+        competenciaId: competencies.find(c => (c.nome || c.name) === params.competency)?.id || 'unknown',
         competenciaNome: params.competency,
         temaNome: params.topic,
         temaId: 'gen-ai',
@@ -157,7 +157,7 @@ export function AdvancedQuestionGenerator({ onQuestionsGenerated, onClose, compe
                         >
                           <option value="">Selecione uma competência...</option>
                           {competencies.map(c => (
-                            <option key={c.id} value={c.nome}>{c.nome}</option>
+                            <option key={c.id} value={c.nome || c.name}>{c.nome || c.name}</option>
                           ))}
                         </select>
                       </div>

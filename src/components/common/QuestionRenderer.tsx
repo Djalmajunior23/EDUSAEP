@@ -290,6 +290,39 @@ export function QuestionRenderer({
           </div>
         </motion.div>
       )}
+
+      {showCorrectAnswer && question.aiExplicabilidade && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-3xl space-y-4 shadow-sm"
+        >
+          <div className="flex items-center gap-3 text-purple-700 dark:text-purple-400">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg">
+              <Brain size={18} />
+            </div>
+            <h4 className="text-sm font-bold uppercase tracking-widest text-left">Explicabilidade da IA (XAI)</h4>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-purple-600 dark:text-purple-500 uppercase tracking-wider text-left">Dificuldade:</p>
+              <p className="text-xs text-purple-800 dark:text-purple-300 leading-relaxed text-left">{question.aiExplicabilidade.justificativaDificuldade}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-purple-600 dark:text-purple-500 uppercase tracking-wider text-left">Bloom:</p>
+              <p className="text-xs text-purple-800 dark:text-purple-300 leading-relaxed text-left">{question.aiExplicabilidade.justificativaBloom}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-purple-600 dark:text-purple-500 uppercase tracking-wider text-left">Distratores:</p>
+              <p className="text-xs text-purple-800 dark:text-purple-300 leading-relaxed text-left">{question.aiExplicabilidade.analiseDistratores}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-purple-600 dark:text-purple-500 uppercase tracking-wider text-left">Intenção:</p>
+              <p className="text-xs text-purple-800 dark:text-purple-300 leading-relaxed text-left">{question.aiExplicabilidade.intencaoPedagogica}</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

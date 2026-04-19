@@ -44,10 +44,11 @@ export async function triggerN8NAlert(type: string, data: any, attempt = 1): Pro
 /**
  * Realiza uma requisição ao backend Express que encaminha para o n8n.
  */
-export async function triggerN8NRequest(data: any, endpoint: string = 'alerts'): Promise<any> {
+export async function triggerN8NRequest(data: any, endpoint: string = 'alerts', isExternal: boolean = false): Promise<any> {
   const isFormData = data instanceof FormData;
+  const url = isExternal ? endpoint : `/api/n8n/${endpoint}`;
   
-  const response = await fetch(`/api/n8n/${endpoint}`, {
+  const response = await fetch(url, {
     method: 'POST',
     headers: isFormData ? {} : {
       'Content-Type': 'application/json',

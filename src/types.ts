@@ -80,6 +80,12 @@ export interface Question {
   atualizadoEm?: any;
   note?: string;
   feedback?: string;
+  aiExplicabilidade?: {
+    justificativaDificuldade: string;
+    justificativaBloom: string;
+    analiseDistratores: string;
+    intencaoPedagogica: string;
+  };
 }
 
 export interface Exam {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Loader2, Zap, Database, X, Info, BrainCircuit, ListChecks, FileText, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Loader2, Zap, Database, X, Info, BrainCircuit, ListChecks, FileText, CheckCircle2, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { generateDiscursiveQuestion } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
@@ -17,6 +17,8 @@ interface DiscursiveQuestionGeneratorProps {
 export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }: DiscursiveQuestionGeneratorProps) {
   const [prompt, setPrompt] = useState('');
   const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
+  const [selectedCompetency, setSelectedCompetency] = useState('');
+  const [competencies, setCompetencies] = useState<any[]>([]);
   const [localModel, setLocalModel] = useState(selectedModel || 'gemini-3-flash-preview');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
@@ -26,6 +28,21 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
       setLocalModel(selectedModel);
     }
   }, [selectedModel]);
+
+  useEffect(() => {
+    fetchCompetencies();
+  }, []);
+
+  const fetchCompetencies = async () => {
+    try {
+      const q = query(collection(db, 'disciplines'), orderBy('name'));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCompetencies(list);
+    } catch (error) {
+      console.error("Error fetching competencies:", error);
+    }
+  };
 
   const handleFillExample = () => {
     setPrompt('Desenvolvimento de uma API RESTful com Node.js e Express, abordando autenticação JWT e boas práticas de segurança.');
@@ -41,7 +58,7 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
     setIsGenerating(true);
     setGeneratedQuestion(null);
     try {
-      const question = await generateDiscursiveQuestion(prompt, difficulty, localModel, userProfile?.role || 'professor');
+      const question = await generateDiscursiveQuestion(prompt, difficulty, localModel, userProfile?.role || 'professor', selectedCompetency);
       setGeneratedQuestion(question);
       toast.success("Questão discursiva gerada com sucesso!");
     } catch (err: any) {
@@ -100,6 +117,23 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white resize-none"
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Competência Alvo (Opcional)</label>
+            <div className="relative">
+              <Target className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <select
+                value={selectedCompetency}
+                onChange={(e) => setSelectedCompetency(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white appearance-none"
+              >
+                <option value="">Selecione uma competência...</option>
+                {competencies.map(c => (
+                  <option key={c.id} value={c.nome || c.name}>{c.nome || c.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -238,6 +272,29 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
                     ))}
                   </div>
                 </div>
+
+                {generatedQuestion.aiExplicabilidade && (
+                  <div className="p-6 bg-purple-50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-900/20 space-y-4">
+                    <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                      <BrainCircuit size={18} />
+                      <p className="text-xs font-bold uppercase tracking-wider">Explicabilidade da IA (XAI)</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[10px] font-bold text-purple-500 uppercase">Dificuldade</p>
+                        <p className="text-xs text-purple-800 dark:text-purple-300">{generatedQuestion.aiExplicabilidade.justificativaDificuldade}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-purple-500 uppercase">Taxonomia</p>
+                        <p className="text-xs text-purple-800 dark:text-purple-300">{generatedQuestion.aiExplicabilidade.justificativaBloom}</p>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <p className="text-[10px] font-bold text-purple-500 uppercase">Intenção Pedagógica</p>
+                        <p className="text-xs text-purple-800 dark:text-purple-300">{generatedQuestion.aiExplicabilidade.intencaoPedagogica}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-100 dark:border-gray-800">

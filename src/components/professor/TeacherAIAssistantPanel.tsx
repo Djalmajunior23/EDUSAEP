@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, FileText, Code, Briefcase, BrainCircuit, Loader2, CheckCircle2, ListChecks, BookOpen } from 'lucide-react';
+import { Sparkles, FileText, Code, Briefcase, BrainCircuit, Loader2, CheckCircle2, ListChecks, BookOpen, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import Markdown from 'react-markdown';
 import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
 
@@ -13,8 +13,25 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
   const [context, setContext] = useState('');
   const [difficulty, setDifficulty] = useState<'facil' | 'medio' | 'dificil'>('medio');
   const [educationLevel, setEducationLevel] = useState('Ensino Técnico');
+  const [selectedCompetency, setSelectedCompetency] = useState('');
+  const [competencies, setCompetencies] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCompetencies();
+  }, []);
+
+  const fetchCompetencies = async () => {
+    try {
+      const q = query(collection(db, 'disciplines'), orderBy('name'));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCompetencies(list);
+    } catch (error) {
+      console.error("Error fetching competencies:", error);
+    }
+  };
 
   const tabs = [
     { id: 'discursive', label: 'Questão Discursiva', icon: FileText, desc: 'Perguntas abertas com rubrica' },
@@ -42,6 +59,7 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
       let aiPrompt = `
         Atue como um professor especialista em ${educationLevel}.
         Crie um(a) ${selectedTabText} de nível ${difficulty.toUpperCase()} sobre o tema: "${prompt}".
+        ${selectedCompetency ? `Alinhado com a competência: "${selectedCompetency}".` : ''}
         
         Contexto adicional e restrições: "${context || 'Nenhuma restrição adicional.'}"
       `;
@@ -158,6 +176,23 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
           </div>
 
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Competência Alvo (Opcional)</label>
+              <div className="relative">
+                <Target className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <select
+                  value={selectedCompetency}
+                  onChange={(e) => setSelectedCompetency(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+                >
+                  <option value="">Selecione uma competência...</option>
+                  {competencies.map(c => (
+                    <option key={c.id} value={c.nome || c.name}>{c.nome || c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Tema Principal</label>
               <input
