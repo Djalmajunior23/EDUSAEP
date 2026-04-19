@@ -144,6 +144,14 @@ export interface StudyPlan {
     total: number;
   }>;
   recommendations?: string[];
+  phases?: Array<{
+    nome: string;
+    objetivos: string[];
+    topicos: string[];
+    atividades: string[];
+    recursos: string[];
+  }>;
+  mensagem_motivacional?: string;
   createdAt: any;
   updatedAt?: any;
 }

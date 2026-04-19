@@ -12,7 +12,7 @@ import { User } from 'firebase/auth';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 import { pdfExportService } from '../../services/pdfExportService';
-import { generateContentWrapper, DEFAULT_CONFIG, safeParseJson } from '../../services/geminiService';
+import { generateContentWrapper, DEFAULT_CONFIG, safeParseJson, generateLearningPath } from '../../services/geminiService';
 import { Type } from '@google/genai';
 import { Question, Exam, ExamSubmission, StudyPlan, UserProfile } from '../../types';
 
@@ -176,7 +176,7 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
         return;
       }
 
-      // Aggregate Stats
+      // 2. Aggregate Stats
       const competencyStats: { [key: string]: { correct: number, total: number } } = {};
       submissions.forEach(sub => {
         Object.entries(sub.competencyResults || {}).forEach(([comp, stats]) => {
@@ -204,59 +204,26 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
         else if (accuracy < 0.6) weaknesses.push(comp);
       });
 
-      // Gemini AI Plan Generation
-      const prompt = `Como um tutor educacional especialista, gere um plano de estudos ADAPTATIVO e PERSONALIZADO.
-      PERFIL DO ALUNO:
-      - Pontos Fortes: ${strengths.join(', ')}
-      - Pontos Fracos: ${weaknesses.join(', ')}
-      - Análise: ${JSON.stringify(competencyAnalysis)}
+      // Gemini AI Plan Generation using Learning Path
+      const learningPathData = await generateLearningPath({
+        strengths,
+        weaknesses,
+        competencyAnalysis
+      }, selectedModel);
       
-      RETORNE APENAS JSON NO FORMATO:
-      {
-        "priorityTopics": [{ "topic": "String", "reason": "String", "priority": "Alta" | "Média" | "Baixa" }],
-        "recommendedExercises": [{ "id": "String", "title": "String", "competency": "String" }],
-        "recommendations": ["String"]
-      }`;
+      // Mapear o formato para o nosso estado
+      const priorityTopics = learningPathData.fases?.map((f: any) => ({
+        topic: f.nome,
+        reason: (f.objetivos || []).join(' | '),
+        priority: f.nome.toLowerCase().includes('nivelamento') ? 'Alta' : 'Média'
+      })) || [];
 
-      const response = await generateContentWrapper({
-        model: selectedModel,
-        contents: prompt,
-        config: { 
-          responseMimeType: "application/json",
-          ...DEFAULT_CONFIG,
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              priorityTopics: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    topic: { type: Type.STRING },
-                    reason: { type: Type.STRING },
-                    priority: { type: Type.STRING }
-                  }
-                }
-              },
-              recommendedExercises: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    title: { type: Type.STRING },
-                    competency: { type: Type.STRING }
-                  }
-                }
-              },
-              recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
-            }
-          }
-        }
-      });
+      // We still map fallback fields just in case
+      let recommendations = ['Revisar pontos críticos recomendados pela IA.'];
+      if (learningPathData.mensagem_motivacional) {
+        recommendations = [learningPathData.mensagem_motivacional];
+      }
 
-      const aiData = safeParseJson(response.text, {});
-      
       const newPlan = {
         userId: user.uid,
         createdAt: serverTimestamp(),
@@ -264,7 +231,10 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
         weaknesses,
         detailedWeaknesses: [],
         competencyAnalysis,
-        ...aiData
+        priorityTopics: priorityTopics.length > 0 ? priorityTopics : [{ topic: 'Revisão Geral', reason: 'Nenhuma fase foi estruturada', priority: 'Média' }],
+        recommendations,
+        phases: learningPathData.fases || [],
+        mensagem_motivacional: learningPathData.mensagem_motivacional || "Boa sorte na sua jornada!"
       };
 
       await addDoc(collection(db, 'study_plans'), newPlan);
@@ -358,7 +328,16 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
              </div>
           </div>
 
-          {/* Priority Topics */}
+          {studyPlan.mensagem_motivacional && (
+            <div className="bg-gradient-to-r from-emerald-500 to-indigo-600 rounded-3xl p-6 text-white shadow-lg flex items-center gap-4">
+              <Sparkles className="shrink-0 opacity-80" size={32} />
+              <p className="font-medium text-sm md:text-base leading-relaxed opacity-95">
+                {studyPlan.mensagem_motivacional}
+              </p>
+            </div>
+          )}
+
+          {/* Phases or Priority Topics */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight"> Roadmap de Conhecimento</h3>
@@ -370,40 +349,111 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
                 {generatingRefined ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Refinar Sugestões IA
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-4">
-              {studyPlan.priorityTopics.map((topic, i) => (
-                <div key={i} className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                   <div className="p-8 flex flex-col md:flex-row gap-8">
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                            topic.priority === 'Alta' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                          }`}>Prioridade {topic.priority}</span>
-                          <h4 className="text-xl font-bold dark:text-white">{topic.topic}</h4>
-                        </div>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{topic.reason}</p>
-                        <div className="flex flex-wrap gap-4 pt-2">
-                          <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
-                             <Target size={14} /> Foco Teórico
+            
+            <div className="grid grid-cols-1 gap-6">
+              {studyPlan.phases && studyPlan.phases.length > 0 ? (
+                studyPlan.phases.map((phase, i) => (
+                  <div key={i} className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                     <div className="p-8 flex flex-col md:flex-row gap-8">
+                        <div className="flex-1 space-y-6">
+                          <div className="flex items-center gap-3">
+                            <span className="shrink-0 w-8 h-8 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 rounded-full flex items-center justify-center font-black text-sm">
+                              {i + 1}
+                            </span>
+                            <h4 className="text-2xl font-bold dark:text-white">{phase.nome}</h4>
                           </div>
-                          <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
-                             <BookOpen size={14} /> 5 Materiais Disponíveis
+
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-2 flex items-center gap-2"><Target size={14} /> Objetivos</h5>
+                              <ul className="list-none space-y-1">
+                                {phase.objetivos?.map((obj, idx) => (
+                                  <li key={idx} className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                    <span className="text-emerald-500 mt-1">•</span> {obj}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div>
+                                <h5 className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-2 flex items-center gap-2"><BookOpen size={14} /> Tópicos & Atividades</h5>
+                                <div className="flex flex-col gap-2">
+                                  {phase.topicos?.map((top, idx) => (
+                                    <span key={`t-${idx}`} className="px-3 py-1.5 bg-gray-50 dark:bg-gray-900/40 text-gray-600 dark:text-gray-300 rounded-lg text-xs border border-gray-100 dark:border-gray-800 font-medium">
+                                      {top}
+                                    </span>
+                                  ))}
+                                  {phase.atividades?.map((ativ, idx) => (
+                                    <span key={`a-${idx}`} className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-lg text-xs border border-emerald-100 dark:border-emerald-900/30 font-medium">
+                                      {ativ}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <h5 className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-2 flex items-center gap-2"><ExternalLink size={14} /> Recursos Recomendados</h5>
+                                <div className="flex flex-col gap-2">
+                                  {phase.recursos?.map((rec, idx) => (
+                                    <div key={idx} className="flex gap-2 items-start text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
+                                      <Wand2 size={14} className="mt-0.5 shrink-0" />
+                                      <span className="font-semibold">{rec}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="md:w-72 bg-gray-50 dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Minhas Notas de Estudo</label>
-                        <textarea 
-                          defaultValue={topic.details || ''}
-                          onBlur={(e) => saveDetails(i, e.target.value)}
-                          placeholder="Anote links, dúvidas ou progressos aqui..."
-                          className="w-full h-32 bg-white dark:bg-gray-800 border-none rounded-xl p-3 text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none dark:text-white"
-                        />
-                        {savingDetails === `${i}` && <div className="text-[10px] text-emerald-500 font-bold animate-pulse">Salvando...</div>}
-                      </div>
-                   </div>
-                </div>
-              ))}
+
+                        <div className="md:w-72 bg-gray-50 dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Minhas Notas de Estudo</label>
+                          <textarea 
+                            defaultValue={studyPlan.priorityTopics[i]?.details || ''}
+                            onBlur={(e) => saveDetails(i, e.target.value)}
+                            placeholder="Anote links, dúvidas ou progressos aqui..."
+                            className="w-full h-32 bg-white dark:bg-gray-800 border-none rounded-xl p-3 text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none dark:text-white shadow-sm"
+                          />
+                          {savingDetails === `${i}` && <div className="text-[10px] text-emerald-500 font-bold animate-pulse">Salvando...</div>}
+                        </div>
+                     </div>
+                  </div>
+                ))
+              ) : (
+                studyPlan.priorityTopics.map((topic, i) => (
+                  <div key={i} className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                     <div className="p-8 flex flex-col md:flex-row gap-8">
+                        <div className="flex-1 space-y-4">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                              topic.priority === 'Alta' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                            }`}>Prioridade {topic.priority}</span>
+                            <h4 className="text-xl font-bold dark:text-white">{topic.topic}</h4>
+                          </div>
+                          <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{topic.reason}</p>
+                          <div className="flex flex-wrap gap-4 pt-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                               <Target size={14} /> Foco Teórico
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                               <BookOpen size={14} /> 5 Materiais Disponíveis
+                            </div>
+                          </div>
+                        </div>
+                        <div className="md:w-72 bg-gray-50 dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Minhas Notas de Estudo</label>
+                          <textarea 
+                            defaultValue={topic.details || ''}
+                            onBlur={(e) => saveDetails(i, e.target.value)}
+                            placeholder="Anote links, dúvidas ou progressos aqui..."
+                            className="w-full h-32 bg-white dark:bg-gray-800 border-none rounded-xl p-3 text-xs focus:ring-2 focus:ring-emerald-500 outline-none resize-none dark:text-white shadow-sm"
+                          />
+                          {savingDetails === `${i}` && <div className="text-[10px] text-emerald-500 font-bold animate-pulse">Salvando...</div>}
+                        </div>
+                     </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
