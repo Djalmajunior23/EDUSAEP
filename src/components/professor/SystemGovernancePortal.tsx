@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Shield, Settings, Eye, Code, Terminal, Activity, 
-  Lock, Unlock, Server, Database, Save, RefreshCw,
-  Search, Filter, Clock, CheckCircle, AlertTriangle
+  Settings, Terminal, Activity, 
+  Lock, Unlock, RefreshCw, Sliders
 } from 'lucide-react';
 import { featureFlags, FeatureFlags } from '../../services/featureFlagService';
-import { eventBus, SystemEventPayload } from '../../services/eventBusService';
+import { rulesEngine, InstitutionalRules } from '../../services/rulesEngineService';
+import { SystemEventPayload } from '../../services/eventBusService';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
@@ -14,12 +14,14 @@ import { doc, updateDoc, collection, query, orderBy, limit, onSnapshot } from 'f
 
 export function SystemGovernancePortal() {
   const [flags, setFlags] = useState<FeatureFlags>(featureFlags.getFlags());
+  const [rules, setRules] = useState<InstitutionalRules>(rulesEngine.getRules());
   const [events, setEvents] = useState<SystemEventPayload[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'flags' | 'logs'>('flags');
+  const [activeTab, setActiveTab] = useState<'flags' | 'logs' | 'rules'>('flags');
 
   useEffect(() => {
     const unsubFlags = featureFlags.subscribe(setFlags);
+    const unsubRules = rulesEngine.subscribe(setRules);
     
     const eventsQuery = query(
       collection(db, 'system_events'),
@@ -34,6 +36,7 @@ export function SystemGovernancePortal() {
 
     return () => {
       unsubFlags();
+      unsubRules();
       unsubEvents();
     };
   }, []);
@@ -55,6 +58,23 @@ export function SystemGovernancePortal() {
     }
   };
 
+  const handleUpdateRule = async (key: keyof InstitutionalRules, value: number | boolean) => {
+    const newRules = { ...rules, [key]: value };
+    setRules(newRules); // Optimistic UI
+    
+    try {
+      setIsSaving(true);
+      const rulesRef = doc(db, 'system_config', 'institutional_rules');
+      await updateDoc(rulesRef, { [key]: value });
+      toast.success(`Regra ${key} atualizada com sucesso.`);
+    } catch (err) {
+      toast.error('Erro ao atualizar regra.');
+      setRules(rulesEngine.getRules()); // Rollback to actual state
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="bg-gray-50 min-h-[600px] rounded-[32px] border border-gray-200 overflow-hidden flex flex-col font-mono shadow-2xl">
       {/* Sidebar / Vertical Rail */}
@@ -63,12 +83,21 @@ export function SystemGovernancePortal() {
           <button 
             onClick={() => setActiveTab('flags')}
             className={cn("p-3 rounded-xl transition-all", activeTab === 'flags' ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-white")}
+            title="Feature Flags"
           >
             <Settings size={20} />
           </button>
           <button 
+            onClick={() => setActiveTab('rules')}
+            className={cn("p-3 rounded-xl transition-all", activeTab === 'rules' ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-white")}
+            title="Regras Institucionais"
+          >
+            <Sliders size={20} />
+          </button>
+          <button 
             onClick={() => setActiveTab('logs')}
             className={cn("p-3 rounded-xl transition-all", activeTab === 'logs' ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-white")}
+            title="Audit Log"
           >
             <Activity size={20} />
           </button>
@@ -79,7 +108,7 @@ export function SystemGovernancePortal() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl font-black tracking-tighter uppercase text-gray-900">
-                {activeTab === 'flags' ? 'Governança & Módulos' : 'Audit Log & Monitoramento'}
+                {activeTab === 'flags' ? 'Governança & Módulos' : activeTab === 'rules' ? 'Regras Pedagógicas' : 'Audit Log & Monitoramento'}
               </h2>
               <p className="text-xs text-gray-400 font-bold tracking-widest uppercase mt-1">
                 Ambiente de Configuração de ALTA PERFORMANCE // BLOCK 10
@@ -129,6 +158,51 @@ export function SystemGovernancePortal() {
                   </div>
                 ))}
               </motion.div>
+            ) : activeTab === 'rules' ? (
+              <motion.div
+                key="rules"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              >
+                {/* Numeric inputs mapped dynamically */}
+                {(Object.entries(rules) as [keyof InstitutionalRules, any][]).map(([key, value]) => {
+                  if(typeof value === 'boolean') {
+                    return (
+                      <div key={key} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-all">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="font-black text-gray-900 text-sm tracking-tight capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Atuação Automática</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleUpdateRule(key, !value)}
+                          disabled={isSaving}
+                          className={cn("w-12 h-6 rounded-full relative transition-colors", value ? "bg-emerald-500" : "bg-gray-200")}
+                        >
+                          <div className={cn("absolute top-1 w-4 h-4 bg-white rounded-full transition-all", value ? "right-1" : "left-1")} />
+                        </button>
+                      </div>
+                    )
+                  }
+                  
+                  return (
+                  <div key={key} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col group hover:border-indigo-200 transition-all">
+                    <label className="font-black text-gray-900 text-sm tracking-tight capitalize mb-1">{key.replace(/([A-Z])/g, ' $1')}</label>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Limite Operacional</p>
+                    <div className="flex items-center gap-2">
+                       <input 
+                         type="number" 
+                         value={value} 
+                         onChange={(e) => handleUpdateRule(key, parseFloat(e.target.value))} 
+                         className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm font-bold text-gray-700 outline-none focus:border-indigo-400"
+                       />
+                    </div>
+                  </div>
+                )})}
+              </motion.div>
             ) : (
               <motion.div 
                 key="logs"
@@ -151,7 +225,7 @@ export function SystemGovernancePortal() {
                   {events.length > 0 ? events.map((event, i) => (
                     <div key={i} className="flex gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors border-l-2 border-indigo-500/30">
                       <span className="text-indigo-400 opacity-50 shrink-0">
-                        [{(event as any).timestamp?.toDate?.()?.toLocaleTimeString() || new Date().toLocaleTimeString()}]
+                        [{event.timestamp?.toDate?.()?.toLocaleTimeString() || new Date(event.timestamp).toLocaleTimeString() || new Date().toLocaleTimeString()}]
                       </span>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">

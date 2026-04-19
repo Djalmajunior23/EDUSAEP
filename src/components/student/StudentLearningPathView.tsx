@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Map as MapIcon, 
   ChevronRight, 
@@ -12,17 +12,22 @@ import {
   FileText, 
   Zap,
   Loader2,
-  Trophy
+  Trophy,
+  ArrowLeft
 } from 'lucide-react';
 import { generateLearningPath } from '../../services/geminiService';
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { toast } from 'sonner';
+import { AdaptiveExam } from './AdaptiveExam';
+
+import { gamificationEngine } from '../../services/gamificationService';
 
 export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
   const [path, setPath] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activePhase, setActivePhase] = useState(0);
+  const [activeSimulationContext, setActiveSimulationContext] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStudentDataAndGeneratePath();
@@ -80,6 +85,33 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
       </button>
     </div>
   );
+
+  if (activeSimulationContext) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 pb-12">
+        <div className="flex items-center justify-between mb-8">
+          <button 
+            onClick={() => setActiveSimulationContext(null)}
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors font-bold text-sm"
+          >
+            <ArrowLeft size={16} /> Voltar para a Trilha
+          </button>
+          <div className="px-4 py-1.5 bg-indigo-50 border border-indigo-100 rounded-full text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+            <Zap size={14} /> Circuito Ativo
+          </div>
+        </div>
+        <AdaptiveExam 
+          examId={`sim_trilha_${Date.now()}`}
+          competency={activeSimulationContext}
+          onComplete={(score) => {
+            toast.success(`Circuito concluído! Você obteve ${score.toFixed(1)}% de aproveitamento.`);
+            setActiveSimulationContext(null);
+          }}
+          userRole="aluno"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -194,9 +226,18 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
                 </h4>
                 <div className="space-y-2">
                   {path.fases[activePhase].atividades.map((act: string, i: number) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 border border-emerald-100 group hover:border-emerald-200 transition-all">
-                      <CheckCircle2 size={16} className="text-emerald-500" />
-                      <span className="text-sm text-emerald-900 font-medium">{act}</span>
+                    <div 
+                      key={i} 
+                      onClick={() => setActiveSimulationContext(act)}
+                      className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-100 group hover:border-emerald-300 hover:bg-emerald-100 transition-all cursor-pointer shadow-sm"
+                    >
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 size={16} className="text-emerald-500" />
+                        <span className="text-sm text-emerald-900 font-medium">{act}</span>
+                      </div>
+                      <button className="text-emerald-600 bg-white p-1.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                        <ChevronRight size={16} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -220,7 +261,17 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
               </div>
             </div>
 
-            <button className="mt-10 w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-3">
+            <button 
+              onClick={async () => {
+                await gamificationEngine.awardXP('LEARNING_PATH_PHASE');
+                if (activePhase < path.fases.length - 1) {
+                  setActivePhase(activePhase + 1);
+                } else {
+                  toast.success("Trilha de Aprendizagem Concluída! Você ganhou Bônus de Excelência.");
+                }
+              }}
+              className="mt-10 w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-3"
+            >
               Marcar Fase como Concluída <CheckCircle2 size={20} />
             </button>
           </motion.div>

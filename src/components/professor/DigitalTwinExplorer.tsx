@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Brain, Zap, TrendingUp, AlertTriangle, Play, 
-  RefreshCw, Clock, Target, Shield, Info, ArrowRight,
+  Target, Shield, Info,
   ChevronRight, Gauge, Activity, Cpu, Loader2, Sparkles
 } from 'lucide-react';
 import { 
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
-  Tooltip, CartesianGrid, RadarChart, PolarGrid, 
-  PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line
+  ResponsiveContainer, Tooltip, RadarChart, PolarGrid, 
+  PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
 import { simulateDigitalTwin, TwinSimulationResult } from '../../services/geminiService';
 import { cn } from '../../lib/utils';
@@ -251,7 +250,7 @@ export function DigitalTwinExplorer({ stats, selectedModel }: DigitalTwinExplore
                       <TrendingUp size={16} /> Mapa de Impacto por Competência
                     </h4>
                     <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <RadarChart data={result?.detailedProjections}>
                           <PolarGrid stroke="#e2e8f0" />
                           <PolarAngleAxis dataKey="competency" tick={{ fontSize: 10, fontWeight: 700 }} />

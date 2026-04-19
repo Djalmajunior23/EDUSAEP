@@ -1,0 +1,73 @@
+{
+  "name": "EduSAEP-Recovery-Email-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "n8n/plans",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "id": "webhook-trigger",
+      "name": "Webhook: EnviarPlanoEmail"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.body.type}}",
+              "value2": "EnviarPlanoEmail"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "id": "filter-trigger",
+      "name": "Filtro: EnviarPlanoEmail"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$json.body.studentEmail}}",
+        "subject": "Seu Plano de Estudos Personalizado - EduSAEP",
+        "text": "=Olá {{$json.body.studentName}}, seu plano de estudos foi gerado. \nDetalhes: {{$json.body.plan}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [700, 300],
+      "id": "send-email",
+      "name": "Gmail: Enviar Plano"
+    }
+  ],
+  "connections": {
+    "webhook-trigger": {
+      "main": [
+        [
+          {
+            "node": "filter-trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter-trigger": {
+      "main": [
+        [
+          {
+            "node": "send-email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1269,7 +1269,7 @@ function ReportsView({ history }: { history: any[] }) {
               <div key={student} className="mb-8">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">{student}</h4>
                 <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <LineChart data={data}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                       <XAxis 
@@ -1978,7 +1978,7 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -2054,18 +2054,36 @@ function StudentDashboardView({ user, userProfile }: { user: User | null, userPr
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/adaptive-exam/Geral')}
+          onClick={() => navigate('/learning-path')}
+          className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+        >
+          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
+            <Target size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Trilha de Estudos</h3>
+            <p className="text-xs text-gray-500">Siga seu caminho inteligente criado pela IA.</p>
+          </div>
+          <div className="mt-auto flex items-center gap-2 text-rose-600 text-xs font-bold">
+            Retomar <ArrowRight size={14} />
+          </div>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/gamification')}
           className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
         >
           <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
-            <Brain size={24} />
+            <Trophy size={24} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900">Teste Adaptativo</h3>
-            <p className="text-xs text-gray-500">Questões que se ajustam ao seu nível.</p>
+            <h3 className="font-bold text-gray-900">Minhas Conquistas</h3>
+            <p className="text-xs text-gray-500">Veja seu progresso, badges e níveis.</p>
           </div>
           <div className="mt-auto flex items-center gap-2 text-amber-600 text-xs font-bold">
-            Iniciar <ArrowRight size={14} />
+            Ver Perfil <ArrowRight size={14} />
           </div>
         </motion.button>
       </div>
@@ -3212,7 +3230,7 @@ function StudyPlanView({ user, userProfile, selectedModel }: { user: User | null
                   <History className="text-emerald-600" size={28} /> Histórico de Evolução
                 </h3>
                 <div className="h-80 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={history.map(h => ({
                       date: h.completedAt?.seconds ? new Date(h.completedAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'N/A',
                       acuracia: Math.round((h.accuracy || 0) * 100)
@@ -5729,7 +5747,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
                   <h3 className="text-xl font-bold text-gray-900">Histórico de Evolução Geral</h3>
                 </div>
                 <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={studentHistory.map(h => ({
                       date: h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : 'N/A',
                       acuracia: Math.round((h.result?.summary?.acuracia_ponderada || 0) * 100)
@@ -6196,7 +6214,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Evolução de Desempenho</p>
                               </div>
                               <div className="h-40 w-full bg-gray-50/50 rounded-xl p-4 border border-gray-100">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                   <LineChart data={studentHistory.map(h => {
                                     const c = h.result?.diagnostico_por_competencia?.find((dc: any) => dc.competencia === comp.competencia);
                                     return {
@@ -7217,7 +7235,7 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
                 Histórico de Evolução
               </h3>
               <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={studentHistory.map(h => ({
                     date: h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'N/A',
                     acuracia: Math.round((h.result?.summary?.acuracia_ponderada || 0) * 100)
@@ -9023,7 +9041,7 @@ function AppContent() {
                         </div>
                       </div>
                       <div className="h-80 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                           <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                             <XAxis type="number" domain={[0, 100]} hide />
@@ -9112,7 +9130,7 @@ function AppContent() {
                       
                       {evolutionData.length > 1 ? (
                         <div className="h-64 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <LineChart data={evolutionData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                               <XAxis 
@@ -9267,7 +9285,7 @@ function AppContent() {
                                 </div>
 
                                 <div className="h-[120px] w-full mt-auto">
-                                  <ResponsiveContainer width="100%" height="100%">
+                                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart 
                                       data={[
                                         { name: 'Você', value: studentScore, fill: '#10b981' },

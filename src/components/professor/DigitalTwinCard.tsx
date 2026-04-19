@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Brain, TrendingUp, Target, Zap, AlertTriangle, Loader2 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { Brain, TrendingUp, Zap, Loader2 } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { predictPerformance } from '../../services/geminiService';
 import { toast } from 'sonner';
 
@@ -111,7 +110,7 @@ export function DigitalTwinCard({ studentData, selectedModel }: DigitalTwinCardP
             </div>
 
             <div className="h-64 bg-black/20 rounded-2xl border border-white/5 p-4 flex flex-col justify-end">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={mockChartData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">

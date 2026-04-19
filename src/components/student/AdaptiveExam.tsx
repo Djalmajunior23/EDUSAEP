@@ -14,6 +14,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/fi
 import { getNextAdaptiveQuestion, SAEPQuestion } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
+import { gamificationEngine } from '../../services/gamificationService';
 import { QuestionRenderer } from '../common/QuestionRenderer';
 import { Question } from '../../types';
 
@@ -171,6 +172,9 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
         score,
         proficiency
       });
+      
+      // Shadow Gamification: Give XP
+      await gamificationEngine.awardXP('SIMULATION_COMPLETED', score > 70 ? 1.5 : 1.0);
 
       onComplete(score);
     } catch (error) {

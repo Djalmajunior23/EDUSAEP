@@ -1,0 +1,178 @@
+{
+  "name": "EduSAEP - Geração Automatizada de Relatórios Semanais",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 5"
+            }
+          ]
+        }
+      },
+      "id": "e2c39d84-a1db-49be-aaec-a1a74d284a12",
+      "name": "Schedule (Toda Sexta às 18h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=SEU_FIREBASE_API_KEY",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "admin@edusaep.com"
+            },
+            {
+              "name": "password",
+              "value": "sua_senha_segura"
+            },
+            {
+              "name": "returnSecureToken",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2da2913e-f14d-48bd-b1ef-2cb6d22384a4",
+      "name": "Autenticacao Firebase API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://firestore.googleapis.com/v1/projects/SEU_PROJECT_ID/databases/(default)/documents/system_events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4c947ff9-1bb6-46bd-8e3b-dcb749a2a829",
+      "name": "Busca Dados no Firestore",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "sua-credencial",
+          "name": "Token HTTP Firestore"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gemini-3.1-pro",
+        "prompt": "=Você é um sistema de Inteligência Artificial Analítica da plataforma EduSAEP.\n\nAnalise os seguintes logs do sistema dessa semana e gere um relatório de 3 parágrafos focando em:\n1. Nível de engajamento.\n2. Quantidade de alunos que caíram na régua de risco.\n3. Pontos de sucesso nas intervenções.\n\nJSON de Dados: \n{{ JSON.stringify($json.documents) }}\n"
+      },
+      "id": "c138af64-160a-4298-b7ab-8f9dafc126b8",
+      "name": "Google Gemini (Análise de Dados)",
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ],
+      "credentials": {
+        "googleGeminiApi": {
+          "id": "sua-credencial-gemini",
+          "name": "EduSAEP Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "relatorios@edusaep.com",
+        "toEmail": "diretoria@escola.com",
+        "subject": "EduSAEP - Relatório de Inteligência Pedagógica Semanal",
+        "html": "=Prezada Diretoria,<br><br>Segue abaixo o relatório automático gerado pelo motor de inteligência do EduSAEP referente aos dados coletados na última semana:<br><br><hr><br><strong>{{ $json.text }}</strong><br><hr><br>Qualquer dúvida, verifiquem o Painel Administrativo em <i>Backstage Governance</i> da plataforma.<br><br>Att,<br>Equipe Automática EduSAEP."
+      },
+      "id": "8340d2ba-c25e-40af-b5b4-7d5a5cf2b5a2",
+      "name": "Enviar Relatório (Email)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule (Toda Sexta às 18h)": {
+      "main": [
+        [
+          {
+            "node": "Autenticacao Firebase API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autenticacao Firebase API": {
+      "main": [
+        [
+          {
+            "node": "Busca Dados no Firestore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Dados no Firestore": {
+      "main": [
+        [
+          {
+            "node": "Google Gemini (Análise de Dados)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini (Análise de Dados)": {
+      "main": [
+        [
+          {
+            "node": "Enviar Relatório (Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f00ab9c9-63a2-4dd2-b5e1-8f12a32bfcc9",
+  "id": "7Q6R2vWt8o9LpC3F",
+  "tags": []
+}

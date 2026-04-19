@@ -98,7 +98,7 @@ export const n8nEvents = {
 
   // Quando um plano de recuperação é gerado para um aluno
   recoveryPlanGenerated: (data: { studentId: string, studentEmail?: string, studentName?: string, submissionId: string, plan: any }) => 
-    triggerN8NAlert('PlanoRecuperacao', data),
+    triggerN8NAlert('EnviarPlanoEmail', data),
 
   // Quando um diagnóstico é importado/criado
   diagnosticCreated: (data: { professorId: string, aluno: string, result: any }) => 

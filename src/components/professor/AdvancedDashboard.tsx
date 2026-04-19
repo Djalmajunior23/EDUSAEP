@@ -2,23 +2,23 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar 
+  LineChart, Line
 } from 'recharts';
 import { 
   Users, FileText, Target, TrendingUp, AlertTriangle, CheckCircle, 
-  Filter, Calendar, BookOpen, GraduationCap, ArrowUpRight, ArrowDownRight, Sparkles, Zap,
-  Brain, Shield, Layout, Settings, Loader2, X
+  Filter, Calendar, ArrowUpRight, ArrowDownRight, Sparkles, Zap,
+  Brain, Shield, Layout, Settings, Loader2, X, Download
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { ProfessorInsights } from './ProfessorInsights';
-import { PainelInsightsIA } from './PainelInsightsIA';
 import { PedagogicalRecommendations } from './PedagogicalRecommendations';
 import { DigitalTwinCard } from './DigitalTwinCard';
 import { DigitalTwinExplorer } from './DigitalTwinExplorer';
 import { SystemGovernancePortal } from './SystemGovernancePortal';
+import { ErrorEngineeringMap } from './ErrorEngineeringMap';
 import { UserProfile } from '../../App';
 import { toast } from 'sonner';
 import { generateClassRecoveryOrchestration, ClassOrchestrationResult, generateSIPA, SIPAResult } from '../../services/geminiService';
+import { exportDashboardToPDF, exportStudentsToExcel } from '../../services/exportService';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -41,12 +41,25 @@ interface DashboardProps {
 }
 
 export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplinePerformance, studentEvolution, competencyDistribution, classComparison }: DashboardProps) {
-  const [activeTab, setActiveTab] = React.useState<'overview' | 'simulation' | 'governance'>('overview');
+  const [activeTab, setActiveTab] = React.useState<'overview' | 'simulation' | 'governance' | 'errors'>('overview');
   const [isGeneratingPath, setIsGeneratingPath] = React.useState(false);
   const [isIntervening, setIsIntervening] = React.useState(false);
   const [isSimulatingImpact, setIsSimulatingImpact] = React.useState(false);
   const [orchestrationResult, setOrchestrationResult] = React.useState<ClassOrchestrationResult | null>(null);
   const [sipaResult, setSipaResult] = React.useState<SIPAResult | null>(null);
+
+  const handleExportPDF = () => {
+    toast.info("Gerando relatório executivo S.A.E.P...");
+    exportDashboardToPDF(stats, disciplinePerformance);
+    toast.success("Download iniciado!");
+  };
+
+  const handleExportExcel = () => {
+    toast.info("Exportando matriz...");
+    // Em produção exportaria os detalhes reais dos estudantes
+    exportStudentsToExcel([{id: 1, name: 'Anônimo (Dados Agregados)'}]); 
+    toast.success("Download iniciado!");
+  };
 
   const handleGenerateLearningPath = async () => {
     setIsGeneratingPath(true);
@@ -141,6 +154,18 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
         </div>
         
         <div className="flex items-center gap-3">
+          <button 
+             onClick={handleExportExcel}
+             className="px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 font-bold rounded-xl text-sm transition-all shadow-sm flex items-center gap-2 group"
+          >
+             EXCEL <FileText size={16} className="group-hover:scale-110 transition-transform" />
+          </button>
+          <button 
+             onClick={handleExportPDF}
+             className="px-4 py-2 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 font-bold rounded-xl text-sm transition-all shadow-sm flex items-center gap-2 group"
+          >
+             PDF <Download size={16} className="group-hover:scale-110 transition-transform" />
+          </button>
           <div className="hidden xl:flex items-center gap-3 mr-4 py-2 px-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
             <div className="text-right">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Próxima Aula</p>
@@ -168,6 +193,15 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
             )}
           >
             <Brain size={18} /> Sala de Guerra
+          </button>
+          <button 
+            onClick={() => setActiveTab('errors')}
+            className={cn(
+              "px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-xl active:scale-95",
+              activeTab === 'errors' ? "bg-rose-600 text-white shadow-rose-200" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            )}
+          >
+            <AlertTriangle size={18} /> Engenharia de Erros
           </button>
           <button 
             onClick={() => setActiveTab('governance')}
@@ -452,6 +486,18 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
           </motion.div>
         )}
 
+        {activeTab === 'errors' && (
+          <motion.div
+            key="errors"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full relative z-10"
+          >
+            <ErrorEngineeringMap studentsData={stats} />
+          </motion.div>
+        )}
+
         {activeTab === 'simulation' && (
           <motion.div
             key="simulation"
@@ -478,49 +524,47 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
       <div className="h-px w-full bg-gray-200 my-8" />
 
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KpiCard 
-            title="Total de Alunos" 
-            value={stats.totalStudents} 
-            icon={<Users size={24} />} 
-            trend="+5%" 
-            trendType="up"
-            color="blue"
-          />
-          <KpiCard 
-            title="Simulados Realizados" 
-            value={stats.totalExams} 
-            icon={<FileText size={24} />} 
-            trend="+12%" 
-            trendType="up"
-            color="emerald"
-          />
-          <KpiCard 
-            title="Média Geral" 
-            value={`${(stats.averageScore * 100).toFixed(1)}%`} 
-            icon={<Target size={24} />} 
-            trend="-2%" 
-            trendType="down"
-            color="amber"
-          />
-          <KpiCard 
-            title="Taxa de Sucesso" 
-            value={`${(stats.successRate * 100).toFixed(1)}%`} 
-            icon={<CheckCircle size={24} />} 
-            trend="+8%" 
-            trendType="up"
-            color="indigo"
-          />
-        </div>
-      )}
+        <React.Fragment>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <KpiCard 
+              title="Total de Alunos" 
+              value={stats.totalStudents} 
+              icon={<Users size={24} />} 
+              trend="+5%" 
+              trendType="up"
+              color="blue"
+            />
+            <KpiCard 
+              title="Simulados Realizados" 
+              value={stats.totalExams} 
+              icon={<FileText size={24} />} 
+              trend="+12%" 
+              trendType="up"
+              color="emerald"
+            />
+            <KpiCard 
+              title="Média Geral" 
+              value={`${(stats.averageScore * 100).toFixed(1)}%`} 
+              icon={<Target size={24} />} 
+              trend="-2%" 
+              trendType="down"
+              color="amber"
+            />
+            <KpiCard 
+              title="Taxa de Sucesso" 
+              value={`${(stats.successRate * 100).toFixed(1)}%`} 
+              icon={<CheckCircle size={24} />} 
+              trend="+8%" 
+              trendType="up"
+              color="indigo"
+            />
+          </div>
 
-      {/* SIPA Simulator Section */}
-
-      {/* Main Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Main Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         {/* Performance by Discipline */}
         <ChartCard title="Desempenho por Disciplina" subtitle="Média de acertos por unidade curricular">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={300} minWidth={0} minHeight={0}>
             <BarChart data={disciplinePerformance}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -535,7 +579,7 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
 
         {/* Student Evolution */}
         <ChartCard title="Evolução Temporal" subtitle="Progresso médio da turma ao longo do semestre">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={300} minWidth={0} minHeight={0}>
             <LineChart data={studentEvolution}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -668,6 +712,8 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
           </div>
         </div>
       </section>
+      </React.Fragment>
+      )}
     </div>
   );
 }

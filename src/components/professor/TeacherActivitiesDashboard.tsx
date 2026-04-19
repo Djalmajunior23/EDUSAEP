@@ -150,7 +150,7 @@ export function TeacherActivitiesDashboard({ userProfile, onBack }: { userProfil
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h4 className="font-bold text-gray-900 mb-6">Status das Entregas</h4>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={statusChartData}
@@ -176,7 +176,7 @@ export function TeacherActivitiesDashboard({ userProfile, onBack }: { userProfil
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h4 className="font-bold text-gray-900 mb-6">Engajamento por Atividade (Top 5)</h4>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={activityStats} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{fontSize: 12}} />

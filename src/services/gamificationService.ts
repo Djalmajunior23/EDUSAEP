@@ -1,69 +1,78 @@
-import { doc, getDoc, updateDoc, increment, arrayUnion } from "firebase/firestore";
-import { db } from "../firebase";
-import { toast } from "sonner";
+import { db, auth } from '../firebase';
+import { doc, getDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { toast } from 'sonner';
 
-export interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  xpReward: number;
+// Shadow Gamification Engine
+// Foca no engajamento subjacente e no XP sem parecer um "joguinho" infantil.
+
+export interface GamificationAction {
+  type: 'SIMULATION_COMPLETED' | 'LEARNING_PATH_PHASE' | 'FORUM_CONTRIBUTION' | 'DIAGNOSTIC_COMPLETED';
+  baseXp: number;
+  metadata?: any;
 }
 
-export const BADGES: Badge[] = [
-  { id: 'first_exam', name: 'Primeiro Passo', description: 'Concluiu seu primeiro simulado.', icon: '🎯', xpReward: 100 },
-  { id: 'perfect_score', name: 'Gênio', description: 'Acertou todas as questões de uma competência.', icon: '🧠', xpReward: 500 },
-  { id: 'streak_3', name: 'Focado', description: 'Acessou a plataforma por 3 dias seguidos.', icon: '🔥', xpReward: 200 },
-  { id: 'tri_champion', name: 'Mestre da Lógica', description: 'Acertou uma questão de nível difícil na TRI.', icon: '⚖️', xpReward: 300 },
-];
+const ACTION_XP_MAP: Record<string, number> = {
+  'SIMULATION_COMPLETED': 150,
+  'LEARNING_PATH_PHASE': 300,
+  'FORUM_CONTRIBUTION': 50,
+  'DIAGNOSTIC_COMPLETED': 500,
+};
 
-export async function addXP(userId: string, amount: number) {
-  const userRef = doc(db, 'users', userId);
-  try {
-    await updateDoc(userRef, {
-      xp: increment(amount)
-    });
-    
-    // Check for level up logic
-    const userDoc = await getDoc(userRef);
-    const data = userDoc.data();
-    if (data) {
-      const currentXP = data.xp || 0;
-      const currentLevel = data.level || 1;
-      const nextLevelThreshold = currentLevel * 1000;
+export const calculateLevel = (xp: number = 0) => {
+  return Math.floor(Math.sqrt(xp / 100)) + 1;
+};
+
+export const getXPForNextLevel = (level: number) => {
+  return Math.pow(level, 2) * 100;
+};
+
+class ShadowGamificationEngine {
+  
+  public async awardXP(actionType: keyof typeof ACTION_XP_MAP, multiplier: number = 1.0, showToast: boolean = true) {
+    if (!auth.currentUser) return;
+
+    const baseAmount = ACTION_XP_MAP[actionType] || 10;
+    const finalXP = Math.round(baseAmount * multiplier);
+
+    try {
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
       
-      if (currentXP >= nextLevelThreshold) {
+      if (userSnap.exists()) {
+        const currentXP = userSnap.data().xp || 0;
+        const currentLevel = calculateLevel(currentXP);
+        const newXP = currentXP + finalXP;
+        const newLevel = calculateLevel(newXP);
+
         await updateDoc(userRef, {
-          level: increment(1)
+          xp: increment(finalXP),
+          level: newLevel,
+          lastActive: serverTimestamp()
         });
-        toast.success(`🎉 Nível UP! Você agora está no nível ${currentLevel + 1}!`);
+
+        if (showToast) {
+          toast.success(`+${finalXP} XP adquiridos!`, {
+            description: 'Seu engajamento impulsiona a IA.',
+            icon: '⚡'
+          });
+        }
+
+        // Shadow Level Up Detection
+        if (newLevel > currentLevel && showToast) {
+          toast.success(`Nível de Engajamento Subiu!`, {
+            description: `Você atingiu o Patamar Evolutivo ${newLevel}. A IA adaptativa agora tem rotas mais complexas disponíveis para você.`,
+            icon: '🧠',
+            duration: 5000
+          });
+        }
+
+        return { newXP, newLevel, leveledUp: newLevel > currentLevel };
       }
+    } catch (error) {
+      console.error("Error awarding Shadow XP:", error);
     }
-  } catch (error) {
-    console.error("Error updating XP:", error);
   }
+
 }
 
-export async function awardBadge(userId: string, badgeId: string) {
-  const badge = BADGES.find(b => b.id === badgeId);
-  if (!badge) return;
-
-  const userRef = doc(db, 'users', userId);
-  try {
-    const userDoc = await getDoc(userRef);
-    const data = userDoc.data();
-    
-    if (data && !data.badges?.includes(badgeId)) {
-      await updateDoc(userRef, {
-        badges: arrayUnion(badgeId)
-      });
-      await addXP(userId, badge.xpReward);
-      toast(`🏅 Medalha Conquistada: ${badge.name}!`, {
-        description: badge.description,
-        icon: badge.icon
-      });
-    }
-  } catch (error) {
-    console.error("Error awarding badge:", error);
-  }
-}
+export const gamificationEngine = new ShadowGamificationEngine();

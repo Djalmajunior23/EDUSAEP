@@ -16,6 +16,7 @@ export interface SystemEventPayload {
   turmaId?: string;
   data: any;
   metadata?: Record<string, any>;
+  timestamp?: any;
 }
 
 class EventBusService {

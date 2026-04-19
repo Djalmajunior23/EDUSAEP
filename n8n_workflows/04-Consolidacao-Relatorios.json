@@ -1,0 +1,96 @@
+{
+  "name": "EduSAEP-Relatorio-Consolidado",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "minutesInterval": 10080
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "id": "cron-trigger",
+      "name": "Cron: Relatório Semanal"
+    },
+    {
+      "parameters": {
+        "url": "https://firestore.googleapis.com/v1/projects/seu-projeto/databases/(default)/documents/analytics",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "id": "fetch-data",
+      "name": "Fetch Dados Pedagógicos"
+    },
+    {
+      "parameters": {
+        "model": "gemini-1.5-pro-latest",
+        "promptType": "define",
+        "text": "=Analise estes dados pedagógicos e gere um plano de ação para a semana: {{$json.body}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "id": "gemini-analysis",
+      "name": "Gemini: Análise de BI"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "diretoria@escola.com",
+        "subject": "Relatório Semanal de Inteligência Pedagógica - EduSAEP",
+        "text": "=Segue o resumo gerado pela IA:\n{{$json.output}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "id": "send-report",
+      "name": "Gmail: Enviar Relatório"
+    }
+  ],
+  "connections": {
+    "cron-trigger": {
+      "main": [
+        [
+          {
+            "node": "fetch-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-data": {
+      "main": [
+        [
+          {
+            "node": "gemini-analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini-analysis": {
+      "main": [
+        [
+          {
+            "node": "send-report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

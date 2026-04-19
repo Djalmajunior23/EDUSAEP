@@ -361,7 +361,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
           </div>
           
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                 <PolarGrid stroke="#e2e8f0" />
                 <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10 }} />
@@ -392,7 +392,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
           </div>
 
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <LineChart data={submissions.slice().reverse().map(s => ({
                 date: s.completedAt?.seconds ? new Date(s.completedAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '---',
                 ...Object.fromEntries(Object.entries(s.competencyResults || {}).map(([k, v]: any) => [k, v.acuracia * 100]))
@@ -462,7 +462,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-pre
                     <span className="text-xs text-gray-500">Aluno: {item.A.toFixed(0)}% | Turma: {avg.toFixed(0)}%</span>
                   </div>
                   <div className="h-20 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <BarChart data={[{ name: 'Aluno', value: item.A }, { name: 'Turma', value: avg }]} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                         <XAxis type="number" domain={[0, 100]} hide />
                         <YAxis type="category" dataKey="name" hide />

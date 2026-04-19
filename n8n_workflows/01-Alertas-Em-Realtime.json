@@ -1,0 +1,161 @@
+{
+  "name": "EduSAEP - Motor de Triagem e Alertas em Tempo Real",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "edusaep-event-bus",
+        "options": {}
+      },
+      "id": "e21b8fbf-ec58-472e-84b2-29fcb16e8810",
+      "name": "Webhook Central EduSAEP",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        220,
+        340
+      ],
+      "webhookId": "edusaep-webhook-id-replace-me"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body.type }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "performance.below_threshold",
+              "output": 0
+            },
+            {
+              "value2": "intervention.triggered",
+              "output": 1
+            },
+            {
+              "value2": "insight.generated",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "id": "b1b7a635-43cf-4273-beb2-2a075dcd5f75",
+      "name": "Roteador de Eventos (EventBus)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        480,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "channel": "=#alertas-pedagogicos",
+        "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO ⚠️\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 *Aluno(a/ID)*: {{ $json.body.userId || 'Sistema' }}\n🔹 *Turma*: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 *Gatilho*: {{ JSON.stringify($json.body.data) }}\n\nPor favor, Coordenação, verificar no Painel EduSAEP imediatamente.",
+        "otherOptions": {}
+      },
+      "id": "4facced1-f8e1-455b-b9ab-b427b0b14c5c",
+      "name": "Alerta Coordenação (Slack)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [
+        740,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "suporte@edusaep.com",
+        "toEmail": "={{ $json.body.data.professorEmail || 'professor@edusaep.com' }}",
+        "subject": "=Aviso: Nova Intervenção Disparada",
+        "html": "=Olá Educador, uma intervenção automática foi disparada na plataforma EduSAEP.<br><br><b>Detalhes da Intervenção:</b><br>{{ JSON.stringify($json.body.data) }}<br><br>Acesse seu Painel para mais informações.",
+        "options": {}
+      },
+      "id": "71bcd7b6-ccac-4b0d-b1aa-0eac9a34bc89",
+      "name": "Notifica Professor (Email)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        740,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "sua-planilha-id-no-google",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs_Insights",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "DATA_HORA": "={{ $now }}",
+            "TIPO_EVENTO": "={{ $json.body.type }}",
+            "DATA_PAYLOAD": "={{ JSON.stringify($json.body.data) }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "70be9f66-1cda-48c0-bc6f-57def6180c55",
+      "name": "Auditoria de Insights (GSheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [
+        740,
+        540
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Central EduSAEP": {
+      "main": [
+        [
+          {
+            "node": "Roteador de Eventos (EventBus)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Roteador de Eventos (EventBus)": {
+      "main": [
+        [
+          {
+            "node": "Alerta Coordenação (Slack)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notifica Professor (Email)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auditoria de Insights (GSheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f7ab0a72-f8c7-4c3e-86b2-60ba1fcfbb0c",
+  "id": "6B5T9cRm4x3VpD2Q",
+  "tags": []
+}

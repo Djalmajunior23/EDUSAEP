@@ -203,7 +203,7 @@ export function ConsolidatedReportView({ history, onReset }: ConsolidatedReportV
             <h3 className="font-bold text-gray-700 dark:text-gray-300">Tendência</h3>
           </div>
           <div className="h-16 mt-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <LineChart data={reportData.trendData}>
                 <Line type="monotone" dataKey="average" stroke="#8b5cf6" strokeWidth={2} dot={false} />
               </LineChart>
@@ -218,7 +218,7 @@ export function ConsolidatedReportView({ history, onReset }: ConsolidatedReportV
         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
           <h3 className="font-bold text-gray-900 dark:text-white mb-6">Desempenho por Disciplina/Competência</h3>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={reportData.competencyAverages} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                 <XAxis type="number" domain={[0, 1]} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} />
