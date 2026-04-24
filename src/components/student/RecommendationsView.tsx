@@ -184,6 +184,40 @@ export function RecommendationsView({ user, userProfile }: { user: any, userProf
               </div>
             </motion.div>
 
+            {recommendation.atividadesPraticas && recommendation.atividadesPraticas.length > 0 && (
+               <motion.div 
+               initial={{ opacity: 0, x: 20 }}
+               animate={{ opacity: 1, x: 0 }}
+               transition={{ delay: 0.1 }}
+               className="bg-indigo-50 p-6 rounded-3xl shadow-xl border border-indigo-100"
+             >
+               <h3 className="font-bold text-lg text-indigo-900 mb-6 flex items-center gap-2">
+                 <Zap className="text-indigo-600" size={20} />
+                 Micro-Atividades Recomendadas
+               </h3>
+               <div className="space-y-4">
+                 {recommendation.atividadesPraticas.map((ativ, idx) => (
+                   <div key={idx} className="p-4 bg-white rounded-2xl shadow-sm border border-indigo-100 transition-all hover:shadow-md">
+                     <div className="flex justify-between items-start mb-2">
+                       <h4 className="font-bold text-sm text-gray-900">{ativ.titulo}</h4>
+                       <span className="text-xs font-bold px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md shrink-0 ml-2">
+                         {ativ.tempo}
+                       </span>
+                     </div>
+                     <p className="text-sm text-gray-600 leading-relaxed">
+                       {ativ.descricao}
+                     </p>
+                     <div className="mt-3 flex justify-end">
+                       <button className="text-xs font-bold text-indigo-600 flex items-center gap-1 hover:text-indigo-800">
+                         Iniciar Prática <ArrowRight size={12} />
+                       </button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </motion.div>
+            )}
+
             <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-3xl shadow-xl text-white">
               <div className="flex items-center gap-2 mb-4">
                 <Star className="text-yellow-400" size={20} />
@@ -192,10 +226,6 @@ export function RecommendationsView({ user, userProfile }: { user: any, userProf
               <p className="text-sm text-indigo-100 leading-relaxed italic">
                 "A consistência é mais importante que a intensidade. Tente dedicar pelo menos 30 minutos diários às competências de foco."
               </p>
-              <button className="w-full mt-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
-                Ver Trilha Completa
-                <ArrowRight size={16} />
-              </button>
             </div>
           </div>
         </div>

@@ -66,7 +66,7 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
         { name: 'João Silva', level: 'Crítico', score: 35 },
         { name: 'Maria Oliveira', level: 'Atenção', score: 52 }
       ];
-      const result = await generateInterventionStrategy(classData, studentsAtRisk, selectedModel, userProfile?.role as any || 'professor');
+      const result = await generateInterventionStrategy(classData, studentsAtRisk, selectedModel, userProfile?.role as any || 'TEACHER');
       setSipaResult(result);
       
       // Save to Firestore
@@ -229,7 +229,7 @@ export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash
         diagnosticsCount: diagnostics.length
       };
 
-      const plan = await generateLessonPlan(planData, cognitiveAnalyses, selectedModel, userProfile?.role as any || 'professor');
+      const plan = await generateLessonPlan(planData, cognitiveAnalyses, selectedModel, userProfile?.role as any || 'TEACHER');
       setLessonPlan(plan);
       
       // 7. Save to Firestore

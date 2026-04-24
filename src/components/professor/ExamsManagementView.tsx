@@ -24,6 +24,7 @@ import {
   Eye,
   Upload,
   X,
+  BrainCircuit,
   Save
 } from 'lucide-react';
 import { db } from '../../firebase';
@@ -31,29 +32,9 @@ import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, s
 import { toast } from 'sonner';
 import { exportExamToGoogleForms } from '../../services/googleFormsService';
 import { parseQuestionsFromText } from '../../services/geminiService';
+import { Exam } from '../../types/edusaep.types';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
-
-// Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-interface Exam {
-  id?: string;
-  title: string;
-  description: string;
-  type: 'simulado' | 'avaliacao' | 'recuperacao' | 'exercicio';
-  status: 'rascunho' | 'publicado' | 'encerrado';
-  dueDate: string;
-  duration: number; // minutes
-  totalQuestions: number;
-  totalPoints: number;
-  questions: string[]; // IDs of questions
-  createdBy: string;
-  createdAt: any;
-  updatedAt: any;
-  submissionsCount?: number;
-  averageScore?: number;
-}
 
 import { ExamGenerator } from './exam/ExamGenerator';
 
@@ -109,7 +90,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       }
 
       setImportProgress(50);
-      const questions = await parseQuestionsFromText(text, selectedModel, userProfile?.role || 'professor');
+      const questions = await parseQuestionsFromText(text, selectedModel, userProfile?.role || 'TEACHER');
       setImportProgress(80);
 
       if (!questions || questions.length === 0) {
@@ -392,11 +373,18 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
             className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all group flex flex-col"
           >
             <div className="flex justify-between items-start mb-4">
-              <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                exam.status === 'publicado' ? 'bg-emerald-100 text-emerald-700' :
-                exam.status === 'encerrado' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {exam.status}
+              <div className="flex flex-col gap-2">
+                <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase inline-block ${
+                  exam.status === 'publicado' ? 'bg-emerald-100 text-emerald-700' :
+                  exam.status === 'encerrado' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {exam.status}
+                </div>
+                {exam.isAdaptive && (
+                  <div className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 self-start">
+                    <BrainCircuit size={12} /> Adaptive
+                  </div>
+                )}
               </div>
               <div className="flex gap-1">
                 <button 
@@ -548,6 +536,27 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
+                </div>
+
+                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+                      <BrainCircuit size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-indigo-900">Modo Adaptativo (Beta)</p>
+                      <p className="text-[10px] text-indigo-600">O sistema ajusta a dificuldade em tempo real.</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={currentExam.isAdaptive || false}
+                      onChange={e => setCurrentExam({ ...currentExam, isAdaptive: e.target.checked })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
                 </div>
 
                 <button

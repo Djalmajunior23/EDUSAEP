@@ -27,12 +27,17 @@ import {
   X,
   Save,
   ExternalLink,
-  Zap
+  Zap,
+  Code,
+  Image as ImageIcon,
+  Archive,
+  Layout as LayoutIcon,
+  Activity
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { generateContentWrapper, getSystemInstruction, parseQuestionsFromText, generateQuestionVariation, generateMultipleQuestionVariations } from '../../services/geminiService';
+import { generateContentWrapper, getSystemInstruction, parseQuestionsFromText, generateQuestionVariation, generateMultipleQuestionVariations, analyzeQuestionByPerformance, QuestionAnalysisResult } from '../../services/geminiService';
 import { exportQuestionsToGoogleForms } from '../../services/googleFormsService';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
@@ -63,6 +68,10 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
   const [isGeneratingVariation, setIsGeneratingVariation] = useState<string | null>(null);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [showAdvancedGenerator, setShowAdvancedGenerator] = useState(false);
+
+  // Analysis states
+  const [isAnalyzingQuestion, setIsAnalyzingQuestion] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{questionId: string, result: QuestionAnalysisResult} | null>(null);
   
   // Import State
   const [isImporting, setIsImporting] = useState(false);
@@ -100,7 +109,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       // Filter out empty names and duplicates
       const uniqueMap = new Map();
       list.forEach(item => {
-        const n = (item.nome || item.name || '').trim();
+        const n = ((item as any).nome || (item as any).name || '').trim();
         if (n && !uniqueMap.has(n)) {
           uniqueMap.set(n, item);
         }
@@ -117,21 +126,83 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     setEditedQuestion(quest);
   };
 
+  const handleCreateClick = () => {
+    setEditingQuestionId('new');
+    setEditedQuestion({
+      enunciado: '',
+      dificuldade: 'médio',
+      bloom: 'compreender',
+      tipoQuestao: 'multipla_escolha',
+      competenciaNome: (disciplines[0] as any)?.nome || (disciplines[0] as any)?.name || 'Geral',
+      competenciaId: disciplines[0]?.id || 'unknown',
+      temaNome: 'Geral',
+      tags: [],
+      alternativas: [
+        { id: 'A', texto: '' },
+        { id: 'B', texto: '' },
+        { id: 'C', texto: '' },
+        { id: 'D', texto: '' }
+      ],
+      respostaCorreta: 'A',
+      assets: []
+    });
+  };
+
+  const addAsset = (type: 'image' | 'code' | 'table' | 'case_study' | 'diagram') => {
+    const newAssets = [...(editedQuestion.assets || [])];
+    newAssets.push({
+      id: Math.random().toString(36).substring(7),
+      type,
+      content: '',
+      title: '',
+      caption: '',
+      language: type === 'code' ? 'javascript' : undefined
+    });
+    setEditedQuestion({ ...editedQuestion, assets: newAssets });
+    toast.info(`Recurso do tipo ${type} adicionado.`);
+  };
+
+  const removeAsset = (index: number) => {
+    const newAssets = [...(editedQuestion.assets || [])];
+    newAssets.splice(index, 1);
+    setEditedQuestion({ ...editedQuestion, assets: newAssets });
+  };
+
+  const updateAsset = (index: number, updates: any) => {
+    const newAssets = [...(editedQuestion.assets || [])];
+    newAssets[index] = { ...newAssets[index], ...updates };
+    setEditedQuestion({ ...editedQuestion, assets: newAssets });
+  };
+
   const handleSaveEdit = async () => {
     if (!editingQuestionId) return;
     setIsSavingEdit(true);
     try {
-      const docRef = doc(db, 'questions', editingQuestionId);
-      await updateDoc(docRef, {
-        ...editedQuestion,
-        updatedAt: serverTimestamp()
-      });
-      toast.success("Questão atualizada com sucesso!");
+      if (editingQuestionId === 'new') {
+        const questionData = {
+          ...editedQuestion,
+          origem: 'manual',
+          usoTotal: 0,
+          revisadaPorProfessor: true,
+          status: 'publicado',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        await addDoc(collection(db, 'questions'), questionData);
+        toast.success("Questão criada com sucesso!");
+      } else {
+        const docRef = doc(db, 'questions', editingQuestionId);
+        await updateDoc(docRef, {
+          ...editedQuestion,
+          updatedAt: serverTimestamp()
+        });
+        toast.success("Questão atualizada com sucesso!");
+      }
       setEditingQuestionId(null);
       fetchQuestions();
     } catch (error) {
-      console.error("Error updating question:", error);
-      toast.error("Erro ao atualizar questão.");
+      console.error("Error saving question:", error);
+      toast.error("Erro ao salvar questão.");
     } finally {
       setIsSavingEdit(false);
     }
@@ -237,7 +308,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     setImportProgress(0);
     try {
       toast.info("A IA está analisando o conteúdo e extraindo as questões...");
-      const parsedQuestions = await parseQuestionsFromText(text, selectedModel, 'professor');
+      const parsedQuestions = await parseQuestionsFromText(text, selectedModel, 'TEACHER');
       
       if (!parsedQuestions || parsedQuestions.length === 0) {
         toast.error("Nenhuma questão identificada no arquivo.");
@@ -355,7 +426,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     
     try {
       toast.info(`A IA está gerando ${count} variações contextuais da questão...`);
-      const newQuestions = await generateMultipleQuestionVariations(original, count, selectedModel, 'professor');
+      const newQuestions = await generateMultipleQuestionVariations(original, count, selectedModel, 'TEACHER');
       
       const batch = writeBatch(db);
       const questionsCol = collection(db, 'questions');
@@ -383,6 +454,38 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       toast.error("Erro ao gerar variações da questão.");
     } finally {
       setIsGeneratingVariation(null);
+    }
+  };
+
+  const handleAnalyzeQuestion = async (question: Question) => {
+    if (!question.id) return;
+    setIsAnalyzingQuestion(question.id);
+    
+    // Automatically expand the question so the analysis block is visible
+    if (expandedQuestionId !== question.id) {
+      setExpandedQuestionId(question.id);
+    }
+    
+    try {
+      toast.info('Analisando questão com base em dados simulados de desempenho...');
+      // MOCK: in a real app, you would fetch real stats from completed exams that used this question.
+      const mockStats = {
+        totalAnswers: Math.floor(Math.random() * 50) + 10,
+        correctAnswers: Math.floor(Math.random() * 20),
+        commonErrors: [
+          "Alunos confundiram a alternativa B com o conceito principal (erro de distração)",
+          "Baixa taxa de conclusão para esta questão (possível erro de interpretação do enunciado)"
+        ]
+      };
+      
+      const analysis = await analyzeQuestionByPerformance(question, mockStats, selectedModel, 'professor');
+      setAnalysisResult({ questionId: question.id, result: analysis });
+      toast.success('Análise concluída com sucesso!');
+    } catch (error) {
+      console.error("Error analyzing question:", error);
+      toast.error("Erro ao analisar questão.");
+    } finally {
+      setIsAnalyzingQuestion(null);
     }
   };
 
@@ -455,7 +558,10 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
             {isImporting ? <Loader2 size={20} className="animate-spin" /> : <FileUp size={20} />}
             Importar Arquivo
           </button>
-          <button className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2">
+          <button 
+            onClick={handleCreateClick}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+          >
             <Plus size={20} /> Nova Questão
           </button>
         </div>
@@ -636,9 +742,74 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-4 pt-4 border-t border-gray-50"
+                        className="mt-4 pt-4 border-t border-gray-50 flex flex-col gap-4"
                       >
                         <QuestionRenderer question={question as any} showCorrectAnswer={true} />
+                        
+                        {analysisResult && analysisResult.questionId === question.id && (
+                          <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 shadow-sm mt-4">
+                            <div className="flex items-center justify-between mb-4">
+                               <h4 className="font-bold text-emerald-900 flex items-center gap-2 text-lg">
+                                 <Activity size={20} className="text-emerald-600" /> 
+                                 Análise Cognitiva e de Desempenho
+                               </h4>
+                               <button 
+                                 onClick={() => setAnalysisResult(null)}
+                                 className="text-emerald-500 hover:text-emerald-700"
+                               >
+                                 <X size={20} />
+                               </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-50">
+                                   <p className="text-xs font-bold text-emerald-600 uppercase mb-2">Diagnóstico do Enunciado</p>
+                                   <p className="text-sm text-gray-700 leading-relaxed">{analysisResult.result.diagnosticoEnunciado}</p>
+                                   {analysisResult.result.sugestaoReformulacaoEnunciado && (
+                                     <div className="mt-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100/50">
+                                       <p className="text-xs font-bold text-emerald-700 mb-1">Sugestão de Reformulação:</p>
+                                       <p className="text-sm text-emerald-900 italic font-medium">{analysisResult.result.sugestaoReformulacaoEnunciado}</p>
+                                     </div>
+                                   )}
+                                </div>
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-50">
+                                   <p className="text-xs font-bold text-emerald-600 uppercase mb-2">Adequação Pedagógica</p>
+                                   <span className={cn(
+                                     "px-3 py-1 rounded-full text-xs font-black uppercase inline-block",
+                                     analysisResult.result.nivelAdequacao === 'Baixo' ? "bg-red-100 text-red-700" :
+                                     analysisResult.result.nivelAdequacao === 'Médio' ? "bg-amber-100 text-amber-700" :
+                                     "bg-emerald-100 text-emerald-700"
+                                   )}>
+                                     Nível {analysisResult.result.nivelAdequacao}
+                                   </span>
+                                </div>
+                              </div>
+                              <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-50">
+                                   <p className="text-xs font-bold text-emerald-600 uppercase mb-2">Diagnóstico das Alternativas</p>
+                                   <p className="text-sm text-gray-700 leading-relaxed">{analysisResult.result.diagnosticoAlternativas}</p>
+                                </div>
+                                
+                                {analysisResult.result.sugestaoReformulacaoAlternativas && analysisResult.result.sugestaoReformulacaoAlternativas.length > 0 && (
+                                  <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-50">
+                                    <p className="text-xs font-bold text-emerald-600 uppercase mb-3">Sugestões (Distratores)</p>
+                                    <div className="space-y-3">
+                                      {analysisResult.result.sugestaoReformulacaoAlternativas.map((alt, i) => (
+                                        <div key={i} className="text-sm border-l-2 border-emerald-300 pl-3">
+                                          <p className="font-bold text-gray-900">Alternativa {alt.id}</p>
+                                          <p className="text-gray-500 line-through text-xs mb-1">{alt.textoAtual}</p>
+                                          <p className="text-emerald-700 font-medium text-xs mb-1">Novo: {alt.novoTextoSugerido}</p>
+                                          <p className="text-gray-600 text-xs italic">"{alt.justificativa}"</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -658,6 +829,14 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
               </div>
 
               <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => handleAnalyzeQuestion(question)}
+                  disabled={isAnalyzingQuestion === question.id}
+                  className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                  title="Analisar Desempenho e Erros Cognitivos"
+                >
+                  {isAnalyzingQuestion === question.id ? <Loader2 size={20} className="animate-spin" /> : <Activity size={20} />}
+                </button>
                 <button 
                   onClick={() => setVariationModalConfig({ isOpen: true, question, count: 5 })}
                   disabled={isGeneratingVariation === question.id}
@@ -697,7 +876,10 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
               className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             >
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-xl font-bold flex items-center gap-2"><Edit2 size={24} className="text-indigo-600"/> Editar Questão</h3>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  {editingQuestionId === 'new' ? <Plus size={24} className="text-emerald-600"/> : <Edit2 size={24} className="text-indigo-600"/>} 
+                  {editingQuestionId === 'new' ? 'Criar Nova Questão' : 'Editar Questão'}
+                </h3>
                 <button onClick={() => setEditingQuestionId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
               </div>
               <div className="p-6 overflow-y-auto space-y-4">
@@ -728,8 +910,176 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
                     <Eye size={12} /> Pré-visualização do Enunciado
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-gray-200">
-                    <QuestionRenderer question={{ ...editedQuestion as any, assets: [] }} showCorrectAnswer={false} className="space-y-0" />
+                    <QuestionRenderer question={{ ...editedQuestion as any }} showCorrectAnswer={false} className="space-y-0" />
                   </div>
+                </div>
+
+                {/* Asset Management Section */}
+                <div className="space-y-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2 uppercase tracking-widest">
+                      <Zap size={18} className="text-indigo-600" /> Recursos da Questão ({editedQuestion.assets?.length || 0})
+                    </label>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => addAsset('image')}
+                        className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
+                        title="Adicionar Imagem via URL"
+                      >
+                        <ImageIcon size={16} />
+                      </button>
+                      <button 
+                        onClick={() => addAsset('code')}
+                        className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                        title="Adicionar Bloco de Código"
+                      >
+                        <Code size={16} />
+                      </button>
+                      <button 
+                        onClick={() => addAsset('table')}
+                        className="p-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors"
+                        title="Adicionar Tabela (JSON)"
+                      >
+                        <Table size={16} />
+                      </button>
+                      <button 
+                        onClick={() => addAsset('case_study')}
+                        className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors"
+                        title="Adicionar Estudo de Caso"
+                      >
+                        <FileText size={16} />
+                      </button>
+                      <button 
+                        onClick={() => addAsset('diagram')}
+                        className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"
+                        title="Adicionar Diagrama"
+                      >
+                        <LayoutIcon size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {editedQuestion.assets && editedQuestion.assets.length > 0 ? (
+                    <div className="space-y-3">
+                      {editedQuestion.assets.map((asset, index) => (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          key={asset.id} 
+                          className="p-4 bg-gray-50 border border-gray-200 rounded-2xl relative group"
+                        >
+                          <button 
+                            onClick={() => removeAsset(index)}
+                            className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={cn(
+                                "p-1.5 rounded-lg",
+                                asset.type === 'image' ? "bg-purple-100 text-purple-600" :
+                                asset.type === 'code' ? "bg-blue-100 text-blue-600" :
+                                asset.type === 'table' ? "bg-pink-100 text-pink-600" :
+                                asset.type === 'case_study' ? "bg-amber-100 text-amber-600" : "bg-indigo-100 text-indigo-600"
+                              )}>
+                                {asset.type === 'image' ? <ImageIcon size={12} /> :
+                                 asset.type === 'code' ? <Code size={12} /> :
+                                 asset.type === 'table' ? <Table size={12} /> :
+                                 asset.type === 'case_study' ? <FileText size={12} /> : <LayoutIcon size={12} />}
+                              </div>
+                              <span className="text-[10px] font-black uppercase text-gray-400">Recurso #{index + 1}: {asset.type.replace('_', ' ')}</span>
+                            </div>
+                            
+                            <input 
+                              type="text"
+                              placeholder="Título (Ex: Arquitetura do Sistema)"
+                              value={asset.title || ''}
+                              onChange={e => updateAsset(index, { title: e.target.value })}
+                              className="w-full p-2 text-sm font-bold border-b border-gray-200 bg-transparent focus:border-indigo-500 outline-none transition-all placeholder:font-normal"
+                            />
+                            
+                            {asset.type === 'image' || asset.type === 'diagram' ? (
+                              <input 
+                                type="text"
+                                placeholder="URL Pública da Imagem / Diagrama"
+                                value={asset.content}
+                                onChange={e => updateAsset(index, { content: e.target.value })}
+                                className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                              />
+                            ) : asset.type === 'code' ? (
+                              <div className="space-y-2">
+                                <div className="flex gap-2 flex-wrap">
+                                  {['javascript', 'python', 'sql', 'cpp', 'java', 'html', 'css'].map(lang => (
+                                    <button
+                                      key={lang}
+                                      onClick={() => updateAsset(index, { language: lang })}
+                                      className={cn(
+                                        "px-2 py-1 rounded text-[10px] font-bold uppercase transition-all",
+                                        asset.language === lang ? "bg-blue-600 text-white" : "bg-white text-gray-400 border border-gray-200"
+                                      )}
+                                    >
+                                      {lang}
+                                    </button>
+                                  ))}
+                                </div>
+                                <textarea 
+                                  placeholder="Cole seu código aqui..."
+                                  value={asset.content}
+                                  onChange={e => updateAsset(index, { content: e.target.value })}
+                                  className="w-full p-3 text-sm border border-gray-200 rounded-xl font-mono h-32 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                />
+                              </div>
+                            ) : asset.type === 'table' ? (
+                              <div className="space-y-2">
+                                <textarea 
+                                  placeholder='JSON da Tabela. Ex: {"headers": ["A", "B"], "rows": [["1", "2"]]}'
+                                  value={asset.content}
+                                  onChange={e => updateAsset(index, { content: e.target.value })}
+                                  className="w-full p-3 text-sm border border-gray-200 rounded-xl font-mono h-32 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                />
+                                <button 
+                                  onClick={() => {
+                                    const example = JSON.stringify({
+                                      headers: ["Item", "Especificação", "Valor"],
+                                      rows: [
+                                        ["Processador", "Octa-core", "2.8GHz"],
+                                        ["RAM", "LPDDR5", "8GB"]
+                                      ]
+                                    }, null, 2);
+                                    updateAsset(index, { content: example });
+                                  }}
+                                  className="text-[10px] font-black uppercase text-indigo-600 underline"
+                                >
+                                  Usar Exemplo de Tabela
+                                </button>
+                              </div>
+                            ) : (
+                               <textarea 
+                                 placeholder="Descreva o Estudo de Caso ou Cenário aqui..."
+                                 value={asset.content}
+                                 onChange={e => updateAsset(index, { content: e.target.value })}
+                                 className="w-full p-3 text-sm border border-gray-200 rounded-xl italic h-32 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                               />
+                            )}
+                            
+                            <input 
+                              type="text"
+                              placeholder="Legenda pedagógica para o rodapé do recurso"
+                              value={asset.caption || ''}
+                              onChange={e => updateAsset(index, { caption: e.target.value })}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-xl italic bg-white"
+                            />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 border-2 border-dashed border-gray-100 rounded-3xl text-center">
+                      <p className="text-gray-400 text-sm italic">Nenhum recurso multimídia anexado. Use os ícones acima para adicionar imagens, código ou tabelas.</p>
+                    </div>
+                  )}
                 </div>
 
                 <div>

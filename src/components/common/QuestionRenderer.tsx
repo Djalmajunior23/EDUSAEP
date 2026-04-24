@@ -227,6 +227,28 @@ export function QuestionRenderer({
                    <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold uppercase text-left">Critérios de Rubrica: {question.rubricaAvaliacao}</p>
                 </div>
               )}
+              {Array.isArray(question.criteriosAvaliacao) && question.criteriosAvaliacao.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-700/50 space-y-2">
+                  <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-left">Critérios de Avaliação (Rubrica Detalhada)</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {question.criteriosAvaliacao.map((c: any, i: number) => (
+                      <div key={i} className="bg-emerald-100/50 dark:bg-emerald-800/30 p-2 rounded text-left">
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm font-bold text-emerald-900 dark:text-emerald-200">{c.criterio}</span>
+                          <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded">{c.pontuacao} pts</span>
+                        </div>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">{c.descricao}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {question.feedbackProfessorSugerido && (
+                <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-700/50 space-y-1 text-left">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Sugestão de Feedback</p>
+                  <p className="text-sm text-emerald-800 dark:text-emerald-300 italic">{question.feedbackProfessorSugerido}</p>
+                </div>
+              )}
             </motion.div>
           )}
         </div>

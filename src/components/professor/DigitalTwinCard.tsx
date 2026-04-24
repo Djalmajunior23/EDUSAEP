@@ -16,7 +16,7 @@ export function DigitalTwinCard({ studentData, selectedModel }: DigitalTwinCardP
   const runPrediction = async () => {
     setLoading(true);
     try {
-      const result = await predictPerformance(studentData, selectedModel, 'professor');
+      const result = await predictPerformance(studentData, selectedModel, 'ADMIN');
       setPrediction(result);
       toast.success('Simulação de Gêmeo Digital concluída!');
     } catch (err) {

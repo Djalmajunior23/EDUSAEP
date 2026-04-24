@@ -12,7 +12,7 @@ export function SocraticTutorView({ userProfile, selectedModel }: SocraticTutorV
     <div className="py-8">
       <SocraticTutor 
         selectedModel={selectedModel} 
-        userRole={userProfile?.role as any || 'aluno'} 
+        userRole={userProfile?.role as any || 'STUDENT'} 
       />
     </div>
   );

@@ -6,8 +6,6 @@ import { AggregationService } from './aggregationService';
  * Migration script to process existing data and populate stats.
  */
 export async function migrateExistingClassStats() {
-  console.log("Starting migration of class statistics...");
-  
   // 1. Get all classes (this assumes an existing collections structure, adjust as needed)
   const classesSnap = await getDocs(collection(db, 'classes'));
   
@@ -39,9 +37,5 @@ export async function migrateExistingClassStats() {
       deliveryRate: count, // simplified
       lastUpdate: serverTimestamp()
     });
-    
-    console.log(`Migrated class: ${classId}`);
   }
-  
-  console.log("Migration completed!");
 }

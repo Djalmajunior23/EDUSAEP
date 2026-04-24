@@ -61,7 +61,7 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
     setGeneratedQuestion(null);
     setValidationResult(null);
     try {
-      const question = await generateDiscursiveQuestion(prompt, difficulty, localModel, userProfile?.role || 'professor', selectedCompetency);
+      const question = await generateDiscursiveQuestion(prompt, difficulty, localModel, userProfile?.role || 'TEACHER', selectedCompetency);
       setGeneratedQuestion(question);
       toast.success("Questão discursiva gerada com sucesso!");
     } catch (err: any) {
@@ -302,6 +302,19 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20 space-y-3">
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                    <Info size={18} />
+                    <p className="text-xs font-bold uppercase tracking-wider">Sugestão de Feedback do Professor</p>
+                  </div>
+                  <textarea 
+                    value={generatedQuestion.feedbackProfessorSugerido || ''}
+                    onChange={(e) => setGeneratedQuestion({ ...generatedQuestion, feedbackProfessorSugerido: e.target.value })}
+                    className="w-full bg-transparent text-sm text-blue-800 dark:text-blue-300 leading-relaxed outline-none focus:ring-2 focus:ring-blue-500/20 rounded-lg p-2 resize-none"
+                    rows={3}
+                  />
                 </div>
 
                 {generatedQuestion.aiExplicabilidade && (

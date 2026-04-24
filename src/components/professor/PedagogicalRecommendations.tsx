@@ -40,7 +40,7 @@ export function PedagogicalRecommendations({ userProfile }: { userProfile: any }
       const submissionsSnap = await getDocs(query(collection(db, 'exam_submissions'), limit(50)));
       const submissions = submissionsSnap.docs.map(doc => doc.data());
       
-      const studentsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno'), limit(50)));
+      const studentsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'STUDENT'), limit(50)));
       const students = studentsSnap.docs.map(doc => doc.data());
 
       const context = {
@@ -52,7 +52,7 @@ export function PedagogicalRecommendations({ userProfile }: { userProfile: any }
         recentSubmissions: submissions.slice(0, 10)
       };
 
-      const result = await generatePedagogicalAnalysis(context, 'gemini-3-flash-preview', 'professor');
+      const result = await generatePedagogicalAnalysis(context, 'gemini-3-flash-preview', 'TEACHER');
       setRecommendations(result);
       toast.success("Novas recomendações geradas!");
     } catch (error) {

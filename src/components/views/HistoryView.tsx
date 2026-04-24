@@ -21,10 +21,13 @@ interface HistoryViewProps {
   userProfile: UserProfile | null;
 }
 
+import { useAuth } from '../../contexts/AuthContext';
+
 export function HistoryView({ 
   history, deleteDiagnostic, archiveDiagnostic, setResult, 
   navigate, setCurrentDiagnosticId, userProfile 
 }: HistoryViewProps) {
+  const { isProfessor: authIsProfessor, isAluno: authIsStudent } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isBulkEdit, setIsBulkEdit] = useState(false);
@@ -33,8 +36,8 @@ export function HistoryView({
   const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc');
 
-  const isStudent = userProfile?.role === 'aluno';
-  const isProfessor = userProfile?.role === 'professor' || userProfile?.role === 'admin';
+  const isStudent = authIsStudent || userProfile?.role === 'STUDENT' || userProfile?.role === 'MONITOR';
+  const isProfessor = authIsProfessor || userProfile?.role === 'TEACHER' || userProfile?.role === 'ADMIN' || userProfile?.role === 'COORDINATOR';
 
   const filteredHistory = useMemo(() => {
     const filtered = history.filter(item => {

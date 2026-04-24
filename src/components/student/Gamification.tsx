@@ -9,7 +9,8 @@ import {
   TrendingUp,
   Users,
   Medal,
-  Crown
+  Crown,
+  FileText
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -28,6 +29,18 @@ export function Gamification() {
   }, []);
 
   if (loading || !userProfile) return null;
+
+  const currentLevelValue = userProfile.level || 1;
+  const levels = [
+    { name: 'Iniciante', min: 1, max: 5, description: 'Dando os primeiros passos na jornada de conhecimento.' },
+    { name: 'Aprendiz', min: 6, max: 15, description: 'Começando a dominar os conceitos fundamentais.' },
+    { name: 'Explorador', min: 16, max: 30, description: 'Buscando novos desafios e aprofundando saberes.' },
+    { name: 'Praticante', min: 31, max: 50, description: 'Consolidação de rotina e consistência nos estudos.' },
+    { name: 'Avançado', min: 51, max: 80, description: 'Alta performance e domínio de competências complexas.' },
+    { name: 'Destaque', min: 81, max: 999, description: 'Referência de excelência acadêmica e engajamento.' },
+  ];
+
+  const currentLevelCategory = levels.find(l => currentLevelValue >= l.min && currentLevelValue <= l.max) || levels[0];
 
   const progress = ((userProfile.xp || 0) % 1000) / 10;
 
@@ -60,8 +73,14 @@ export function Gamification() {
           <div className="flex-1 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Nível {userProfile.level || 1}</h3>
-                <p className="text-sm text-gray-500">{userProfile.xp || 0} XP acumulados</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Nível {currentLevelValue}</h3>
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                    {currentLevelCategory.name}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 max-w-md">{currentLevelCategory.description}</p>
+                <p className="text-xs text-gray-400 mt-1">{userProfile.xp || 0} XP acumulados</p>
               </div>
               <div className="text-right">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Próximo Nível</p>
@@ -159,5 +178,3 @@ export function Gamification() {
     </div>
   );
 }
-
-import { FileText } from 'lucide-react';

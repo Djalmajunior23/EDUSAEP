@@ -1,78 +1,148 @@
-import { db, auth } from '../firebase';
-import { doc, getDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { GamificationProfile, Achievement } from '../types';
 import { toast } from 'sonner';
 
-// Shadow Gamification Engine
-// Foca no engajamento subjacente e no XP sem parecer um "joguinho" infantil.
+export const XP_PER_LEVEL = 1000;
 
-export interface GamificationAction {
-  type: 'SIMULATION_COMPLETED' | 'LEARNING_PATH_PHASE' | 'FORUM_CONTRIBUTION' | 'DIAGNOSTIC_COMPLETED';
-  baseXp: number;
-  metadata?: any;
-}
-
-const ACTION_XP_MAP: Record<string, number> = {
-  'SIMULATION_COMPLETED': 150,
-  'LEARNING_PATH_PHASE': 300,
-  'FORUM_CONTRIBUTION': 50,
-  'DIAGNOSTIC_COMPLETED': 500,
-};
-
-export const calculateLevel = (xp: number = 0) => {
-  return Math.floor(Math.sqrt(xp / 100)) + 1;
-};
-
-export const getXPForNextLevel = (level: number) => {
-  return Math.pow(level, 2) * 100;
-};
-
-class ShadowGamificationEngine {
-  
-  public async awardXP(actionType: keyof typeof ACTION_XP_MAP, multiplier: number = 1.0, showToast: boolean = true) {
-    if (!auth.currentUser) return;
-
-    const baseAmount = ACTION_XP_MAP[actionType] || 10;
-    const finalXP = Math.round(baseAmount * multiplier);
-
-    try {
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        const currentXP = userSnap.data().xp || 0;
-        const currentLevel = calculateLevel(currentXP);
-        const newXP = currentXP + finalXP;
-        const newLevel = calculateLevel(newXP);
-
-        await updateDoc(userRef, {
-          xp: increment(finalXP),
-          level: newLevel,
-          lastActive: serverTimestamp()
-        });
-
-        if (showToast) {
-          toast.success(`+${finalXP} XP adquiridos!`, {
-            description: 'Seu engajamento impulsiona a IA.',
-            icon: '⚡'
-          });
-        }
-
-        // Shadow Level Up Detection
-        if (newLevel > currentLevel && showToast) {
-          toast.success(`Nível de Engajamento Subiu!`, {
-            description: `Você atingiu o Patamar Evolutivo ${newLevel}. A IA adaptativa agora tem rotas mais complexas disponíveis para você.`,
-            icon: '🧠',
-            duration: 5000
-          });
-        }
-
-        return { newXP, newLevel, leveledUp: newLevel > currentLevel };
-      }
-    } catch (error) {
-      console.error("Error awarding Shadow XP:", error);
-    }
+export const ACHIEVEMENTS: Achievement[] = [
+  {
+    id: 'first_activity',
+    title: 'Primeiros Passos',
+    description: 'Concluiu sua primeira atividade na plataforma.',
+    icon: '🎯',
+    xpReward: 50,
+    type: 'engagement'
+  },
+  {
+    id: 'five_activities',
+    title: 'Explorador Dedicado',
+    description: 'Concluiu 5 atividades com sucesso.',
+    icon: '🧭',
+    xpReward: 200,
+    type: 'academic'
+  },
+  {
+    id: 'quiz_master',
+    title: 'Mestre dos Quizzes',
+    description: 'Respondeu a 3 quizzes interativos.',
+    icon: '🧠',
+    xpReward: 150,
+    type: 'academic'
+  },
+  {
+    id: 'high_performer',
+    title: 'Alta Performance',
+    description: 'Manteve uma média acima de 90% em 3 avaliações seguidas.',
+    icon: '⚡',
+    xpReward: 500,
+    type: 'academic'
   }
+];
 
-}
+export const getNextLevel = (xp: number) => Math.floor(xp / XP_PER_LEVEL) + 1;
 
-export const gamificationEngine = new ShadowGamificationEngine();
+export const LevelConfig = {
+  XP_PER_LEVEL,
+  MAX_LEVEL: 100
+};
+
+export type { GamificationProfile } from '../types';
+
+export const gamificationService = {
+  async getProfile(studentId: string): Promise<GamificationProfile | null> {
+    const docRef = doc(db, 'gamification_profiles', studentId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return docSnap.data() as GamificationProfile;
+    }
+    
+    const newProfile: GamificationProfile = {
+      studentId,
+      points: 0,
+      level: 1,
+      experience: 0,
+      achievements: [],
+      streak: 0,
+      lastActivityAt: serverTimestamp()
+    };
+    
+    await setDoc(docRef, newProfile);
+    return newProfile;
+  },
+
+  // Alias for getProfile that matches some components
+  async createProfile(studentId: string): Promise<GamificationProfile> {
+    const profile = await this.getProfile(studentId);
+    return profile || {
+      studentId,
+      points: 0,
+      level: 1,
+      experience: 0,
+      achievements: [],
+      streak: 0,
+      lastActivityAt: serverTimestamp()
+    } as GamificationProfile;
+  },
+
+  async awardPoints(studentId: string, points: number, experience: number): Promise<void> {
+    const profile = await this.getProfile(studentId);
+    if (!profile) return;
+
+    const newExp = profile.experience + experience;
+    const newPoints = profile.points + points;
+    const newLevel = getNextLevel(newExp);
+
+    const docRef = doc(db, 'gamification_profiles', studentId);
+    await updateDoc(docRef, {
+      points: newPoints,
+      experience: newExp,
+      level: newLevel,
+      lastActivityAt: serverTimestamp()
+    });
+
+    if (newLevel > profile.level) {
+      toast.success(`Parabéns! Você alcançou o nível ${newLevel}!`);
+    }
+  },
+
+  // Compatibility aliases
+  async awardXP(studentId: string, amount: number): Promise<void> {
+    await this.awardPoints(studentId, 0, amount);
+  },
+
+  async addXP(studentId: string, amount: number): Promise<void> {
+    await this.awardPoints(studentId, 0, amount);
+  },
+
+  async checkAndAwardAchievement(studentId: string, achievementId: string): Promise<void> {
+    const profile = await this.getProfile(studentId);
+    if (!profile) return;
+
+    if (profile.achievements.includes(achievementId)) return;
+
+    const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+    if (!achievement) return;
+
+    const newAchievements = [...profile.achievements, achievementId];
+    const docRef = doc(db, 'gamification_profiles', studentId);
+    
+    await updateDoc(docRef, {
+      achievements: newAchievements,
+      experience: profile.experience + achievement.xpReward
+    });
+
+    toast.success(`Conquista Desbloqueada: ${achievement.title}!`, {
+      description: achievement.description
+    });
+  },
+
+  // Alias for checkAndAwardAchievement
+  async awardBadge(studentId: string, badgeId: string): Promise<void> {
+    await this.checkAndAwardAchievement(studentId, badgeId);
+  }
+};
+
+// Compatibility aliases
+export const gamificationEngine = gamificationService;

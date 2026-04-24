@@ -150,8 +150,8 @@ export function ObservatorioAlunoView() {
                  <span className="truncate pr-2 font-medium text-gray-700">{c.name}</span>
                  <span className={cn(
                    "px-2 py-0.5 rounded-full font-semibold",
-                   c.masteryLevel === 'Alto' ? 'bg-green-100 text-green-700' :
-                   c.masteryLevel === 'Médio' ? 'bg-yellow-100 text-yellow-700' :
+                   c.masteryLevel === 'Forte' ? 'bg-emerald-100 text-emerald-700' :
+                   c.masteryLevel === 'Atenção' ? 'bg-amber-100 text-amber-700' :
                    'bg-red-100 text-red-700'
                  )}>{c.score}%</span>
                </div>

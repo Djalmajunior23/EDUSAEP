@@ -114,7 +114,7 @@ export function TeacherActivitiesManager({ userProfile, selectedModel }: { userP
 
       // Notify all students
       try {
-        const studentsSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'aluno')));
+        const studentsSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'STUDENT')));
         const studentIds = studentsSnapshot.docs.map(d => d.id);
         if (studentIds.length > 0) {
           await notificationService.notifyMultipleUsers(studentIds, {
@@ -247,7 +247,7 @@ export function TeacherActivitiesManager({ userProfile, selectedModel }: { userP
         model: selectedModel || 'gemini-3-flash-preview',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: getSystemInstruction('professor', 'smart_content'),
+          systemInstruction: getSystemInstruction('TEACHER', 'smart_content'),
           responseMimeType: 'application/json'
         }
       });

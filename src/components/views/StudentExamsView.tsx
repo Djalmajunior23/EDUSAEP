@@ -3,7 +3,8 @@ import {
   BookOpen, Info, Loader2, CheckSquare, ExternalLink 
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db } from '../../firebase';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Exam, ExamSubmission, UserProfile, SimuladoForm } from '../../types';
 import { User } from 'firebase/auth';
@@ -174,7 +175,7 @@ export function StudentExamsView({ user, userProfile, selectedModel }: StudentEx
                           rel="noreferrer"
                           className="px-6 py-2 bg-white dark:bg-gray-800 text-emerald-600 border-2 border-emerald-600 rounded-xl font-bold hover:bg-emerald-50 dark:hover:bg-gray-700 transition-all text-sm text-center flex items-center justify-center gap-2"
                         >
-                          <ExternalLink size={16} title="Responder Externo" />
+                          <ExternalLink size={16} />
                           Responder em Formulário
                         </a>
                       )}

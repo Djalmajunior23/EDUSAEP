@@ -1,9 +1,47 @@
 import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Question } from '../types';
+import { AIService } from './aiService';
 
 export class QuestionService {
   private static collectionName = 'questions';
+
+  static async generateDiscursiveQuestion(
+    topic: string,
+    difficulty: 'fácil' | 'médio' | 'difícil',
+    context: string,
+    userId: string,
+    userRole: string
+  ): Promise<Partial<Question>> {
+    if (userRole !== 'admin' && userRole !== 'professor') {
+      throw new Error("Permissão negada: Apenas professores e administradores podem gerar questões com IA.");
+    }
+
+    const prompt = `
+      Gere uma questão discursiva sobre o tema: "${topic}".
+      Dificuldade: ${difficulty}.
+      Contexto/Referência: "${context}".
+      
+      A resposta deve estar em formato JSON estrito com os campos:
+      - enunciado (string)
+      - respostaEsperada (string)
+      - criteriosAvaliacao (string[]) - mínimo 3 critérios
+      - dificuldade (deve ser: 'fácil', 'médio' ou 'difícil')
+      - tipoQuestao (deve ser: 'discursiva')
+    `;
+
+    const response = await AIService.generatePedagogicalContent(prompt, userRole, true);
+    
+    try {
+      const generatedQuestion: Partial<Question> = JSON.parse(response);
+      return generatedQuestion;
+    } catch (e) {
+      console.error("Erro ao parsear JSON da IA:", response);
+      throw new Error("Erro ao estruturar a questão gerada pela IA.");
+    }
+  }
+
+  // ... (validateQuestionPayload e outros métodos permanecem abaixo)
 
   private static validateQuestionPayload(data: Partial<Question>, isUpdate: boolean = false) {
     // Enunciado

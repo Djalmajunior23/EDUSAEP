@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { GeneratedAssetsView } from './GeneratedAssetsView';
 import { 
   BrainCircuit, 
@@ -24,6 +25,7 @@ import { IntelligenceEngine } from '../../services/advancedIntelligenceEngine';
 import { ErrorMapEntry } from '../../types';
 
 export function PedagogicalIntelligenceHub() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [errorMap, setErrorMap] = useState<ErrorMapEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -173,7 +175,9 @@ export function PedagogicalIntelligenceHub() {
                 <span className="text-red-600 font-black text-sm bg-red-50 px-2 py-0.5 rounded-lg">Alta Suspeita</span>
               </div>
               <p className="text-2xl font-black text-gray-900">12 Alunos</p>
-              <button className="w-full mt-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm">
+              <button 
+                onClick={() => navigate('/teacher-ai-assistant')}
+                className="w-full mt-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm">
                 Gerar Lista de Revisão
               </button>
             </div>

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ChevronLeft, BookOpen, Zap, CheckCircle2, 
+  ChevronLeft, BookOpen, Zap, CheckCircle2, XCircle,
   Loader2, Brain, AlertCircle 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp, doc, getDocFromServer, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Exam, User, UserProfile, ExamSubmission } from '../../types';
+import { Exam, UserProfile, ExamSubmission } from '../../types';
+import { User } from 'firebase/auth';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '../../services/errorService';

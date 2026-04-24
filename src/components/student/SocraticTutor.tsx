@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Send, Loader2, X, Sparkles } from 'lucide-react';
+import { UserRole } from '../../types';
 import { db, auth } from '../../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
@@ -22,7 +23,7 @@ interface SocraticTutorProps {
   questionText?: string;
   onClose?: () => void;
   selectedModel?: string;
-  userRole?: 'professor' | 'aluno';
+  userRole?: UserRole | 'professor' | 'aluno';
 }
 
 export function SocraticTutor({ 
@@ -30,7 +31,7 @@ export function SocraticTutor({
   questionText = 'Dúvida Geral', 
   onClose, 
   selectedModel = "gemini-3-flash-preview",
-  userRole = 'aluno'
+  userRole = 'STUDENT'
 }: SocraticTutorProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');

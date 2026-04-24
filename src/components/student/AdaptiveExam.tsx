@@ -9,6 +9,7 @@ import {
   AlertCircle,
   ArrowRight
 } from 'lucide-react';
+import { UserRole } from '../../types';
 import { db, auth } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getNextAdaptiveQuestion, SAEPQuestion } from '../../services/geminiService';
@@ -24,10 +25,10 @@ interface AdaptiveExamProps {
   competency: string;
   onComplete: (score: number) => void;
   selectedModel?: string;
-  userRole?: 'professor' | 'aluno';
+  userRole?: UserRole | 'professor' | 'aluno';
 }
 
-export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-3-flash-preview", userRole = 'aluno' }: AdaptiveExamProps) {
+export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-3-flash-preview", userRole = 'STUDENT' }: AdaptiveExamProps) {
   const [currentQuestion, setCurrentQuestion] = useState<SAEPQuestion | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [proficiency, setProficiency] = useState(50); // Start at medium
@@ -98,7 +99,8 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
   const fetchNextQuestion = async (p: number, h: any[]) => {
     setIsLoading(true);
     try {
-      const question = await getNextAdaptiveQuestion(p, competency, h, selectedModel, userRole);
+      const role = userRole === 'professor' ? 'TEACHER' : (userRole === 'aluno' ? 'STUDENT' : userRole);
+      const question = await getNextAdaptiveQuestion(p, competency, h, selectedModel, role as UserRole);
       setCurrentQuestion(question);
       setQuestionCount(prev => prev + 1);
     } catch (error) {

@@ -106,7 +106,7 @@ export function LearningSituationGenerator({ userProfile, selectedModel }: Props
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
           responseMimeType: 'application/json',
-          systemInstruction: getSystemInstruction('professor', 'smart_content')
+          systemInstruction: getSystemInstruction('TEACHER', 'smart_content')
         }
       });
 

@@ -137,7 +137,7 @@ export function LessonManagementView({ userProfile, selectedModel }: { userProfi
         diagnosticsCount: diagnostics.length
       };
 
-      const plan = await generateLessonPlan(planData, cognitiveAnalyses, selectedModel, userProfile?.role || 'professor');
+      const plan = await generateLessonPlan(planData, cognitiveAnalyses, selectedModel, userProfile?.role || 'TEACHER');
       
       // Save to Firestore
       const docRef = await addDoc(collection(db, 'lesson_plans'), {

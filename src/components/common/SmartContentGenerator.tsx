@@ -39,7 +39,7 @@ export function SmartContentGenerator({ userProfile, selectedModel }: SmartConte
     const input: SmartContentInput = {
       prompt,
       tipo,
-      perfil: userProfile?.role === 'professor' ? 'professor' : 'aluno',
+      perfil: (userProfile?.role === 'TEACHER' || userProfile?.role === 'ADMIN' || userProfile?.role === 'COORDINATOR') ? 'TEACHER' : 'STUDENT',
       disciplina,
       competencias: competencias.split(',').map(c => c.trim()).filter(c => c !== ''),
       nivel,

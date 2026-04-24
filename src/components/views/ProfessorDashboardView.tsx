@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Users, BookOpen, TrendingUp, LayoutDashboard, 
-  CheckSquare, Target, ArrowRight, Database, Brain, History 
+  CheckSquare, Target, ArrowRight, Database, Brain, History, FolderPlus 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
@@ -11,6 +11,7 @@ import { db } from '../../firebase';
 import { UserProfile } from '../../types';
 import { ActivityManager } from '../professor/ActivityManager';
 import { HeatmapLearning } from '../shared/HeatmapLearning';
+import { RiskStudentsPanel } from '../analytics/RiskStudentsPanel';
 
 interface ProfessorDashboardViewProps {
   user: User | null;
@@ -33,7 +34,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
 
     const fetchStats = async () => {
       try {
-        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'aluno'));
+        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'STUDENT'));
         const studentsSnap = await getDocs(studentsQuery);
         
         const diagQuery = query(collection(db, 'diagnostics'), orderBy('createdAt', 'desc'), limit(50));
@@ -104,6 +105,46 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Média de Acertos</p>
             <p className="text-2xl font-black text-gray-900 dark:text-white">{loading ? '...' : `${stats.avgScore.toFixed(1)}%`}</p>
           </div>
+        </div>
+      </div>
+
+      {/* Módulo de IA Avançada */}
+      <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-3xl p-8 text-white shadow-xl">
+        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+          <Brain size={24} className="text-purple-400" />
+          Inteligência Pedagógica Avançada
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { id: 'copilot', label: 'Copiloto Pedagógico' },
+            { id: 'gen-quest', label: 'Gerador de Questões' },
+            { id: 'gen-discursive', label: 'Gerador Discursivas' },
+            { id: 'gen-sa', label: 'Gerador de SA' },
+            { id: 'observatory', label: 'Observatório Pedagógico' },
+            { id: 'gen-material', label: 'Gerador Materiais' },
+            { id: 'an-cogn', label: 'Análise Cognitiva' },
+            { id: 'governance', label: 'Governança IA' },
+          ].map(tool => (
+            <button
+              key={tool.id}
+              onClick={() => {
+                const map: any = {
+                  'copilot': '/copilot',
+                  'gen-quest': '/generate-questions',
+                  'gen-discursive': '/generate-discursive',
+                  'gen-sa': '/learning-situation',
+                  'observatory': '/observatory',
+                  'gen-material': '/teacher-ai-assistant',
+                  'an-cogn': '/cognitive-analysis',
+                  'governance': '/ai-governance'
+                };
+                navigate(map[tool.id]);
+              }}
+              className="bg-white/10 hover:bg-white/20 transition-all p-4 rounded-xl text-center text-sm font-bold border border-white/10"
+            >
+              {tool.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -182,6 +223,24 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/resources')}
+                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
+                >
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center">
+                    <FolderPlus size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Recursos Didáticos</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Organize slides, PDFs e materiais de apoio.</p>
+                  </div>
+                  <div className="mt-auto flex items-center gap-2 text-amber-600 text-xs font-bold">
+                    Gerenciar <ArrowRight size={14} />
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => navigate('/cognitive-analysis')}
                   className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
                 >
@@ -196,28 +255,12 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
                     Analisar <ArrowRight size={14} />
                   </div>
                 </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/tri-analysis')}
-                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left flex flex-col gap-4"
-                >
-                  <div className="w-12 h-12 bg-cyan-100 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-xl flex items-center justify-center">
-                    <Target size={24} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">Análise TRI</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Parâmetros psicométricos das questões.</p>
-                  </div>
-                  <div className="mt-auto flex items-center gap-2 text-cyan-600 text-xs font-bold">
-                    Analisar <ArrowRight size={14} />
-                  </div>
-                </motion.button>
               </div>
             </div>
 
             <div className="space-y-6">
+              <RiskStudentsPanel />
+              
               <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <History size={20} className="text-emerald-600" />
                 Atividade Recente

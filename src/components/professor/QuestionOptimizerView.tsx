@@ -145,7 +145,7 @@ export function QuestionOptimizerView({ userProfile }: { userProfile: UserProfil
     
     try {
       const perf = questionPerformance[question.id!] || questionPerformance[question.questionUid] || { errorDetails: [] };
-      const result = await analyzeQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'professor');
+      const result = await analyzeQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'TEACHER');
       setSelectedAnalysis(result);
       toast.success("Análise de qualidade concluída!");
     } catch (error) {

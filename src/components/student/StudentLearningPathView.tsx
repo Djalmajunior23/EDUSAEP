@@ -22,16 +22,46 @@ import { toast } from 'sonner';
 import { AdaptiveExam } from './AdaptiveExam';
 
 import { gamificationEngine } from '../../services/gamificationService';
+import { cn } from '../../lib/utils';
 
 export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
   const [path, setPath] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activePhase, setActivePhase] = useState(0);
   const [activeSimulationContext, setActiveSimulationContext] = useState<string | null>(null);
+  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchStudentDataAndGeneratePath();
   }, [userProfile]);
+
+  const toggleItemCompletion = (itemKey: string) => {
+    const newSet = new Set(completedItems);
+    if (newSet.has(itemKey)) {
+      newSet.delete(itemKey);
+    } else {
+      newSet.add(itemKey);
+    }
+    setCompletedItems(newSet);
+  };
+
+  const getPhaseStats = (fase: any, idx: number) => {
+    const items = [
+      ...(fase.topicos || []),
+      ...(fase.atividades || []),
+      ...(fase.recursos || [])
+    ];
+    const totalItems = items.length;
+    if (totalItems === 0) return { percent: 0, completed: 0, total: 0 };
+    
+    const completedInPhase = items.filter(item => completedItems.has(`${idx}-${item}`)).length;
+    
+    return {
+      percent: Math.round((completedInPhase / totalItems) * 100),
+      completed: completedInPhase,
+      total: totalItems
+    };
+  };
 
   const fetchStudentDataAndGeneratePath = async () => {
     try {
@@ -107,7 +137,7 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
             toast.success(`Circuito concluído! Você obteve ${score.toFixed(1)}% de aproveitamento.`);
             setActiveSimulationContext(null);
           }}
-          userRole="aluno"
+          userRole="STUDENT"
         />
       </div>
     );
@@ -166,7 +196,24 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
                 <p className={`text-xs font-bold uppercase tracking-wider ${activePhase === idx ? 'text-indigo-100' : 'text-gray-400'}`}>
                   Fase {idx + 1}
                 </p>
-                <p className="font-black">{fase.nome}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-black truncate max-w-[120px]">{fase.nome}</p>
+                  <span className={`text-[10px] font-black ${activePhase === idx ? 'text-indigo-100' : 'text-emerald-600'}`}>
+                    {getPhaseStats(fase, idx).percent}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden mr-2">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${getPhaseStats(fase, idx).percent}%` }}
+                      className={`h-full ${activePhase === idx ? 'bg-white' : 'bg-emerald-500'}`}
+                    />
+                  </div>
+                  <span className={`text-[8px] font-bold whitespace-nowrap ${activePhase === idx ? 'text-indigo-200' : 'text-gray-400'}`}>
+                    {getPhaseStats(fase, idx).completed}/{getPhaseStats(fase, idx).total}
+                  </span>
+                </div>
               </div>
               {activePhase === idx && <ChevronRight size={20} />}
             </button>
@@ -190,12 +237,26 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
             <div className="flex justify-between items-start mb-8">
               <div>
                 <h3 className="text-2xl font-black text-gray-900">{path.fases[activePhase].nome}</h3>
-                <div className="flex gap-2 mt-2">
-                  {path.fases[activePhase].objetivos.map((obj: string, i: number) => (
-                    <span key={i} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold">
-                      {obj}
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex gap-2">
+                    {path.fases[activePhase].objetivos.map((obj: string, i: number) => (
+                      <span key={i} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold">
+                        {obj}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="h-4 w-px bg-gray-200" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 bg-gray-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-emerald-500 h-full transition-all" 
+                        style={{ width: `${getPhaseStats(path.fases[activePhase], activePhase).percent}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-600 uppercase">
+                      {getPhaseStats(path.fases[activePhase], activePhase).percent}% Completo ({getPhaseStats(path.fases[activePhase], activePhase).completed}/{getPhaseStats(path.fases[activePhase], activePhase).total})
                     </span>
-                  ))}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-indigo-600 font-black text-sm">
@@ -210,12 +271,28 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
                   <BookOpen size={18} className="text-indigo-500" /> Tópicos de Estudo
                 </h4>
                 <div className="space-y-2">
-                  {path.fases[activePhase].topicos.map((topic: string, i: number) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100 group hover:border-indigo-200 transition-all">
-                      <Circle size={16} className="text-gray-300 group-hover:text-indigo-400" />
-                      <span className="text-sm text-gray-700 font-medium">{topic}</span>
-                    </div>
-                  ))}
+                  {path.fases[activePhase].topicos.map((topic: string, i: number) => {
+                    const isDone = completedItems.has(`${activePhase}-${topic}`);
+                    return (
+                      <div 
+                        key={i} 
+                        onClick={() => toggleItemCompletion(`${activePhase}-${topic}`)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
+                          isDone ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-100 hover:border-indigo-200"
+                        )}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={16} className="text-emerald-500" />
+                        ) : (
+                          <Circle size={16} className="text-gray-300 group-hover:text-indigo-400" />
+                        )}
+                        <span className={cn("text-sm font-medium", isDone ? "text-emerald-900 line-through" : "text-gray-700")}>
+                          {topic}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -225,21 +302,34 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
                   <Zap size={18} className="text-amber-500" /> Atividades Práticas
                 </h4>
                 <div className="space-y-2">
-                  {path.fases[activePhase].atividades.map((act: string, i: number) => (
-                    <div 
-                      key={i} 
-                      onClick={() => setActiveSimulationContext(act)}
-                      className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-100 group hover:border-emerald-300 hover:bg-emerald-100 transition-all cursor-pointer shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 size={16} className="text-emerald-500" />
-                        <span className="text-sm text-emerald-900 font-medium">{act}</span>
+                  {path.fases[activePhase].atividades.map((act: string, i: number) => {
+                    const isDone = completedItems.has(`${activePhase}-${act}`);
+                    return (
+                      <div 
+                        key={i} 
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-xl border transition-all shadow-sm",
+                          isDone ? "bg-emerald-100 border-emerald-300" : "bg-emerald-50 border-emerald-100 hover:border-emerald-300 hover:bg-emerald-100"
+                        )}
+                      >
+                        <div 
+                          className="flex items-center gap-3 cursor-pointer flex-1"
+                          onClick={() => toggleItemCompletion(`${activePhase}-${act}`)}
+                        >
+                          <CheckCircle2 size={16} className={isDone ? "text-emerald-700" : "text-emerald-500"} />
+                          <span className={cn("text-sm font-medium", isDone ? "text-emerald-900 line-through" : "text-emerald-900")}>
+                            {act}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => setActiveSimulationContext(act)}
+                          className="text-emerald-600 bg-white p-1.5 rounded-lg shadow-sm hover:scale-110 transition-transform"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
                       </div>
-                      <button className="text-emerald-600 bg-white p-1.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -250,20 +340,36 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
                 <Video size={18} className="text-red-500" /> Recursos Recomendados
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {path.fases[activePhase].recursos.map((res: string, i: number) => (
-                  <div key={i} className="p-4 rounded-2xl border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-md transition-all cursor-pointer group">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center mb-3 group-hover:bg-indigo-50 transition-colors">
-                      {res.toLowerCase().includes('vídeo') ? <Video className="text-red-500" size={20} /> : <FileText className="text-indigo-500" size={20} />}
+                {path.fases[activePhase].recursos.map((res: string, i: number) => {
+                  const isDone = completedItems.has(`${activePhase}-${res}`);
+                  return (
+                    <div 
+                      key={i} 
+                      onClick={() => toggleItemCompletion(`${activePhase}-${res}`)}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all cursor-pointer group relative",
+                        isDone ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-100 hover:bg-white hover:shadow-md"
+                      )}
+                    >
+                      {isDone && <CheckCircle2 className="absolute top-2 right-2 text-emerald-500" size={16} />}
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors",
+                        isDone ? "bg-emerald-100" : "bg-white group-hover:bg-indigo-50"
+                      )}>
+                        {res.toLowerCase().includes('vídeo') ? <Video className="text-red-500" size={20} /> : <FileText className="text-indigo-500" size={20} />}
+                      </div>
+                      <p className={cn("text-xs font-bold line-clamp-2", isDone ? "text-emerald-900 line-through" : "text-gray-900")}>
+                        {res}
+                      </p>
                     </div>
-                    <p className="text-xs font-bold text-gray-900 line-clamp-2">{res}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
             <button 
               onClick={async () => {
-                await gamificationEngine.awardXP('LEARNING_PATH_PHASE');
+                await gamificationEngine.awardXP(userProfile.uid, 500);
                 if (activePhase < path.fases.length - 1) {
                   setActivePhase(activePhase + 1);
                 } else {

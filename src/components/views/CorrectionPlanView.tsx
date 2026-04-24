@@ -4,7 +4,8 @@ import {
   CheckCircle2, Triangle, Lightbulb, ArrowRight, Save, User as UserIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db } from '../../firebase';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { 
   collection, query, where, getDocs, updateDoc, doc, limit, orderBy, onSnapshot, addDoc, serverTimestamp
 } from 'firebase/firestore';

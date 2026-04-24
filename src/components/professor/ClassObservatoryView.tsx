@@ -6,13 +6,9 @@ import {
   TrendingUp, 
   Users, 
   Target, 
-  Activity, 
-  MessageSquare, 
   ChevronRight, 
   Loader2,
   BrainCircuit,
-  PieChart as PieChartIcon,
-  BarChart as BarChartIcon,
   Flame,
   Sparkles,
   Zap,
@@ -30,8 +26,6 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  BarChart, 
-  Bar, 
   Cell,
   PieChart,
   Pie
@@ -40,7 +34,9 @@ import { getClassObservatoryData, ClassObservatoryData } from '../../services/da
 import { generateInterventionPlan } from '../../services/geminiService';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
+
+import { StudentCompetencyModal } from './StudentCompetencyModal';
 
 export function ClassObservatoryView() {
   const [data, setData] = useState<ClassObservatoryData | null>(null);
@@ -51,6 +47,7 @@ export function ClassObservatoryView() {
   
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [selectedStudent, setSelectedStudent] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     fetchClasses();
@@ -165,13 +162,17 @@ export function ClassObservatoryView() {
               {data.studentsAtRisk.map(student => (
                 <motion.div 
                   key={student.id}
+                  onClick={() => setSelectedStudent({ id: student.id, name: student.name })}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md transition-all group"
+                  className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md hover:border-indigo-200 transition-all group cursor-pointer"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{student.name}</h4>
+                      <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors flex items-center gap-2">
+                        {student.name}
+                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </h4>
                       <p className="text-xs text-gray-500">{student.email}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -447,6 +448,14 @@ export function ClassObservatoryView() {
           </div>
         </div>
       </div>
+
+      {selectedStudent && (
+        <StudentCompetencyModal
+          studentId={selectedStudent.id}
+          studentName={selectedStudent.name}
+          onClose={() => setSelectedStudent(null)}
+        />
+      )}
     </div>
   );
 }

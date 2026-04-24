@@ -17,7 +17,7 @@ function StudentListModal({ classId, className, onClose }: { classId: string, cl
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const q = query(collection(db, 'users'), where('role', '==', 'aluno'), where('turmaId', '==', classId));
+        const q = query(collection(db, 'users'), where('role', '==', 'STUDENT'), where('turmaId', '==', classId));
         const snap = await getDocs(q);
         setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {

@@ -1,5 +1,7 @@
 // src/types.ts
 
+export type UserRole = 'ADMIN' | 'COORDINATOR' | 'TEACHER' | 'MONITOR' | 'STUDENT';
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -7,21 +9,51 @@ export interface UserProfile {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
-  role: 'professor' | 'aluno' | 'admin';
+  role: UserRole;
+  institutionId?: string;
   xp?: number;
   level?: number;
   badges?: string[];
   gamificationEnabled?: boolean;
+  preferences?: any;
   createdAt: string;
+  updatedAt?: string;
   settings?: {
     theme: 'light' | 'dark';
     notifications: boolean;
+    language: string;
     webhookUrl?: string;
   };
-  preferences?: {
-    defaultGrade: string;
-    language: string;
-  };
+}
+
+export interface Institution {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  address?: string;
+  contactEmail?: string;
+  settings?: any;
+  createdAt: string;
+}
+
+export interface Course {
+  id: string;
+  institutionId: string;
+  name: string;
+  description?: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+}
+
+export interface Subject {
+  id: string;
+  institutionId: string;
+  courseId: string;
+  name: string;
+  code: string;
+  description?: string;
+  status: 'active' | 'inactive';
 }
 
 export interface Discipline {
@@ -63,8 +95,9 @@ export interface Question {
   respostaCorreta?: string; // ID for multiple choice
   respostaEsperada?: string; // Sample answer for discursive
   rubricaAvaliacao?: string; // Guidelines for manual scoring
-  criteriosAvaliacao?: string[]; // Detailed criteria for evaluators
+  criteriosAvaliacao?: Array<{ criterio: string; pontuacao: number; descricao: string }> | string[]; // Detailed criteria for evaluators
   comentarioGabarito?: string;
+  feedbackProfessorSugerido?: string;
   comentarioPedagogico?: string;
   justificativasAlternativas?: Record<string, string>;
   contextoHash: string;
@@ -158,9 +191,22 @@ export interface StudyPlan {
 
 export interface Class {
   id: string;
+  institutionId: string;
+  courseId: string;
+  subjectId: string;
   name: string;
   period: string;
+  teacherId?: string;
   status: 'active' | 'inactive';
+  createdAt?: any;
+}
+
+export interface ClassMembership {
+  id: string;
+  classId: string;
+  studentId: string;
+  role: 'STUDENT' | 'MONITOR';
+  joinedAt: string;
 }
 
 export interface Student {
@@ -271,4 +317,144 @@ export interface AutomatedPBLDefinition {
   competenciesCovered: string[];
   evaluationRubric: { criteria: string, weight: number }[];
   complexityLevel: 'iniciante' | 'intermediario' | 'avancado';
+}
+
+export interface SimuladoForm {
+  id?: string;
+  simuladoId: string;
+  provider: 'google' | 'microsoft' | 'typeform';
+  externalFormId: string;
+  publicUrl: string;
+  adminUrl?: string;
+  status: 'active' | 'inactive' | 'archived';
+  createdAt: any;
+  lastSyncAt?: any;
+  responseCount?: number;
+}
+
+export interface DidacticResource {
+  id?: string;
+  title: string;
+  description?: string;
+  type: 'PDF' | 'Slides' | 'DOC' | 'XLS' | 'Image' | 'Video' | 'Link' | 'Other';
+  origin: 'UPLOAD_INTERNO' | 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'EXTERNAL_LINK';
+  storagePath?: string;
+  externalUrl?: string;
+  ownerId: string;
+  sharedWithClasses: string[]; // IDs of classes
+  tags: string[];
+  stats: {
+    views: number;
+    downloads: number;
+  };
+  createdAt: any;
+  updatedAt?: any;
+}
+
+// ============================================================================
+// ULTRA EXPANSION TYPES
+// ============================================================================
+
+export interface GamificationProfile {
+  studentId: string;
+  points: number;
+  level: number;
+  experience: number;
+  achievements: string[];
+  streak: number;
+  lastActivityAt: any;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  xpReward: number;
+  type: 'academic' | 'engagement' | 'social';
+}
+
+export interface InteractiveQuiz {
+  id?: string;
+  title: string;
+  description: string;
+  teacherId: string;
+  classId?: string;
+  questions: Array<{
+    id: string;
+    question: string;
+    options: string[];
+    correctAnswer: number;
+    type: 'multiple' | 'boolean' | 'interpretative';
+    feedback?: string;
+  }>;
+  isActive: boolean;
+  createdAt: any;
+}
+
+export interface QuizAttempt {
+  id?: string;
+  quizId: string;
+  studentId: string;
+  answers: number[];
+  score: number;
+  completedAt: any;
+  feedback?: string;
+}
+
+export interface Simulator {
+  id?: string;
+  title: string;
+  description: string;
+  type: 'tech' | 'professional' | 'logic' | 'soft_skill';
+  scenario: string;
+  stages: Array<{
+    title: string;
+    description: string;
+    challenge: string;
+    options?: string[];
+    correctAction?: string;
+    feedback: string;
+  }>;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  xpReward: number;
+  createdAt: any;
+}
+
+export interface PracticalLab {
+  id?: string;
+  title: string;
+  objective: string;
+  description: string;
+  steps: Array<{
+    title: string;
+    instruction: string;
+    expectedOutcome: string;
+  }>;
+  resources: string[];
+  rubricId?: string;
+  teacherId: string;
+  createdAt: any;
+}
+
+export interface LabSubmission {
+  id?: string;
+  labId: string;
+  studentId: string;
+  studentName: string;
+  content: string;
+  attachments?: string[];
+  status: 'pending' | 'reviewed';
+  feedback?: string;
+  grade?: number;
+  submittedAt: any;
+}
+
+export enum OperationType {
+  CREATE = 'create',
+  READ = 'get',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  WRITE = 'write',
+  LIST = 'list'
 }

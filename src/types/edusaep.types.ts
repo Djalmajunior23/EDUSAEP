@@ -38,7 +38,7 @@ export interface AIProviderConfig {
   apiKey: string;
   isActive: boolean;
   priority: number;
-  allowedRoles: Array<'admin' | 'professor' | 'aluno'>;
+  allowedRoles: Array<'ADMIN' | 'TEACHER' | 'STUDENT' | 'COORDINATOR' | 'MONITOR'>;
   createdAt: string;
   updatedAt: string;
 }
@@ -163,12 +163,43 @@ export interface ActivitySubmission {
   gradedBy?: string;
 }
 
-export interface SubmissionHistory {
+export interface Question {
   id?: string;
-  submissionId: string;
-  action: 'submitted' | 'graded' | 'returned' | 'resubmitted';
-  actorId: string;
-  actorName: string;
-  timestamp: any;
-  comment?: string;
+  text: string;
+  options: string[];
+  correctOption: number;
+  bloomLevel: 'lembrar' | 'entender' | 'aplicar' | 'analisar' | 'avaliar' | 'criar';
+  difficulty: 'fácil' | 'médio' | 'difícil';
+  competency: string;
+  theme: string;
+  tags?: string[];
+  explanation?: string;
+  createdBy: string;
+  createdAt: any;
+  usoTotal?: number;
+}
+
+export interface Exam {
+  id?: string;
+  title: string;
+  description: string;
+  type: 'simulado' | 'avaliacao' | 'recuperacao' | 'exercicio';
+  status: 'rascunho' | 'publicado' | 'encerrado';
+  dueDate: string;
+  duration: number; // minutes
+  totalQuestions: number;
+  totalPoints: number;
+  questions: string[]; // IDs das questões
+  isAdaptive?: boolean; // Se ativado, a ordem das questões muda baseada no desempenho
+  adaptiveConfig?: {
+    startDifficulty: 'fácil' | 'médio';
+    minQuestions: number;
+    maxQuestions: number;
+    masteryThreshold: number; // Porcentagem para considerar domínio
+  };
+  createdBy: string;
+  createdAt: any;
+  updatedAt: any;
+  submissionsCount?: number;
+  averageScore?: number;
 }

@@ -38,7 +38,7 @@ export function DisciplinesManagementView() {
 
   const fetchProfessors = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'users'), where('role', '==', 'professor')));
+      const snap = await getDocs(query(collection(db, 'users'), where('role', '==', 'TEACHER')));
       const data = snap.docs.map(doc => {
         const userData = doc.data() as any;
         return { id: doc.id, name: userData.displayName || userData.email || 'Professor' };

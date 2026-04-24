@@ -3,9 +3,11 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
+import { UserRole } from '../types';
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: ('admin' | 'professor' | 'aluno')[];
+  allowedRoles?: UserRole[];
   userProfile?: any; // For backwards compatibility with App.tsx
 }
 
@@ -34,13 +36,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
-    if (userProfile.role === 'admin') {
+    if (userProfile.role === 'ADMIN') {
       return <>{children}</>; // Admins have access to everything
     }
 
     if (!allowedRoles.includes(userProfile.role)) {
       // Redirect to a safe page based on role
-      const redirectPath = userProfile.role === 'aluno' ? '/student-exams' : '/dashboard';
+      const redirectPath = (userProfile.role === 'STUDENT' || userProfile.role === 'MONITOR') ? '/student-exams' : '/dashboard';
       return <Navigate to={redirectPath} replace />;
     }
   }

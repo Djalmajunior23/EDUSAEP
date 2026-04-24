@@ -46,7 +46,7 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
     setIsGenerating(true);
     setGeneratedQuestion(null);
     try {
-      const question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'professor');
+      const question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'TEACHER');
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
     } catch (err: any) {

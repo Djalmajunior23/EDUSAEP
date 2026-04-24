@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  User, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification
+} from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../services/errorService';
@@ -10,6 +20,9 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   isAuthReady: boolean;
   loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, pass: string) => Promise<void>;
+  registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
   isProfessor: boolean;
@@ -45,13 +58,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onSnapshot(doc(db, 'users', user.uid), async (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as UserProfile;
-        // Ensure Djalma is always an admin in the frontend, even if the DB hasn't updated yet
+        // Migration: Ensure role is uppercase
+        if (data.role === 'admin' as any) data.role = 'ADMIN';
+        if (data.role === 'professor' as any) data.role = 'TEACHER';
+        if (data.role === 'aluno' as any) data.role = 'STUDENT';
+
+        // Ensure Djalma is always an admin
         if (user.email === 'djalmabatistajunior@gmail.com') {
-          data.role = 'admin';
-        }
-        // Auto-populate matricula if missing
-        if (!data.matricula && user.email) {
-          data.matricula = user.email.substring(0, 10);
+          data.role = 'ADMIN';
         }
         setUserProfile(data);
         setIsAuthReady(true);
@@ -61,28 +75,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newProfile: Partial<UserProfile> = {
           uid: user.uid,
           email: user.email || '',
-          role: isFirstUser ? 'admin' : 'aluno',
-          matricula: user.email?.substring(0, 10) || '',
+          role: isFirstUser ? 'ADMIN' : 'STUDENT',
           displayName: user.displayName || user.email?.split('@')[0] || 'Aluno',
           createdAt: new Date().toISOString(),
           xp: 0,
           level: 1,
-          badges: []
+          badges: [],
+          settings: {
+            theme: 'light',
+            notifications: true,
+            language: 'pt-BR'
+          }
         };
 
         try {
           await setDoc(doc(db, 'users', user.uid), newProfile);
-          // The onSnapshot will trigger again and set the profile
         } catch (err) {
           console.error("Error creating user profile:", err);
-          // Fallback in case of error (e.g. permission denied before rules are updated)
           setUserProfile(newProfile as UserProfile);
           setIsAuthReady(true);
         }
       }
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, path);
-      setIsAuthReady(true); // Ensure app doesn't hang on error
+      setIsAuthReady(true);
     });
 
     return () => unsubscribe();
@@ -98,6 +114,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithEmail = async (email: string, pass: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error) {
+      console.error("Error signing in with Email:", error);
+      throw error;
+    }
+  };
+
+  const registerWithEmail = async (email: string, pass: string, name: string) => {
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, pass);
+      const user = result.user;
+      if (name) {
+        await updateProfile(user, { displayName: name });
+      }
+      await sendEmailVerification(user);
+    } catch (error) {
+      console.error("Error registering user:", error);
+      throw error;
+    }
+  };
+
+  const resendVerification = async () => {
+    if (auth.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+      } catch (error) {
+        console.error("Error resending verification:", error);
+        throw error;
+      }
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -107,9 +157,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isAdmin = userProfile?.role === 'admin';
-  const isProfessor = userProfile?.role === 'professor' || isAdmin;
-  const isAluno = userProfile?.role === 'aluno';
+  const isAdmin = userProfile?.role === 'ADMIN';
+  const isProfessor = userProfile?.role === 'TEACHER' || userProfile?.role === 'COORDINATOR' || isAdmin;
+  const isAluno = userProfile?.role === 'STUDENT' || userProfile?.role === 'MONITOR';
 
   return (
     <AuthContext.Provider value={{ 
@@ -117,6 +167,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userProfile, 
       isAuthReady, 
       loginWithGoogle, 
+      loginWithEmail,
+      registerWithEmail,
+      resendVerification,
       logout,
       isAdmin,
       isProfessor,

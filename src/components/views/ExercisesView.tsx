@@ -3,7 +3,8 @@ import {
   CheckSquare, BookOpen, Search, Info, Loader2, ArrowRight, Zap, CheckCircle2 
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db } from '../../firebase';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Exam, ExamSubmission, UserProfile } from '../../types';
 import { User } from 'firebase/auth';

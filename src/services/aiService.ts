@@ -1,46 +1,67 @@
-import { generateContentWrapper } from './geminiService';
+import { auth } from "../firebase";
+import { UserRole } from "../types";
 
-export class AIService {
-  /**
-   * Generates content using AI, with automatic fallback from OpenAI to Gemini on 429 errors.
-   * Differentiates behavior based on user role (professors get more robust/detailed prompts).
-   */
-  static async generatePedagogicalContent(prompt: string, role: string, isJson: boolean = false): Promise<string> {
-    try {
-      // Enhance prompt based on role
-      let enhancedPrompt = prompt;
-      if (role === 'professor' || role === 'admin') {
-        enhancedPrompt = `[MODO ESPECIALISTA PEDAGÓGICO]\nAtue como um especialista em elaboração de itens (padrão SAEP/SENAI).\n${prompt}\nForneça uma resposta técnica, detalhada e com alto rigor acadêmico.`;
-      } else {
-        enhancedPrompt = `[MODO TUTOR]\nAtue como um tutor paciente e encorajador.\n${prompt}\nExplique de forma simples e didática, sem dar a resposta direta se for um exercício.`;
-      }
+export type AIProvider = 'gemini' | 'openai' | 'groq' | 'deepseek' | 'cohere' | 'together';
 
-      // generateContentWrapper already handles the fallback logic from OpenAI to Gemini internally
-      // when a 429 error occurs.
-      const response = await generateContentWrapper({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: enhancedPrompt }]
-          }
-        ],
-        config: isJson ? { responseMimeType: "application/json" } : undefined
-      });
-      return response.text;
-    } catch (error: any) {
-      console.error("AIService Error:", error);
-      
-      // Differentiate errors
-      if (error.message?.includes('429') || error.status === 429) {
-        throw new Error("Limite de requisições excedido nas APIs de IA. Por favor, tente novamente em alguns minutos.");
-      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-        throw new Error("Erro de rede ao conectar com a IA. Verifique sua conexão.");
-      } else if (error.message?.includes('key') || error.message?.includes('auth')) {
-        throw new Error("Erro de autenticação com o provedor de IA. Contate o administrador.");
-      }
-      
-      throw new Error("Falha inesperada ao gerar conteúdo com IA. Tente novamente.");
+export interface AICompletionParams {
+  prompt: string;
+  systemInstruction?: string;
+  responseFormat?: "json" | "text";
+  task: string;
+  model?: string;
+}
+
+/**
+ * Real-time AI Multi-Provider Router with Fallback & Security.
+ * This function calls our central backend router (/api/ai/completions).
+ * Direct AI calls from the frontend are deprecated for security reasons.
+ */
+export async function generateAIContent(params: AICompletionParams): Promise<{ text: string, provider: string, model: string }> {
+  try {
+    const userId = auth.currentUser?.uid || 'anonymous';
+    // User role helps the backend decide on cost and priority
+    const userRole = localStorage.getItem('user_role') || 'GUEST';
+
+    const response = await fetch('/api/ai/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...params,
+        userId,
+        userRole
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `AI error: ${response.status}`);
     }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error("[AI Service] Error generating content:", error);
+    throw error;
   }
 }
+
+/**
+ * Legacy wrapper for compatibility with older components
+ */
+export class AIService {
+  static async generatePedagogicalContent(prompt: string, role: string, isJson: boolean = false): Promise<string> {
+    const response = await generateAIContent({
+      prompt,
+      responseFormat: isJson ? "json" : "text",
+      task: role === 'student' ? 'student_chat' : 'pedagogical_gen',
+      systemInstruction: role === 'student' 
+        ? "Atue como um tutor didático e paciente. Não dê a resposta diretamente." 
+        : "Atue como um especialista em pedagogia e avaliação técnica SENAI/SAEP."
+    });
+    return response.text;
+  }
+}
+
+export const generateSmartContent = generateAIContent;
+

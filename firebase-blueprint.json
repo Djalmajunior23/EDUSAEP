@@ -1,40 +1,96 @@
 {
   "entities": {
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Stores user information and settings.",
+    "DidacticResource": {
+      "title": "Didactic Resource",
+      "description": "Stores files, links, and documents for pedagogical support.",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "The unique ID of the user." },
-        "email": { "type": "string", "format": "email", "description": "The email of the user." },
-        "displayName": { "type": "string", "description": "The display name of the user." },
-        "photoURL": { "type": "string", "description": "The photo URL of the user." },
-        "emailVerified": { "type": "boolean", "description": "Whether the user's email is verified." },
-        "role": { "type": "string", "enum": ["aluno", "professor", "admin"], "description": "The user's role in the system." },
-        "xp": { "type": "number", "description": "The user's experience points." },
-        "level": { "type": "number", "description": "The user's current level." },
-        "badges": { "type": "array", "items": { "type": "string" }, "description": "List of badge IDs earned by the user." },
-        "gamificationEnabled": { "type": "boolean", "description": "Whether gamification is enabled for the user." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["pdf", "video", "image", "link", "doc", "zip"] },
+        "url": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "turmaIds": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "size": { "type": "number" },
+        "mimeType": { "type": "string" },
+        "views": { "type": "number" },
+        "downloads": { "type": "number" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "type", "url", "ownerId", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user information, roles, and institutional links.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "emailVerified": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["ADMIN", "COORDINATOR", "TEACHER", "MONITOR", "STUDENT"] },
+        "institutionId": { "type": "string" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "badges": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
         "settings": {
           "type": "object",
-          "description": "User account settings.",
           "properties": {
-            "theme": { "type": "string", "enum": ["light", "dark"], "description": "UI theme preference." },
-            "notifications": { "type": "boolean", "description": "Whether notifications are enabled." },
-            "webhookUrl": { "type": "string", "description": "Webhook URL for N8N integration." }
-          }
-        },
-        "preferences": {
-          "type": "object",
-          "description": "User pedagogical preferences.",
-          "properties": {
-            "defaultGrade": { "type": "string", "description": "Default grade level for diagnostics." },
-            "language": { "type": "string", "description": "Preferred language for the interface." }
+            "theme": { "type": "string", "enum": ["light", "dark"] },
+            "notifications": { "type": "boolean" },
+            "language": { "type": "string" }
           }
         }
       },
-      "required": ["uid", "email"]
+      "required": ["uid", "email", "role"]
+    },
+    "Institution": {
+      "title": "Institution",
+      "description": "Educational institution (Tenant).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string", "description": "Unique identifier for URLs." },
+        "logoUrl": { "type": "string" },
+        "address": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "settings": { "type": "object", "description": "Custom flags and policies for the institution." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "slug", "createdAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "A program of study (e.g., Engineering, High School).",
+      "type": "object",
+      "properties": {
+        "institutionId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["institutionId", "name", "status"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "A discipline or course module.",
+      "type": "object",
+      "properties": {
+        "institutionId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["institutionId", "name", "status"]
     },
     "Diagnostic": {
       "title": "Diagnostic Result",
@@ -294,14 +350,31 @@
     },
     "Class": {
       "title": "Class",
-      "description": "A class or group of students.",
+      "description": "A group of students for a specific subject/period.",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Name of the class." },
-        "period": { "type": "string", "description": "Period or semester." },
-        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Status." }
+        "institutionId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "name": { "type": "string" },
+        "period": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "period", "status"]
+      "required": ["institutionId", "name", "period", "status"]
+    },
+    "ClassMembership": {
+      "title": "Class Membership",
+      "description": "Link between a student and a class.",
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "role": { "type": "string", "enum": ["STUDENT", "MONITOR"] },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["classId", "studentId", "joinedAt"]
     },
     "Discipline": {
       "title": "Discipline",
@@ -570,8 +643,114 @@
       },
       "required": ["userId", "action", "timestamp"]
     },
+    "AIProvider": {
+      "title": "AI Provider",
+      "description": "Configuration for an AI provider like Gemini, OpenAI, Groq.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "providerKey": { "type": "string", "enum": ["gemini", "openai", "groq", "deepseek", "cohere", "together"] },
+        "enabled": { "type": "boolean" },
+        "priority": { "type": "number", "description": "Lower is higher priority." },
+        "defaultModel": { "type": "string" },
+        "supportedTasks": { "type": "array", "items": { "type": "string" } },
+        "allowedRoles": { "type": "array", "items": { "type": "string" } },
+        "monthlyLimit": { "type": "number" },
+        "currentUsage": { "type": "number" },
+        "costPer1kTokens": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "providerKey", "enabled", "priority"]
+    },
+    "AIUsageLog": {
+      "title": "AI Usage Log",
+      "description": "Logs every AI request for cost control and audit.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userRole": { "type": "string" },
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "task": { "type": "string" },
+        "tokensIn": { "type": "number" },
+        "tokensOut": { "type": "number" },
+        "estimatedCost": { "type": "number" },
+        "success": { "type": "boolean" },
+        "errorMessage": { "type": "string" },
+        "latency": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "provider", "task", "timestamp"]
+    },
+    "StudentAchievement": {
+      "title": "Student Achievement",
+      "description": "Individual student achievements.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "achievementId": { "type": "string" },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "achievementId", "grantedAt"]
+    },
+    "StudentPoint": {
+      "title": "Student Point",
+      "description": "Log of points gained by a student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "points": { "type": "number" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "points", "reason", "createdAt"]
+    },
+    "SimulatorAttempt": {
+      "title": "Simulator Attempt",
+      "description": "Result of a simulator attempt.",
+      "type": "object",
+      "properties": {
+        "simulatorId": { "type": "string" },
+        "userId": { "type": "string" },
+        "results": { "type": "object" },
+        "status": { "type": "string", "enum": ["in_progress", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["simulatorId", "userId", "status", "createdAt"]
+    },
+    "GamificationProfile": {
+      "title": "Gamification Profile",
+      "description": "Student gamification data (XP, Level, Points).",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "points": { "type": "number" },
+        "level": { "type": "number" },
+        "experience": { "type": "number" },
+        "achievements": { "type": "array", "items": { "type": "string" } },
+        "streak": { "type": "number" },
+        "lastActivityAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "points", "level"]
+    },
+    "LabSubmission": {
+      "title": "Lab Submission",
+      "description": "Student delivery for a Practical Lab.",
+      "type": "object",
+      "properties": {
+        "labId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "content": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "reviewed"] },
+        "feedback": { "type": "string" },
+        "grade": { "type": "number" },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["labId", "studentId", "content", "submittedAt"]
+    },
     "LearningDNA": {
-      "title": "Learning DNA",
       "description": "Dynamic multidimensional profile of the student.",
       "type": "object",
       "properties": {
@@ -825,9 +1004,116 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["studentId", "title", "competencies"]
+    },
+    "DidacticResource": {
+      "title": "Didactic Resource",
+      "description": "Educational materials like PDFs, videos, and links.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["PDF", "Slides", "DOC", "XLS", "Image", "Video", "Link", "Other"] },
+        "origin": { "type": "string", "enum": ["UPLOAD_INTERNO", "GOOGLE_DRIVE", "ONEDRIVE", "EXTERNAL_LINK"] },
+        "storagePath": { "type": "string" },
+        "externalUrl": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "sharedWithClasses": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "views": { "type": "number" },
+            "downloads": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "type", "origin", "ownerId"]
+    },
+    "Quiz": {
+      "title": "Interactive Quiz",
+      "description": "Short, gamified quiz for quick diagnostic or review.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "questions": { "type": "array", "items": { "type": "object" } },
+        "difficulty": { "type": "string", "enum": ["iniciante", "intermediário", "avançado"] },
+        "isLive": { "type": "boolean", "description": "If active for real-time classroom participation." },
+        "xpReward": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "subjectId", "questions", "createdBy"]
+    },
+    "QuizAttempt": {
+      "title": "Quiz Attempt",
+      "description": "Student result for a specific quiz.",
+      "type": "object",
+      "properties": {
+        "quizId": { "type": "string" },
+        "userId": { "type": "string" },
+        "answers": { "type": "array", "items": { "type": "object" } },
+        "score": { "type": "number" },
+        "timeSpent": { "type": "number" },
+        "isCorrectGroup": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["quizId", "userId", "score", "createdAt"]
+    },
+    "Simulator": {
+      "title": "Practical Simulator",
+      "description": "Interative simulator for technical or professional scenarios.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["tech", "professional", "logic", "soft_skill"] },
+        "config": { "type": "object", "description": "Engine configuration for the simulator." },
+        "competencies": { "type": "array", "items": { "type": "string" } },
+        "difficulty": { "type": "number", "description": "Level 1 to 5." },
+        "xpReward": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "type", "config", "createdAt"]
+    },
+    "PracticalLab": {
+      "title": "Practical Lab",
+      "description": "Comprehensive practical experience session created by teachers.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "objective": { "type": "string" },
+        "context": { "type": "string" },
+        "problem": { "type": "string" },
+        "steps": { "type": "array", "items": { "type": "object" } },
+        "resources": { "type": "array", "items": { "type": "string" } },
+        "rubricId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "objective", "steps", "teacherId"]
     }
   },
   "firestore": {
+    "/institutions/{institutionId}": {
+      "schema": "Institution",
+      "description": "Module 1: Educational institution settings."
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Module 2: Programs of study."
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Module 2: Specific disciplines."
+    },
+    "/class_memberships/{membershipId}": {
+      "schema": "ClassMembership",
+      "description": "Module 1: User-Class associations."
+    },
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "User profile documents."
@@ -940,6 +1226,26 @@
       "schema": "LearningDNA",
       "description": "Student learning DNA profiles."
     },
+    "/gamification_profiles/{studentId}": {
+      "schema": "GamificationProfile",
+      "description": "Student gamification data."
+    },
+    "/student_achievements/{achievementId}": {
+      "schema": "StudentAchievement",
+      "description": "Student achievements."
+    },
+    "/student_points/{pointId}": {
+      "schema": "StudentPoint",
+      "description": "Log of points gained by a student."
+    },
+    "/simulator_attempts/{attemptId}": {
+      "schema": "SimulatorAttempt",
+      "description": "Simulator attempt results."
+    },
+    "/lab_submissions/{submissionId}": {
+      "schema": "LabSubmission",
+      "description": "Student deliveries for practical labs."
+    },
     "/content_recommendations/{recId}": {
       "schema": "ContentRecommendation",
       "description": "AI-curated content recommendations."
@@ -1015,6 +1321,26 @@
     "/evidence_portfolio/{portfolioId}": {
       "schema": "EvidencePortfolioItem",
       "description": "Student evidence portfolio items (Module 8)."
+    },
+    "/resources/{resourceId}": {
+      "schema": "DidacticResource",
+      "description": "Didactic resources and materials (Module 3)."
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Interactive quizzes (Module 2)."
+    },
+    "/quiz_attempts/{attemptId}": {
+      "schema": "QuizAttempt",
+      "description": "Student results for quizzes."
+    },
+    "/simulators/{simulatorId}": {
+      "schema": "Simulator",
+      "description": "Interactive simulators (Module 3)."
+    },
+    "/practical_labs/{labId}": {
+      "schema": "PracticalLab",
+      "description": "Teacher-created practical labs (Module 4)."
     }
   }
 }

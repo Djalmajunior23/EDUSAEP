@@ -1,14 +1,16 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
+import { generateAIContent } from "./aiService";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import { UserProfile, UserRole } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// The GoogleGenAI import and instance are kept ONLY if needed for complex object structures, 
+// but generateAIContent is now the primary gateway.
+import { Type } from "@google/genai";
 
 /**
  * Logs AI usage to Firestore for institutional governance and cost analysis.
  */
-async function logAIUsage(provider: AIProvider, model: string, success: boolean, error?: string) {
+async function logAIUsage(provider: string, model: string, success: boolean, error?: string) {
   try {
     const userId = auth.currentUser?.uid || 'anonymous';
     const email = auth.currentUser?.email || 'anonymous';
@@ -21,18 +23,17 @@ async function logAIUsage(provider: AIProvider, model: string, success: boolean,
       timestamp: serverTimestamp(),
       success,
       error: error || null,
-      // In a real environment, we would also log tokens here if the API provides them
-      costEstimate: provider === 'openai' ? 0.01 : 0.005, // Placeholder for cost tracking logic
+      costEstimate: 0, 
     });
   } catch (err) {
     console.warn("[AI Logging] Failed to log usage:", err);
   }
 }
 
-export type AIProvider = 'gemini' | 'openai' | 'deepseek';
+export type AIProvider = 'gemini' | 'openai' | 'groq' | 'deepseek' | 'cohere' | 'together';
 
 export function getAIProvider(): AIProvider {
-  return (localStorage.getItem('ai_provider') as AIProvider) || 'deepseek';
+  return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
 }
 
 export function setAIProvider(provider: AIProvider) {
@@ -40,8 +41,8 @@ export function setAIProvider(provider: AIProvider) {
   window.dispatchEvent(new Event('ai_provider_changed'));
 }
 
-export function getSystemInstruction(profile: 'professor' | 'aluno', module: string): string {
-  const isProfessor = profile === 'professor';
+export function getSystemInstruction(profile: UserRole | 'professor' | 'aluno', module: string): string {
+  const isProfessor = profile === 'TEACHER' || profile === 'ADMIN' || profile === 'COORDINATOR' || profile === 'professor';
   const isBancoQuestoes = module === 'banco_questoes';
   const isSimulados = module === 'simulados';
   const isExportForms = module === 'exportacao_google_forms';
@@ -212,124 +213,33 @@ function buildPromptString(params: any): string {
 }
 
 export async function generateContentWrapper(params: any): Promise<any> {
-  const provider = getAIProvider();
+  const prompt = buildPromptString(params);
+  const systemInstruction = params.config?.systemInstruction || "";
+  const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : 'text';
+  const task = params.task || "generic_gen";
 
-  // Ensure systemInstruction is handled for external providers if possible, 
-  // or prepended to the prompt.
-  const systemInstruction = params.config?.systemInstruction;
+  try {
+    const result = await generateAIContent({
+      prompt,
+      systemInstruction,
+      responseFormat,
+      task,
+      model: params.model
+    });
 
-  if (provider === 'openai' || provider === 'deepseek') {
-    const prompt = buildPromptString(params);
-    const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
-
-    let fetchResponse;
-    let fetchError;
-    try {
-      fetchResponse = await fetch('/api/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt, 
-          responseFormat, 
-          provider,
-          model: params.model 
-        })
-      });
-    } catch (err) {
-      fetchError = err;
-    }
-
-    if (fetchError || !fetchResponse?.ok) {
-      const errorMsg = fetchError ? fetchError.message : (fetchResponse ? `Status ${fetchResponse.status}` : 'Unknown error');
-      await logAIUsage(provider, params.model || 'unknown', false, errorMsg);
-      
-      if (fetchError) {
-        // Only log if it's not a quota/rate limit error
-        if (!fetchError.message?.includes('429') && !fetchError.message?.includes('quota')) {
-          console.error(`[AI] Network error calling ${provider}:`, fetchError);
-        }
-      } else if (fetchResponse) {
-        const errData = await fetchResponse.json().catch(() => ({}));
-        if (fetchResponse.status !== 429) {
-          console.error(`[AI] API error (${provider}):`, errData);
-          console.warn(`[AI] Fallback to Gemini due to ${provider} error: ${errData.error || fetchResponse.statusText}`);
-        }
+    // For compatibility with previous calls that expect a result object with a .text property or a .response.text() method
+    return {
+      text: result.text,
+      response: {
+        text: () => result.text
       }
-
-      // Ensure we use a Gemini model for fallback
-      const fallbackParams = { ...params };
-      if (!fallbackParams.model?.startsWith('gemini-')) {
-        fallbackParams.model = 'gemini-3-flash-preview';
-      }
-      
-      try {
-        console.warn(`[AI] Fallback to Gemini...`);
-        return await ai.models.generateContent(fallbackParams);
-      } catch (geminiErr: any) {
-        if (geminiErr?.status === 429 || geminiErr?.message?.includes('429') || geminiErr?.message?.includes('quota')) {
-          console.error(`[AI] Gemini fallback also failed due to quota.`);
-          throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
-        }
-        throw geminiErr;
-      }
-    }
-
-    const data = await fetchResponse.json();
-    await logAIUsage(provider, params.model || 'unknown', true);
-    return { text: data.text };
-  } else {
-    // Ensure we use a Gemini model if the provider is gemini
-    const geminiParams = { ...params };
-    if (!geminiParams.model?.startsWith('gemini-')) {
-      geminiParams.model = 'gemini-3-flash-preview';
-    }
-    try {
-      const result = await ai.models.generateContent(geminiParams);
-      await logAIUsage('gemini', geminiParams.model, true);
-      return result;
-    } catch (err: any) {
-      const isQuotaError = err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('quota');
-      await logAIUsage('gemini', geminiParams.model, false, err.message);
-
-      if (isQuotaError) {
-        console.warn(`[AI] Gemini quota exceeded, falling back to backend (DeepSeek/Groq)`);
-        
-        const prompt = buildPromptString(params);
-        const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : undefined;
-
-        let fetchResponse;
-        try {
-          fetchResponse = await fetch('/api/ai/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              prompt, 
-              responseFormat, 
-              provider: 'deepseek',
-              model: 'deepseek-chat' 
-            })
-          });
-        } catch (fetchErr) {
-          console.error(`[AI] Backend fallback failed:`, fetchErr);
-          throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
-        }
-
-        if (!fetchResponse.ok) {
-          await logAIUsage('deepseek', 'deepseek-chat', false, `Secondary fallback failed: ${fetchResponse.status}`);
-          if (fetchResponse.status === 429) {
-            throw new Error("Limite de uso da Inteligência Artificial excedido (Quota Exceeded). Por favor, aguarde alguns instantes e tente novamente.");
-          }
-          throw new Error(`Backend fallback failed com status ${fetchResponse.status}`);
-        }
-
-        const data = await fetchResponse.json();
-        await logAIUsage('deepseek', 'deepseek-chat', true);
-        return { text: data.text };
-      }
-      throw err;
-    }
+    };
+  } catch (error: any) {
+    console.error("[Gemini Service Web Client] Routing to backend failed:", error);
+    throw error;
   }
 }
+
 
 export const DEFAULT_CONFIG = {
   temperature: 1.2,
@@ -397,7 +307,6 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
       healed += ']'.repeat(Math.max(0, openBrackets - closeBrackets));
       
       const parsed = JSON.parse(healed);
-      console.log("[Gemini] JSON healed successfully");
       return unwrapParsedJson(parsed);
       
     } catch (healError) {
@@ -407,7 +316,7 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
   }
 }
 
-export async function generateQuestionVariation(originalQuestion: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any> {
+export async function generateQuestionVariation(originalQuestion: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any> {
   const prompt = `
 Aja como um especialista em avaliação educacional de alto nível.
 Sua tarefa é criar uma VARIAÇÃO da questão fornecida.
@@ -471,7 +380,7 @@ Seja criativo no contexto, garantindo que o candidato precise entender o conceit
   return parsed;
 }
 
-export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any[]> {
+export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = "gemini-3-flash-preview", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
   const prompt = `
 Aja como um especialista em avaliação educacional de alto nível.
 Sua tarefa é criar ${count} VARIAÇÕES diferentes da questão fornecida.
@@ -538,7 +447,7 @@ Seja criativo nos contextos, garantindo que o candidato precise entender o conce
   return parsed;
 }
 
-export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<any[]> {
+export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
   // Split text into chunks of ~15,000 characters to avoid output token limits
   const chunkSize = 15000;
   const chunks: string[] = [];
@@ -687,6 +596,7 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
 
 export interface DiagnosticResult {
   aluno: string;
+  resumo_executivo?: string;
   summary: {
     total_questoes: number;
     acertos: number;
@@ -701,6 +611,8 @@ export interface DiagnosticResult {
     acertos: number;
     acuracia: number;
     acuracia_ponderada: number;
+    peso_na_uc?: string | number;
+    gap_identificado?: string;
     distribuicao_bloom: Record<string, number>;
     conhecimentos_fracos: string[];
     recomendacoes: string;
@@ -728,6 +640,11 @@ export interface DiagnosticResult {
     tema: string;
     atividades: string[];
     criterio_sucesso: string;
+  }>;
+  sugestao_intervencao?: Array<{
+    tipo: string;
+    descricao: string;
+    esforço?: string;
   }>;
   acoes_para_o_instrutor: string[];
   metricas_para_dashboard: {
@@ -1138,7 +1055,7 @@ export interface LearningProfileResult {
   recommendations: string;
 }
 
-export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<LearningProfileResult> {
+export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'STUDENT'): Promise<LearningProfileResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1381,9 +1298,64 @@ export async function analyzeCognitiveErrors(submissionData: any, questions: any
   return safeParseJson(response.text, { errors: [] });
 }
 
+export interface QuestionAnalysisResult {
+  diagnosticoEnunciado: string;
+  sugestaoReformulacaoEnunciado: string;
+  diagnosticoAlternativas: string;
+  sugestaoReformulacaoAlternativas: Array<{id: string, textoAtual: string, novoTextoSugerido: string, justificativa: string}>;
+  nivelAdequacao: 'Baixo' | 'Médio' | 'Alto';
+}
+
+export async function analyzeQuestionByPerformance(questionData: any, performanceStats: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionAnalysisResult> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Analise a questão '${questionData.id}' com base nos dados de desempenho recentes dos alunos, focando nos erros cognitivos mais comuns (interpretação, conceito, atenção, lógica). 
+            Sugira uma reformulação do enunciado ou das alternativas para melhorar a clareza e a precisão pedagógica.
+            
+            DADOS DA QUESTÃO:
+            ${JSON.stringify(questionData)}
+            
+            ESTATÍSTICAS DE DESEMPENHO NA QUESTÃO:
+            ${JSON.stringify(performanceStats)}
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "diagnosticoEnunciado": "Diagnóstico claro sobre o enunciado atual",
+              "sugestaoReformulacaoEnunciado": "Novo enunciado sugerido, ou nulo se não houver necessidade",
+              "diagnosticoAlternativas": "Diagnóstico claro sobre as alternativas atuais",
+              "sugestaoReformulacaoAlternativas": [
+                  {"id": "A", "textoAtual": "...", "novoTextoSugerido": "...", "justificativa": "..."}
+              ],
+              "nivelAdequacao": "Baixo" | "Médio" | "Alto"
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, {
+    diagnosticoEnunciado: "Não foi possível analisar o enunciado.",
+    sugestaoReformulacaoEnunciado: "",
+    diagnosticoAlternativas: "Não foi possível analisar as alternativas.",
+    sugestaoReformulacaoAlternativas: [],
+    nivelAdequacao: "Médio"
+  });
+}
+
 export interface SmartContentInput {
   tipo: 'questoes' | 'simulado' | 'plano_estudo' | 'explicacao' | 'analise_desempenho';
-  perfil: 'professor' | 'aluno';
+  perfil: UserRole | 'professor' | 'aluno';
   disciplina: string;
   competencias: string[];
   nivel: 'facil' | 'medio' | 'dificil';
@@ -1554,7 +1526,7 @@ export interface PerformancePredictionResult {
   recommendations: string;
 }
 
-export async function predictPerformance(historicalData: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<PerformancePredictionResult> {
+export async function predictPerformance(historicalData: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'ADMIN'): Promise<PerformancePredictionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1737,7 +1709,7 @@ export interface GuessDetectionResult {
   reason: string;
 }
 
-export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<GuessDetectionResult> {
+export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'STUDENT'): Promise<GuessDetectionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1909,7 +1881,7 @@ export interface PedagogicalAnalysisResult {
   sugestoes_para_professor: string[];
 }
 
-export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<PedagogicalAnalysisResult> {
+export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<PedagogicalAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1959,7 +1931,7 @@ export interface BloomAnalysisResult {
   recommendations: string;
 }
 
-export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<BloomAnalysisResult> {
+export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<BloomAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2005,7 +1977,7 @@ export interface OpenQuestionGrade {
   missing_points: string[];
 }
 
-export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<OpenQuestionGrade> {
+export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<OpenQuestionGrade> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2052,7 +2024,7 @@ export interface QuestionQualityAnalysis {
   cognitiveErrorsAddressed: string[];
 }
 
-export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionQualityAnalysis> {
+export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2163,7 +2135,7 @@ export async function generateInterventionStrategy(classData: any[], studentsAtR
   return safeParseJson(response.text, {});
 }
 
-export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<SAEPQuestion> {
+export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'STUDENT'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2278,7 +2250,7 @@ export async function generateDiscursiveQuestion(
   prompt: string,
   difficulty: string,
   modelName: string = 'gemini-3-flash-preview',
-  userRole: 'professor' | 'aluno' = 'professor',
+  userRole: UserRole = 'TEACHER',
   competency: string = ''
 ): Promise<any> {
   const response = await generateContentWrapper({
@@ -2301,7 +2273,8 @@ export async function generateDiscursiveQuestion(
             2. Resposta Esperada (Ideal): Um exemplo de resposta perfeita que o aluno deveria fornecer.
             3. Critérios de Avaliação (Rubrica): Pelo menos 3 critérios claros com pontuação (ex: Identificação do problema - 30pts, Implementação da lógica - 40pts, Sintaxe e boas práticas - 30pts).
             4. Comentário do Gabarito: Uma explicação detalhada de porque a resposta ideal é a correta e o que se espera que o aluno demonstre.
-            5. Explicabilidade da IA: Justificativa pedagógica para o nível de Bloom e dificuldade.
+            5. Feedback Sugerido: Um campo com a sugestão de feedback do professor para o aluno.
+            6. Explicabilidade da IA: Justificativa pedagógica para o nível de Bloom e dificuldade.
             
             RETORNE O JSON COMPLETO NO FORMATO SOLICITADO.`
           }
@@ -2324,6 +2297,7 @@ export async function generateDiscursiveQuestion(
           enunciado: { type: Type.STRING },
           respostaEsperada: { type: Type.STRING },
           comentarioGabarito: { type: Type.STRING },
+          feedbackProfessorSugerido: { type: Type.STRING },
           criteriosAvaliacao: {
             type: Type.ARRAY,
             items: {
@@ -2351,7 +2325,7 @@ export async function generateDiscursiveQuestion(
         },
         required: [
           "questionUid", "competenciaNome", "temaNome", "dificuldade", "bloom", 
-          "tipoQuestao", "enunciado", "respostaEsperada", "comentarioGabarito", "criteriosAvaliacao", "aiExplicabilidade"
+          "tipoQuestao", "enunciado", "respostaEsperada", "comentarioGabarito", "feedbackProfessorSugerido", "criteriosAvaliacao", "aiExplicabilidade"
         ]
       }
     }

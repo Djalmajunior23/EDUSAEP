@@ -21,7 +21,7 @@ export function CalendarView({ userProfile }: { userProfile: any }) {
 
       // Fetch Activities
       let actQuery;
-      if (userProfile.role === 'aluno') {
+      if (userProfile.role === 'STUDENT' || userProfile.role === 'MONITOR') {
         actQuery = query(collection(db, 'activities'), where('status', '==', 'active'));
       } else {
         actQuery = query(collection(db, 'activities'), where('createdBy', '==', userProfile.uid));

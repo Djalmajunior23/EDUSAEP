@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Brain, Loader2, BarChart3, Filter, FileText, Sparkles, Target, Send, BookOpen, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { db, auth } from '../../firebase';
@@ -8,9 +9,10 @@ import { UserProfile } from '../../types';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
+  const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,10 +25,12 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
   const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !userProfile) return;
 
     // Fetch submissions
-    const subQuery = query(collection(db, 'exam_submissions'));
+    const subQuery = userProfile.role === 'STUDENT'
+      ? query(collection(db, 'exam_submissions'), where('studentId', '==', auth.currentUser.uid))
+      : query(collection(db, 'exam_submissions'));
     const unsubscribeSubs = onSnapshot(subQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSubmissions(data);
@@ -35,7 +39,9 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
     });
 
     // Fetch existing analyses
-    const analysisQuery = query(collection(db, 'cognitive_error_analyses'));
+    const analysisQuery = userProfile.role === 'STUDENT'
+      ? query(collection(db, 'cognitive_error_analyses'), where('userId', '==', auth.currentUser.uid))
+      : query(collection(db, 'cognitive_error_analyses'));
     const unsubscribeAnalyses = onSnapshot(analysisQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAnalyses(data);
@@ -48,7 +54,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
       unsubscribeSubs();
       unsubscribeAnalyses();
     };
-  }, []);
+  }, [userProfile]);
 
   useEffect(() => {
     if (selectedStudent === 'all') {
@@ -129,7 +135,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
 
           const exam = examCache[sub.resourceId];
           if (exam && exam.questions) {
-            const result = await analyzeCognitiveErrors(sub, exam.questions, selectedModel, userProfile?.role as any || 'professor');
+            const result = await analyzeCognitiveErrors(sub, exam.questions, selectedModel, userProfile?.role as any || 'TEACHER');
             
             if (result.errors && result.errors.length > 0) {
               await addDoc(collection(db, 'cognitive_error_analyses'), {
@@ -206,7 +212,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
         errors: aggregatedErrors
       };
 
-      const plan = await generateRecoveryPlan(studentData, selectedModel, userProfile?.role as any || 'professor');
+      const plan = await generateRecoveryPlan(studentData, selectedModel, userProfile?.role as any || 'TEACHER');
       setRecoveryPlan(plan);
       
       // Save the plan to Firestore
@@ -276,7 +282,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
         errors: aggregatedErrors
       };
 
-      const plan = await generateLessonPlan(classData, [], selectedModel, userProfile?.role as any || 'professor');
+      const plan = await generateLessonPlan(classData, [], selectedModel, userProfile?.role as any || 'TEACHER');
       setLessonPlan(plan);
       
       // Save the plan to Firestore
@@ -431,28 +437,30 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
           </div>
         </div>
 
-        {/* Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <BarChart3 size={20} className="text-emerald-600" /> Frequência de Erros por Categoria
-          </h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <Tooltip 
-                  cursor={{ fill: '#f9fafb' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {chartData.map((_entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Chart Container */}
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <BarChart3 size={20} className="text-emerald-600" /> Frequência de Erros por Categoria
+            </h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                  <Tooltip 
+                    cursor={{ fill: '#f9fafb' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {chartData.map((_entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>

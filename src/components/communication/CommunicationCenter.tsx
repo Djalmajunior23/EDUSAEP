@@ -119,7 +119,7 @@ export function CommunicationCenter({ userProfile }: { userProfile: any }) {
             </h2>
             <p className="text-gray-500 mt-1">Avisos oficiais e fórum de discussão.</p>
           </div>
-          {(userProfile.role === 'professor' || userProfile.role === 'admin') && !isCreating && !selectedItem && (
+          {(userProfile.role === 'TEACHER' || userProfile.role === 'ADMIN' || userProfile.role === 'COORDINATOR') && !isCreating && !selectedItem && (
             <button
               onClick={() => setIsCreating(true)}
               className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
@@ -216,7 +216,7 @@ export function CommunicationCenter({ userProfile }: { userProfile: any }) {
                     <span className="flex items-center gap-1"><Clock size={14} /> {selectedItem.createdAt?.toDate().toLocaleDateString()}</span>
                   </div>
                 </div>
-                {(userProfile.role === 'admin' || userProfile.uid === selectedItem.createdBy) && (
+                {(userProfile.role === 'ADMIN' || userProfile.uid === selectedItem.createdBy) && (
                   <button
                     onClick={() => handleDeleteItem(selectedItem.id!)}
                     className="p-2 text-gray-400 hover:text-red-500 transition-colors"

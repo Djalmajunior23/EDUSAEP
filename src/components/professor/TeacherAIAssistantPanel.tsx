@@ -34,15 +34,15 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
       // Merge and unique-ify by name
       const merged = [...discList, ...compList];
       const uniqueMap = new Map();
-      merged.forEach(item => {
+      merged.forEach((item: any) => {
         const name = (item.nome || item.name || '').trim();
         if (name && !uniqueMap.has(name)) {
           uniqueMap.set(name, item);
         }
       });
       
-      setCompetencies(Array.from(uniqueMap.values()).sort((a, b) => 
-        (a.nome || a.name).localeCompare(b.nome || b.name)
+      setCompetencies(Array.from(uniqueMap.values()).sort((a: any, b: any) => 
+        (a.nome || a.name || '').localeCompare(b.nome || b.name || '')
       ));
     } catch (error) {
       console.error("Error fetching competencies:", error);
@@ -71,7 +71,7 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
     try {
       const selectedTabText = tabs.find(t => t.id === activeTab)?.label;
       
-      const systemInstruction = getSystemInstruction('professor', 'smart_content');
+      const systemInstruction = getSystemInstruction('TEACHER', 'smart_content');
       
       let aiPrompt = `
         Atue como um professor especialista em ${educationLevel}.

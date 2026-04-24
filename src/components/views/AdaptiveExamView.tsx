@@ -7,7 +7,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { User, UserProfile, Question } from '../../types';
+import { UserProfile, Question } from '../../types';
+import { User } from 'firebase/auth';
 import { generateQuestionVariation } from '../../services/geminiService';
 import { toast } from 'sonner';
 

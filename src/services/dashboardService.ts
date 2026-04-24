@@ -357,7 +357,7 @@ export async function getClassCompetencyAverages(): Promise<{ competency: string
       average: stats.count > 0 ? (stats.totalAccuracy / stats.count) * 100 : 0
     }));
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, 'exam_submissions');
+    console.warn("Could not fetch class competency averages:", error);
     return [];
   }
 }

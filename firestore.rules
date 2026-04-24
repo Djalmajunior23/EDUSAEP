@@ -3,10 +3,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
+    // Global Safety Net (Pillar 0)
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
     // Helper Functions
     // ===============================================================
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isAuthenticated() {
+      return isSignedIn();
     }
 
     function getUserData() {
@@ -14,28 +25,34 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() &&
+      return isSignedIn() &&
         (
           request.auth.token.email == "djalmabatistajunior@gmail.com" ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           getUserData().role == 'admin')
+           (getUserData().get('role', '') in ['ADMIN', 'admin']))
         );
     }
 
+    function isTeacher() {
+      return isSignedIn() && (
+        request.auth.token.email == "djalmabatistajunior@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         getUserData().get('role', '') in ['TEACHER', 'professor', 'COORDINATOR', 'COORDENADOR', 'ADMIN', 'admin'])
+      );
+    }
+
     function isProfessor() {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        getUserData().role == 'professor';
+      return isTeacher();
     }
 
     function isAluno() {
-      return isAuthenticated() && 
+      return isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        getUserData().role == 'aluno';
+        (getUserData().get('role', '') in ['STUDENT', 'aluno', 'MONITOR', 'monitor']);
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function hasRequiredFields(fields) {
@@ -72,9 +89,9 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || isProfessor();
+      allow read: if isOwner(userId) || isAdmin() || isTeacher();
       allow create: if isOwner(userId) && 
-        (request.resource.data.role in ['professor', 'aluno'] || request.auth.token.email == "djalmabatistajunior@gmail.com");
+        (request.resource.data.role in ['TEACHER', 'STUDENT'] || request.auth.token.email == "djalmabatistajunior@gmail.com");
       allow update: if isAdmin() || (isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role));
     }
 
@@ -114,8 +131,45 @@ service cloud.firestore {
     }
 
     match /diagnostics/{diagnosticId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isProfessor();
+      allow get: if isSignedIn() && (isTeacher() || resource.data.studentId == request.auth.uid || resource.data.userId == request.auth.uid || resource.data.studentEmail == request.auth.token.email);
+      allow list: if isSignedIn() && (isTeacher() || resource.data.studentId == request.auth.uid || resource.data.userId == request.auth.uid || resource.data.studentEmail == request.auth.token.email);
+      allow write: if isTeacher();
+    }
+
+    match /cognitiveLoadChecks/{checkId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || resource.data.studentId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /pedagogicalDecisions/{decisionId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    match /mass_rescue_actions/{actionId} {
+      allow read: if isAdmin() || isTeacher();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    match /lesson_plans/{planId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher());
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    match /recovery_plans/{planId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    match /system_logs/{logId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /ai_usage_logs/{logId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
     }
 
     match /adaptive_sessions/{sessionId} {
@@ -138,9 +192,17 @@ service cloud.firestore {
     }
 
     match /exam_submissions/{submissionId} {
-      allow read: if isAuthenticated(); 
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.studentId == request.auth.uid);
+      function isValidSubmission(data) {
+        return data.studentId == request.auth.uid &&
+               data.answers is list &&
+               data.score is number &&
+               data.maxScore is number;
+      }
+      allow get: if isSignedIn() && (isTeacher() || isOwner(existing().studentId));
+      allow list: if isSignedIn() && (isTeacher() || resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn() && isValidSubmission(request.resource.data);
+      allow update: if (isTeacher() || isOwner(existing().studentId)) && 
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['professorFeedback', 'professorNota', 'updatedAt', 'notified']);
       allow delete: if isAdmin();
     }
 
@@ -172,7 +234,7 @@ service cloud.firestore {
     }
 
     match /cognitive_error_analyses/{analysisId} {
-      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || resource.data.userId == request.auth.uid);
       allow write: if isAdmin() || isProfessor();
     }
 
@@ -204,6 +266,11 @@ service cloud.firestore {
     match /engagement_logs/{logId} {
       allow read: if isAdmin() || isProfessor();
       allow create: if isAuthenticated();
+    }
+    
+    match /classes/{classId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor());
+      allow write: if isAdmin() || isProfessor();
     }
     
     match /disciplines/{disciplineId} {
@@ -285,8 +352,65 @@ service cloud.firestore {
     }
 
     match /class_dashboard_stats/{classId} {
-      allow read: if isProfessor() || isAdmin();
+      allow read: if isTeacher() || isAdmin();
       allow write: if isAdmin(); // Should be updated by service/function
+    }
+
+    match /aiProviders/{providerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /aiUsageLogs/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /gamification_profiles/{studentId} {
+      allow read: if isOwner(studentId) || isAdmin() || isProfessor();
+      allow write: if isAdmin() || isProfessor();
+    }
+    
+    match /student_achievements/{achievementId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin() || isProfessor();
+      allow write: if isAdmin() || isProfessor();
+    }
+    
+    match /student_points/{pointId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin() || isProfessor();
+      allow write: if isAdmin() || isProfessor();
+    }
+    
+    match /simulator_attempts/{attemptId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin() || isProfessor();
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId) || isAdmin() || isProfessor();
+      allow delete: if isAdmin();
+    }
+    
+    match /quiz_attempts/{attemptId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin() || isProfessor();
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId) || isAdmin() || isProfessor();
+      allow delete: if isAdmin();
+    }
+    
+    match /quizzes/{quizId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+    
+    match /simulators/{simulatorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+    
+    match /lab_submissions/{submissionId} {
+      allow read: if isOwner(resource.data.studentId) || isAdmin() || isProfessor();
+      allow create: if isOwner(request.resource.data.studentId);
+      allow update: if isAdmin() || isProfessor() || isOwner(resource.data.studentId);
+      allow delete: if isAdmin();
     }
 
     // Default catch-all (MOVE TO END)

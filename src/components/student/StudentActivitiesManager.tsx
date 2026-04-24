@@ -6,6 +6,7 @@ import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Activity, ActivitySubmission, Rubric } from '../../types/edusaep.types';
 import Markdown from 'react-markdown';
+import { gamificationService } from '../../services/gamificationService';
 import { notificationService } from '../../services/notificationService';
 
 export function StudentActivitiesManager({ userProfile }: { userProfile: any }) {
@@ -139,6 +140,10 @@ export function StudentActivitiesManager({ userProfile }: { userProfile: any }) 
       } catch (notifErr) {
         console.error("Error notifying professor:", notifErr);
       }
+
+      // Award gamification points
+      const points = 100 + (!isLate ? 50 : 0);
+      await gamificationService.awardPoints(userProfile.uid, points, points);
 
       toast.success(isLate ? "Atividade enviada com atraso!" : "Atividade enviada com sucesso!");
       setContent('');

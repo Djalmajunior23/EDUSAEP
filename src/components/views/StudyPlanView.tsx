@@ -4,7 +4,8 @@ import {
   CheckCircle2, Triangle, Lightbulb, ArrowRight, Save, User as UserIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db } from '../../firebase';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { 
   collection, query, where, getDocs, updateDoc, doc, limit, orderBy, onSnapshot, addDoc, serverTimestamp
 } from 'firebase/firestore';
@@ -140,7 +141,7 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
     if (!reportRef.current) return;
     setIsExporting(true);
     try {
-      const filename = `Plano_Estudos_${user?.uid || 'aluno'}`;
+      const filename = `Plano_Estudos_${user?.uid || 'STUDENT'}`;
       await pdfExportService.exportElementToPDF(reportRef.current, filename);
       toast.success("PDF exportado com sucesso!");
     } catch (err: any) {
