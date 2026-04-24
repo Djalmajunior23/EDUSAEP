@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Beaker, Plus, Play, Info, Edit2, Archive, Target, Globe, Lightbulb, X, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { aiCopilotService } from '../../services/aiCopilotService';
+import { simulatorService } from '../../services/simulatorService';
+import { Simulator } from '../../types';
+
 
 export const TeacherSimulatorsManagerView: React.FC = () => {
   const [labs, setLabs] = useState([
@@ -11,6 +15,9 @@ export const TeacherSimulatorsManagerView: React.FC = () => {
   ]);
 
   const [isCreating, setIsCreating] = useState(false);
+  const [title, setTitle] = useState('');
+  const [scenario, setScenario] = useState('');
+  const [difficulty, setDifficulty] = useState<number>(2);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -90,12 +97,20 @@ export const TeacherSimulatorsManagerView: React.FC = () => {
               <div className="col-span-2 space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Título do Laboratório</label>
-                  <input type="text" placeholder="Ex: Troubleshooting de Redes BGP" className="w-full border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" />
+                  <input 
+                    type="text" 
+                    value={title} 
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="Ex: Troubleshooting de Redes BGP" 
+                    className="w-full border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Prompt do Cenário (Instruções para a IA)</label>
                   <textarea 
                     rows={6}
+                    value={scenario}
+                    onChange={e => setScenario(e.target.value)}
                     placeholder="Descreva a situação problema. Ex: O aluno é um técnico em um provedor de internet e a conexão de um bairro inteiro caiu. Ele precisa dar comandos, investigar os roteadores e tomar a decisão correta." 
                     className="w-full border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
                   />
@@ -103,11 +118,15 @@ export const TeacherSimulatorsManagerView: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Nível de Dificuldade</label>
-                    <select className="w-full border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500">
-                      <option>Básico</option>
-                      <option>Intermediário</option>
-                      <option>Avançado</option>
-                      <option>Especialista (Com pegadinhas)</option>
+                    <select 
+                      value={difficulty}
+                      onChange={e => setDifficulty(parseInt(e.target.value))}
+                      className="w-full border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value={1}>Básico</option>
+                      <option value={2}>Intermediário</option>
+                      <option value={3}>Avançado</option>
+                      <option value={5}>Especialista (Com pegadinhas)</option>
                     </select>
                   </div>
                   <div>
@@ -130,9 +149,33 @@ export const TeacherSimulatorsManagerView: React.FC = () => {
                   <p className="text-xs text-gray-500">Quanto mais específico for o cenário, mais realistas as consequências nas escolhas.</p>
                 </div>
                 <button 
-                  onClick={() => {
-                    toast.success("Laboratório 'Draft' gerado com sucesso! Acessando editor de fluxos...");
-                    setIsCreating(false);
+                  onClick={async () => {
+                    try {
+                      // Basic construction of simulator object
+                      const aiStages = await aiCopilotService.generateSimulatorScenario(title);
+                      
+                      const newSimulator: Omit<Simulator, 'id' | 'createdAt'> = {
+                        title: title || aiStages.title || 'Novo Simulador',
+                        description: scenario || aiStages.description || 'Simulador gerado com IA',
+                        type: 'professional',
+                        scenario: scenario || aiStages.description || '',
+                        stages: [{
+                          title: aiStages.title || 'Etapa 1',
+                          description: aiStages.description || 'Início da simulação',
+                          challenge: 'Identificar o problema inicial',
+                          feedback: aiStages.feedback?.success || 'Etapa concluída',
+                        }],
+                        difficulty: difficulty as any,
+                        xpReward: 100,
+                      };
+                      
+                      await simulatorService.createSimulator(newSimulator);
+                      toast.success("Laboratório gerado com sucesso!");
+                      setIsCreating(false);
+                      // In a real app, we should refresh the list.
+                    } catch (error) {
+                      toast.error("Erro ao gerar laboratório: " + (error instanceof Error ? error.message : 'Erro desconhecido'));
+                    }
                   }}
                   className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl font-bold shadow-sm transition-colors flex items-center justify-center gap-2"
                 >
