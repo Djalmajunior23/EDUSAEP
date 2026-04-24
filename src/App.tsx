@@ -157,11 +157,10 @@ import {
   Navigate,
   useParams
 } from 'react-router-dom';
-import { ExternalFormManager } from './modules/simulados/components/ExternalFormManager';
-import { ImportInconsistencyManager } from './modules/simulados/components/ImportInconsistencyManager';
-import { SimuladoForm } from './modules/simulados/types';
-import { simuladoService } from './modules/simulados/services/simuladoService';
-import { pdfExportService } from './modules/simulados/services/pdfExportService';
+import { ExternalFormManager } from './components/professor/ExternalFormManager';
+import { ImportInconsistencyManager } from './components/professor/ImportInconsistencyManager';
+import { SimuladoForm } from './types';
+import { pdfExportService } from './services/pdfExportService';
 import { NotificationBell } from './components/notifications/NotificationBell';
 import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
 import { auth, db, googleProvider, firebaseConfig } from './firebase';
@@ -198,6 +197,8 @@ import {
 import { ExternalFormsView } from './components/professor/ExternalFormsView';
 import { SocraticTutor } from './components/student/SocraticTutor';
 import { StudentInsights } from './components/student/StudentInsights';
+import { FlippedClassroomView } from './components/views/modules/FlippedClassroomView';
+import { CaseStudiesView } from './components/views/modules/CaseStudiesView';
 import { StudentQuickActions } from './components/student/StudentQuickActions';
 import { AdaptiveExam } from './components/student/AdaptiveExam';
 import { Gamification } from './components/student/Gamification';
@@ -1855,7 +1856,12 @@ function AlunoView({ result, onUpdateResult, diagnosticId, userProfile, history,
     if (!result) return;
     setIsExporting(true);
     try {
-      await pdfExportService.exportDiagnosticReport(result, userProfile);
+      const el = document.getElementById('diagnostic-container');
+      if (el) {
+        await pdfExportService.exportElementToPDF(el, 'relatorio-diagnostico.pdf');
+      } else {
+        throw new Error('Element not found');
+      }
       toast.success('Relatório exportado com sucesso!');
     } catch (err: any) {
       toast.error(`Erro ao gerar o PDF do relatório: ${err?.message || 'Erro desconhecido'}`);
@@ -5078,6 +5084,8 @@ function AppContent() {
               <Route path="/notifications" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['STUDENT', 'TEACHER', 'ADMIN', 'COORDINATOR', 'MONITOR']}><NotificationCenter userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/learning-situation" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['TEACHER', 'ADMIN', 'COORDINATOR']}><LearningSituationGenerator userProfile={userProfile} selectedModel={selectedModel} /></ProtectedRoute>} />
               <Route path="/simulators" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['TEACHER', 'ADMIN', 'COORDINATOR']}><SimulatorsView /></ProtectedRoute>} />
+              <Route path="/aula-invertida" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['TEACHER', 'ADMIN', 'COORDINATOR', 'STUDENT']}><FlippedClassroomView /></ProtectedRoute>} />
+              <Route path="/estudos-caso" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['TEACHER', 'ADMIN', 'COORDINATOR', 'STUDENT']}><CaseStudiesView /></ProtectedRoute>} />
               <Route path="/my-learning-situations" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['TEACHER', 'ADMIN', 'COORDINATOR']}><TeacherLearningSituationsView userProfile={userProfile} /></ProtectedRoute>} />
               <Route path="/ai-providers" element={<ProtectedRoute userProfile={userProfile} allowedRoles={['ADMIN']}><AdminAIProviderManager /></ProtectedRoute>} />
             <Route path="/input" element={

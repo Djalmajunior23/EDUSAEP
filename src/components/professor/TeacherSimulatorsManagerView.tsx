@@ -151,15 +151,32 @@ export const TeacherSimulatorsManagerView: React.FC = () => {
                 <button 
                   onClick={async () => {
                     try {
-                      // Basic construction of simulator object
-                      const aiStages = await aiCopilotService.generateSimulatorScenario(title);
+                      // Parsing the AI response properly
+                      const aiRawResponse = await aiCopilotService.generateSimulatorScenario(title);
+                      let aiStages: any = {};
+                      try {
+                        // Assuming aiStages currently returns a string, we need to parse it
+                        // Check if the service returns a parsed object or string
+                        aiStages = typeof aiRawResponse === 'string' ? JSON.parse(aiRawResponse) : aiRawResponse;
+                        // Handle cases where aiCopilotService might return an object wrapping the response
+                        if (aiStages.text) {
+                            try {
+                                aiStages = JSON.parse(aiStages.text);
+                            } catch (e) {
+                                // Maybe not JSON, fallback
+                            }
+                        }
+                      } catch (e) {
+                        console.error("Failed to parse AI response:", e);
+                        aiStages = {};
+                      }
                       
                       const newSimulator: Omit<Simulator, 'id' | 'createdAt'> = {
                         title: title || aiStages.title || 'Novo Simulador',
                         description: scenario || aiStages.description || 'Simulador gerado com IA',
                         type: 'professional',
                         scenario: scenario || aiStages.description || '',
-                        stages: [{
+                        stages: aiStages.stages && Array.isArray(aiStages.stages) && aiStages.stages.length > 0 ? aiStages.stages : [{
                           title: aiStages.title || 'Etapa 1',
                           description: aiStages.description || 'Início da simulação',
                           challenge: 'Identificar o problema inicial',

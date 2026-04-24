@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, orderBy, addDoc, serverTimestamp } f
 import { Archive, Plus, ExternalLink, Award, FileText, ArrowRight, Loader2, Download, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
-import { pdfExportService } from '../../modules/simulados/services/pdfExportService';
+import { pdfExportService } from '../../services/pdfExportService';
 
 interface PortfolioItem {
   id: string;

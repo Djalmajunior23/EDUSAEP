@@ -8,9 +8,9 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { SimuladoForm, Simulado } from '../../modules/simulados/types';
-import { ExternalFormManager } from '../../modules/simulados/components/ExternalFormManager';
-import { ImportInconsistencyManager } from '../../modules/simulados/components/ImportInconsistencyManager';
+import { SimuladoForm, Simulado } from '../../types';
+import { ExternalFormManager } from './ExternalFormManager';
+import { ImportInconsistencyManager } from './ImportInconsistencyManager';
 import { 
   LayoutDashboard, 
   AlertCircle, 

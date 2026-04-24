@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
-import { pdfExportService } from '../../modules/simulados/services/pdfExportService';
+import { pdfExportService } from '../../services/pdfExportService';
 
 interface ReportsViewProps {
   history: any[];

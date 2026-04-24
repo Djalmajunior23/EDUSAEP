@@ -92,6 +92,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'student-exams', label: 'Simulados', icon: BookOpen, path: '/student-exams', description: 'Avaliações' },
         { id: 'student-quizzes', label: 'Quizzes Rápidos', icon: Zap, path: '/quizzes', description: 'Gamificação' },
         { id: 'student-activities', label: 'Atividades', icon: CheckSquare, path: '/student-activities', description: 'Entregas' },
+        { id: 'aula-invertida', label: 'Aula Invertida', icon: BookOpen, path: '/aula-invertida', description: 'Materiais Prévios' },
+        { id: 'estudos-caso', label: 'Estudos de Caso', icon: FileText, path: '/estudos-caso', description: 'Casos Reais' },
         { id: 'learning-path', label: 'Minha Trilha', icon: MapIcon, path: '/learning-path', description: 'Caminhos' },
         { id: 'student-sa', label: 'Situações Práticas', icon: Zap, path: '/student-sa', description: 'Desafios' },
         { id: 'student-simulators', label: 'Simuladores', icon: MonitorPlay, path: '/student-simulators', description: 'Cenários' },
@@ -131,6 +133,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'generate-questions-quick', label: 'Gerador IA', icon: Sparkles, path: '/generate-questions', description: 'Criação Rápida' },
       { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Gestão SAEP' },
       { id: 'activity-manager', label: 'Gestão de Atividades', icon: CheckSquare, path: '/activity-manager' },
+      { id: 'aula-invertida-mgr', label: 'Aula Invertida', icon: BookOpen, path: '/aula-invertida', description: 'Gestão Flipped' },
+      { id: 'estudos-caso-mgr', label: 'Estudos de Caso', icon: FileText, path: '/estudos-caso', description: 'Casos Complexos' },
       
       { type: 'header', id: 'h-mgmt', label: 'Gestão Acadêmica' },
       { id: 'classes', label: 'Turmas', icon: Users, path: '/classes' },

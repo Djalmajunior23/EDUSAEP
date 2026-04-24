@@ -1,4 +1,4 @@
-import { Simulado } from "../../modules/simulados/types";
+import { Simulado } from "../../types";
 
 export interface FormCreationResult {
   externalFormId: string;

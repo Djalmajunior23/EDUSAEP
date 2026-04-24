@@ -123,6 +123,8 @@ export interface Question {
   };
 }
 
+export type Simulado = Exam;
+
 export interface Exam {
   id: string;
   title: string;

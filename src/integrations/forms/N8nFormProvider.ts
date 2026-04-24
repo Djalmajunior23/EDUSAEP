@@ -1,4 +1,4 @@
-import { Simulado } from "../../modules/simulados/types";
+import { Simulado } from "../../types";
 import { FormProvider, FormCreationResult, FormResponse } from "./FormProvider";
 
 import { triggerN8NRequest } from "../../services/n8nService";

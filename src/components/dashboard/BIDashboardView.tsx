@@ -12,7 +12,7 @@ import { Discipline } from '../../types';
 import { getDashboardData } from '../../services/dashboardService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { FileText, Loader2 } from 'lucide-react';
-import { pdfExportService } from '../../modules/simulados/services/pdfExportService';
+import { pdfExportService } from '../../services/pdfExportService';
 import { toast } from 'sonner';
 
 export function BIDashboardView() {

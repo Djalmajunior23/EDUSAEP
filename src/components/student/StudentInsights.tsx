@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { pdfExportService } from '../../modules/simulados/services/pdfExportService';
+import { pdfExportService } from '../../services/pdfExportService';
 import { 
   Target, 
   TrendingUp, 
