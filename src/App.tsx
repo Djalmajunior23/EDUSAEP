@@ -4029,9 +4029,11 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <HashRouter>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </HashRouter>
     </ErrorBoundary>
   );
 }
