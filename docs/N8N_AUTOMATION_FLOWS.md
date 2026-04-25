@@ -1,4 +1,4 @@
-# Fluxos de Automação N8N - EduSAEP ULTRA
+# Fluxos de Automação N8N - EduAI Core ULTRA
 
 Para que a engrenagem do Gêmeo Digital, do Copiloto Pedagógico e da Sala de Comando atinjam autonomia de processamento, as Cloud Functions desenvolvidas podem e devem ser conectadas a um fluxo n8n para rodarem em *background* sem a necessidade de um *Client* (Frontend browser) engatilhar a demanda. 
 
@@ -17,7 +17,7 @@ O n8n vai agir via nós do tipo HTTP Request contra os Callables do Firebase, al
     *   Body: `{ "data": { "classId": "id-da-turma-aqui" } }`
 *   **Node 3: If Node** -> Verifica se `.data.processedClassId` foi sucesso.
 *   **Node 4: Discord / Slack / API WhatsApp (Node)** -> Notifica ao Professor Supervisor do curso:
-    *   *"📊 EduSAEP: O processamento de saúde da Turma X foi finalizado. O painel está atualizado para você analisar as recomendações da sua próxima aula segunda-feira."*
+    *   *"📊 EduAI Core: O processamento de saúde da Turma X foi finalizado. O painel está atualizado para você analisar as recomendações da sua próxima aula segunda-feira."*
 
 ### 2- Fluxo Reativo: Automação de Intervenção Pedagógica (Risco Crítico)
 

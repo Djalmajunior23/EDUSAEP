@@ -3,17 +3,15 @@ import { motion } from 'framer-motion';
 import { 
   Library, 
   Search, 
-  Filter, 
   Gamepad2, 
   Beaker, 
   BrainCircuit, 
   ChevronRight,
-  Play,
   Clock,
   Award,
   BookOpen
 } from 'lucide-react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 

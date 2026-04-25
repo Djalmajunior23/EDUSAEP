@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Plus, Loader2, BookOpen, Target, Sparkles, Wand2, Download, ExternalLink, Calendar,
-  CheckCircle2, Triangle, Lightbulb, ArrowRight, Save, User as UserIcon
+import { Loader2, BookOpen, Target, Sparkles, Wand2, Download, ExternalLink, Calendar,
+  CheckCircle2, Triangle, Lightbulb, ArrowRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../../firebase';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { 
@@ -11,7 +9,6 @@ import {
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
 import { pdfExportService } from '../../services/pdfExportService';
 import { generateContentWrapper, DEFAULT_CONFIG, safeParseJson, generateLearningPath } from '../../services/geminiService';
 import { Type } from '@google/genai';
@@ -467,7 +464,7 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
                   </h3>
                 </div>
                 <div className="space-y-4">
-                  {studyPlan.recommendations.map((rec, i) => (
+                  {studyPlan.recommendations?.map((rec, i) => (
                     <div key={i} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 group">
                       <div className="shrink-0 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center font-black text-emerald-600 text-xs shadow-sm">
                         {i + 1}

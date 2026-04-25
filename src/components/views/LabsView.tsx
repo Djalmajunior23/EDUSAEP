@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   FlaskConical, 
   Plus, 
-  FileText, 
   ChevronRight, 
   CheckCircle2, 
   Timer, 

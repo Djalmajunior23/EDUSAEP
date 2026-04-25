@@ -17,16 +17,10 @@ import {
   Activity, 
   BarChart3, 
   Cpu, 
-  Settings2, 
-  History, 
-  CheckCircle2, 
-  XCircle, 
-  AlertTriangle,
+  History,
   Zap,
-  TrendingDown,
   DollarSign,
   Info,
-  Save,
   Plus,
   Loader2
 } from 'lucide-react';

@@ -5,7 +5,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 initializeApp();
 const db = getFirestore();
 
-// --- EDUSAEP PEDAGOGICAL ENGINE EXPORTS ---
+// --- EDUAI CORE PEDAGOGICAL ENGINE EXPORTS ---
 export { runPedagogicalEngineForClass } from './pedagogical-engine/runPedagogicalEngine';
 export { runStudentEvaluation } from './pedagogical-engine/runStudentEvaluation';
 export { onSubmissionGraded } from './pedagogical-engine/onSubmissionGraded';

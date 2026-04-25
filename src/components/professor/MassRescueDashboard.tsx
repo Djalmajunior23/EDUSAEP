@@ -90,7 +90,7 @@ export function MassRescueDashboard({ userProfile }: MassRescueDashboardProps) {
             <h1 className="text-3xl font-black uppercase tracking-tight">Resgate em Massa (AI Intervenção)</h1>
           </div>
           <p className="text-rose-100 max-w-2xl font-medium">
-            O EduSAEP identificou grupos de alunos com lacunas críticas em competências específicas. 
+            O EduAI Core identificou grupos de alunos com lacunas críticas em competências específicas. 
             Aja agora para evitar a defasagem irreversível.
           </p>
         </div>

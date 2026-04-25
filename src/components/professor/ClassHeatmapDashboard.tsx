@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Target, ChevronRight, X, UserX } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Target, ChevronRight, UserX } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface StudentDifficulty {
   id: string;

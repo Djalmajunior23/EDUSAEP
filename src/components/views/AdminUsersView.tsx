@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { motion } from 'motion/react';
 import { 
-  Users, 
   Search, 
   UserPlus, 
   Trash2, 
-  Mail, 
   Key, 
   Zap, 
   ZapOff,
-  Shield,
   Loader2,
   Filter
 } from 'lucide-react';
@@ -21,8 +17,7 @@ import {
   doc, 
   setDoc, 
   updateDoc, 
-  deleteDoc,
-  serverTimestamp
+  deleteDoc
 } from 'firebase/firestore';
 import { sendPasswordResetEmail, User, getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createSecondaryUser } from 'firebase/auth';
 import { db, auth, firebaseConfig } from '../../firebase';

@@ -1,5 +1,3 @@
-import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 export interface PerformancePrediction {
   examType: string;

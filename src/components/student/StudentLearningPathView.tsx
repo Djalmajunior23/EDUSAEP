@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   Map as MapIcon, 
   ChevronRight, 
   CheckCircle2, 
   Circle, 
-  Lock, 
   Sparkles, 
   BookOpen, 
   Video, 

@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
 import { 
-  Sparkles, 
   Loader2, 
   Zap, 
   Code, 
   Image as ImageIcon, 
   Table as TableIcon, 
   Layout as LayoutIcon,
-  Plus,
   ArrowRight,
   BrainCircuit,
   FileText,
   Target,
   Settings2,
-  ChevronRight,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

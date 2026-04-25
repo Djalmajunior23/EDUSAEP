@@ -1,19 +1,13 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { 
   Library, 
   FileText, 
   Copy, 
-  Plus, 
-  Search, 
-  Grid, 
-  List,
-  ChevronRight,
-  ShieldCheck,
-  Globe
+  Plus,
+  ShieldCheck
 } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 export function InstitutionalTemplateManager() {
   const [templates, setTemplates] = useState<any[]>([]);

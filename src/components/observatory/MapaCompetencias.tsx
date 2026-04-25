@@ -25,7 +25,7 @@ export function MapaCompetencias({ data }: MapaCompetenciasProps) {
           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} />
           <Radar name="Aluno" dataKey="A" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.5} />
           <Tooltip 
-            formatter={(value: number) => [`${value}%`, 'Domínio']}
+            formatter={(value: any) => [`${value}%`, 'Domínio']}
             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
           />
         </RadarChart>

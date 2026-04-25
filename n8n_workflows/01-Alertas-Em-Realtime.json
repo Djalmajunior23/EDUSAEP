@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP - Motor de Triagem e Alertas em Tempo Real",
+  "name": "EduAI Core - Motor de Triagem e Alertas em Tempo Real",
   "nodes": [
     {
       "parameters": {
@@ -8,7 +8,7 @@
         "options": {}
       },
       "id": "e21b8fbf-ec58-472e-84b2-29fcb16e8810",
-      "name": "Webhook Central EduSAEP",
+      "name": "Webhook Central EduAI Core",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
@@ -50,7 +50,7 @@
     {
       "parameters": {
         "channel": "=#alertas-pedagogicos",
-        "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO ⚠️\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 *Aluno(a/ID)*: {{ $json.body.userId || 'Sistema' }}\n🔹 *Turma*: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 *Gatilho*: {{ JSON.stringify($json.body.data) }}\n\nPor favor, Coordenação, verificar no Painel EduSAEP imediatamente.",
+        "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO ⚠️\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 *Aluno(a/ID)*: {{ $json.body.userId || 'Sistema' }}\n🔹 *Turma*: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 *Gatilho*: {{ JSON.stringify($json.body.data) }}\n\nPor favor, Coordenação, verificar no Painel EduAI Core imediatamente.",
         "otherOptions": {}
       },
       "id": "4facced1-f8e1-455b-b9ab-b427b0b14c5c",
@@ -67,7 +67,7 @@
         "fromEmail": "suporte@edusaep.com",
         "toEmail": "={{ $json.body.data.professorEmail || 'professor@edusaep.com' }}",
         "subject": "=Aviso: Nova Intervenção Disparada",
-        "html": "=Olá Educador, uma intervenção automática foi disparada na plataforma EduSAEP.<br><br><b>Detalhes da Intervenção:</b><br>{{ JSON.stringify($json.body.data) }}<br><br>Acesse seu Painel para mais informações.",
+        "html": "=Olá Educador, uma intervenção automática foi disparada na plataforma EduAI Core.<br><br><b>Detalhes da Intervenção:</b><br>{{ JSON.stringify($json.body.data) }}<br><br>Acesse seu Painel para mais informações.",
         "options": {}
       },
       "id": "71bcd7b6-ccac-4b0d-b1aa-0eac9a34bc89",
@@ -114,7 +114,7 @@
   ],
   "pinData": {},
   "connections": {
-    "Webhook Central EduSAEP": {
+    "Webhook Central EduAI Core": {
       "main": [
         [
           {

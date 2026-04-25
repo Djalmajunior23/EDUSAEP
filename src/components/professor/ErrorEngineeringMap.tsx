@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react';
-import { motion } from 'motion/react';
+import React from 'react';
 import { 
   ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, 
-  ZAxis, Tooltip as RechartsTooltip, CartesianGrid, Legend 
+  ZAxis, Tooltip as RechartsTooltip, CartesianGrid 
 } from 'recharts';
-import { AlertCircle, Target, TrendingUp, Zap, Info, Map, CheckCircle2, ChevronRight, XCircle } from 'lucide-react';
+import { AlertCircle, Target, TrendingUp, Zap, Info, Map, CheckCircle2, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface ErrorEngineeringMapProps {

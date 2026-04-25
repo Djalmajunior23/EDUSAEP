@@ -1,7 +1,7 @@
 import { generateAIContent } from "./aiService";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
-import { UserProfile, UserRole } from "../types";
+import { UserRole } from "../types";
 
 // The GoogleGenAI import and instance are kept ONLY if needed for complex object structures, 
 // but generateAIContent is now the primary gateway.
@@ -1579,7 +1579,7 @@ export async function generateClassRecoveryOrchestration(stats: any, modelName: 
         role: "user",
         parts: [
           {
-            text: `Aja como o Motor de Orquestração Pedagógica do EDUSAEP.
+            text: `Aja como o Motor de Orquestração Pedagógica do EDUAI CORE.
             Analise os dados da turma e gere trilhas de recuperação personalizadas para os grupos de risco.
             
             DADOS DA TURMA:
@@ -1669,7 +1669,7 @@ export async function generateSIPA(stats: any, intervention: string, modelName: 
         role: "user",
         parts: [
           {
-            text: `Aja como o Simulador de Impacto Pedagógico (SIPA) do EDUSAEP.
+            text: `Aja como o Simulador de Impacto Pedagógico (SIPA) do EDUAI CORE.
             Simule o impacto da intervenção proposta com base nos dados atuais da turma.
             
             DADOS ATUAIS:
@@ -2512,7 +2512,7 @@ export async function generateAutomatedPBL(competenciesCovered: string[], contex
 
 // Módulo 3: Conflito Cognitivo
 export async function generateCognitiveConflictScenario(topic: string) {
-    const prompt = `Aja como Tutor do EDUSAEP. Para testar o aprendizado profundo do aluno no tema '${topic}', gere um cenário de CONFLITO COGNITIVO. 
+    const prompt = `Aja como Tutor do EDUAI CORE. Para testar o aprendizado profundo do aluno no tema '${topic}', gere um cenário de CONFLITO COGNITIVO. 
     Apresente uma afirmação aparentemente verdadeira e lógica baseada no senso comum, mas que é falha cientificamente/historicamente, e peça para ele encontrar o "furo na matriz" do seu argumento, com 4 alternativas.
     
     RETORNE JSON: { "scenario": "texto", "apparentTruth": "texto ilusório", "alternatives": ["A","B","C","D"], "correctOptionIndex": number, "explanationIfWrong": "string" }`;

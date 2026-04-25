@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Beaker, Plus, Play, Info, Edit2, Archive, Target, Globe, Lightbulb, X, Sparkles } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Beaker, Plus, Play, Info, Edit2, Target, Globe, Lightbulb, X, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { aiCopilotService } from '../../services/aiCopilotService';
 import { simulatorService } from '../../services/simulatorService';

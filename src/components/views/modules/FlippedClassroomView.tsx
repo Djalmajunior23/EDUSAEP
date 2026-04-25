@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { BookOpen, Video, ExternalLink, Activity, Plus } from 'lucide-react';
+import { Video, Activity, Plus } from 'lucide-react';
 import { addFlippedMaterial } from '../../../services/flippedClassroomService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toast } from 'sonner';

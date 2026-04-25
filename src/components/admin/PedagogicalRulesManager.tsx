@@ -2,17 +2,13 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Settings, 
-  SwitchCamera, 
   Plus, 
   Trash2, 
-  Play, 
   History,
-  AlertTriangle,
   Zap,
-  Info,
   Check
 } from 'lucide-react';
-import { RuleEngineService, PedagogicalRule } from '../../services/ruleEngineService';
+import { PedagogicalRule } from '../../services/ruleEngineService';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 

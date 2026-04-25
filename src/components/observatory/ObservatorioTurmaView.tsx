@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { observatoryService } from '../../services/observatoryService';
 import { Users, AlertCircle, CheckCircle2, Target, TrendingDown } from 'lucide-react';
-import { cn } from '../../lib/utils';
 
 export function ObservatorioTurmaView() {
   const { user } = useAuth();

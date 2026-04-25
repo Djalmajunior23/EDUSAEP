@@ -91,14 +91,14 @@ export const generateStudentRecommendation = async (userId: string, studentName:
         atividadesPraticas = criticalCompetencies.slice(0,3).map(comp => ({
           titulo: `Prática Focada em ${comp}`,
           descricao: `Revise os fundamentos e faça 5 exercícios focados.`,
-          tipo: 'exercicio' as 'exercicio',
+          tipo: 'exercicio' as const,
           tempo: '20 min'
         }));
       } else {
          atividadesPraticas = [{
           titulo: `Desafio Avançado`,
           descricao: `Responda a perguntas de nível difícil sobre o conteúdo.`,
-          tipo: 'pratica' as 'pratica',
+          tipo: 'pratica' as const,
           tempo: '30 min'
         }];
       }

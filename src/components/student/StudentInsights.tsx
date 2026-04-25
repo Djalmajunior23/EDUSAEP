@@ -26,8 +26,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   Cell,
@@ -42,7 +40,6 @@ import { handleFirestoreError, OperationType } from '../../services/errorService
 import { toast } from 'sonner';
 import { PredictionService, PerformancePrediction } from '../../services/predictionService';
 import { WorkloadOptimizer, WorkloadHealth } from '../../services/workloadOptimizer';
-import { PedagogicalEngine, StudentSignals, TeacherContext } from '../../services/pedagogicalEngine';
 
 interface StudentInsightsProps {
   studentId: string;

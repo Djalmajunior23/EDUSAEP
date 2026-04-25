@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Users, Lightbulb } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 
 export const CaseStudiesView = () => {
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Loader2, Zap, Database, X, Info, BrainCircuit, ListChecks, FileText, CheckCircle2, Target, AlertCircle, ChevronRight } from 'lucide-react';
+import { Sparkles, Loader2, Database, X, Info, BrainCircuit, ListChecks, FileText, CheckCircle2, Target, AlertCircle, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, ArrowRight, Target, BrainCircuit, AlertTriangle, Zap, Bot, ChevronRight } from 'lucide-react';
+import { BookOpen, ArrowRight, Target, BrainCircuit, AlertTriangle, Zap, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, where, limit } from 'firebase/firestore';

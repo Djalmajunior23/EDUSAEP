@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Bot, Send, User, Sparkles, AlertTriangle, 
-  CheckCircle, Clock, BookOpen, AlertCircle, Plus, FileText, Briefcase
+  Bot, Send, User, Sparkles, BookOpen, AlertCircle, FileText, Briefcase
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Markdown from 'react-markdown';
@@ -124,7 +123,7 @@ export function TeacherCopilotDashboard({ userProfile, selectedModel }: { userPr
             <Bot className="text-indigo-600" size={32} />
             Copiloto Pedagógico <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full font-black uppercase tracking-wider">BETA</span>
           </h1>
-          <p className="text-gray-500">Inteligência contextualizada unida ao motor acadêmico EduSAEP.</p>
+          <p className="text-gray-500">Inteligência contextualizada unida ao motor acadêmico EduAI Core.</p>
         </div>
       </div>
 

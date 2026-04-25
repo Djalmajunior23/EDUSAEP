@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Milestone, 
   Map as MapIcon, 
   Flag, 
-  BookOpen, 
-  Award,
-  ArrowRight,
-  ChevronRight,
-  Calendar,
-  AlertCircle
+  BookOpen,
+  Calendar
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';

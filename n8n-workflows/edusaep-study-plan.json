@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP - Alertas e Planos",
+  "name": "EduAI Core - Alertas e Planos",
   "nodes": [
     {
       "parameters": {
@@ -145,5 +145,5 @@
     }
   },
   "settings": {},
-  "tags": ["EduSAEP", "Alertas"]
+  "tags": ["EduAI Core", "Alertas"]
 }

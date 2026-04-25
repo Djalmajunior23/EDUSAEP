@@ -1,6 +1,6 @@
 import { db } from '../../firebase';
-import { collection, doc, setDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
-import { StudentEvaluationResult, ClassEvaluationResult, StudentMetrics } from '../types';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { StudentEvaluationResult, ClassEvaluationResult } from '../types';
 
 export class FirestoreRepository {
   /**

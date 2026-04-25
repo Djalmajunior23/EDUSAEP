@@ -25,7 +25,7 @@ export class TeacherCopilotService {
 
     // 2. Build contextualized prompt
     const enhancedPrompt = `
-      [COPILOTO PEDAGÓGICO EDUSAEP]
+      [COPILOTO PEDAGÓGICO EDUAI CORE]
       Perfil do Professor: ${JSON.stringify(teacherProfile)}
       Contexto da Turma: ${JSON.stringify(classContext)}
       

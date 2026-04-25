@@ -1,13 +1,13 @@
-# Workflows do n8n (EduSAEP)
+# Workflows do n8n (EduAI Core)
 
-Este diretório contém os blueprints dos workflows configurados para importação rápida na sua instância do [n8n](https://n8n.io/). Esses arquivos JSON conectam a arquitetura orientada a eventos (`EventBusService.ts`) do EduSAEP aos fluxos automatizados externos, sem poluir a aplicação web com envio nativo de e-mail ou integrações Slack/Teams.
+Este diretório contém os blueprints dos workflows configurados para importação rápida na sua instância do [n8n](https://n8n.io/). Esses arquivos JSON conectam a arquitetura orientada a eventos (`EventBusService.ts`) do EduAI Core aos fluxos automatizados externos, sem poluir a aplicação web com envio nativo de e-mail ou integrações Slack/Teams.
 
 ## Fluxos Disponíveis
 
 ### 1. `01-Alertas-Em-Realtime.json`
 **Ativador:** Webhook via `EventBus` (`POST /webhook...`).
 **Função:** Triagem de Eventos do Sistema (Eventos como `performance.below_threshold` ou `intervention.triggered`).
-- Roteará o JSON que chega da EduSAEP.
+- Roteará o JSON que chega da EduAI Core.
 - Manda notificações no Slack para a Coordenação escolar em caso de perigo de evasão/aprendizado crítico.
 - Aciona disparos de e-mail ao Professor da disciplina avisando sobre trilhas de recuperação automatizadas.
 

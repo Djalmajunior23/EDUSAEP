@@ -9,7 +9,7 @@ import { UserProfile } from '../../types';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const navigate = useNavigate();

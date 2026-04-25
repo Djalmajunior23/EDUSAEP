@@ -2,10 +2,7 @@ import { db } from '../firebase';
 import { 
   collection, 
   query, 
-  where, 
-  getDocs,
-  doc,
-  getDoc
+  getDocs
 } from 'firebase/firestore';
 
 export interface QuestionQualityStats {

@@ -1,5 +1,3 @@
-import { db } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 
 export class ContextEngine {
   async getStudentContext(userId: string) {

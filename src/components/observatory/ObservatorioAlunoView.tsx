@@ -4,7 +4,7 @@ import { observatoryService, StudentObservatoryData } from '../../services/obser
 import { PedagogicalInterventionService } from '../../services/analytics/pedagogicalInterventionService';
 import { MapaCompetencias } from './MapaCompetencias';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as LineTooltip, ResponsiveContainer } from 'recharts';
-import { Target, AlertTriangle, TrendingUp, TrendingDown, Minus, BookOpen, Clock, Loader2, Sparkles } from 'lucide-react';
+import { Target, AlertTriangle, TrendingUp, TrendingDown, Minus, BookOpen, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function ObservatorioAlunoView() {
@@ -179,7 +179,7 @@ export function ObservatorioAlunoView() {
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} domain={[0, 100]} dx={-10}/>
                 <LineTooltip 
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => [`${value}`, 'Nota']}
+                  formatter={(value: any) => [`${value}`, 'Nota']}
                 />
                 <Area type="monotone" dataKey="grade" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorGrade)" />
               </AreaChart>

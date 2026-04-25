@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Crosshair, TrendingUp, TrendingDown, Info, Medal, AlertTriangle, BookOpen, Zap } from 'lucide-react';
-import { observatoryService, StudentObservatoryData, CompetencyData } from '../../services/observatoryService';
+import { observatoryService, StudentObservatoryData } from '../../services/observatoryService';
 import { toast } from 'sonner';
 
 interface StudentCompetencyModalProps {

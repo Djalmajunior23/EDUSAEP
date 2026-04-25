@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { MonitorPlay, ChevronDown } from 'lucide-react';
 import { UserProfile } from '../../../types';
 import { TeacherDashboardService, ClassHealthMetric, CriticalCompetency, TeacherRecommendation, NextActionInfo, WeeklySummary } from '../../../pedagogical-engine/services/TeacherDashboardService';
@@ -89,7 +88,7 @@ export function TeacherCommandCenterPage({ userProfile }: TeacherCommandCenterPa
             Sala de Comando
             <span className="text-[10px] px-2 py-1 bg-red-100 text-red-600 rounded-full uppercase tracking-widest font-bold translate-y-[-8px]">AO VIVO</span>
           </h1>
-          <p className="text-gray-500 font-medium">Controle pedagógico em tempo real via IA EduSAEP.</p>
+          <p className="text-gray-500 font-medium">Controle pedagógico em tempo real via IA EduAI Core.</p>
         </div>
         
         {/* Class Selector Mock */}

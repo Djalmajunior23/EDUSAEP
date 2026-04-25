@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP-Recovery-Email-Workflow",
+  "name": "EduAI Core-Recovery-Email-Workflow",
   "nodes": [
     {
       "parameters": {
@@ -35,7 +35,7 @@
         "resource": "message",
         "operation": "send",
         "to": "={{$json.body.studentEmail}}",
-        "subject": "Seu Plano de Estudos Personalizado - EduSAEP",
+        "subject": "Seu Plano de Estudos Personalizado - EduAI Core",
         "text": "=Olá {{$json.body.studentName}}, seu plano de estudos foi gerado. \nDetalhes: {{$json.body.plan}}",
         "options": {}
       },

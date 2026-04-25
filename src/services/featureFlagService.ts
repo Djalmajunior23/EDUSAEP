@@ -1,5 +1,5 @@
-import { db, auth } from '../firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export interface FeatureFlags {
   pedagogicalTwin: boolean;

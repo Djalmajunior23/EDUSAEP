@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { Recommendation, getLatestRecommendation, generateStudentRecommendation } from '../../services/recommendationService';
 import { 
   Target, Sparkles, BookOpen, CheckCircle2, 
   AlertTriangle, ArrowRight, Loader2, RefreshCw,
   Trophy, Star, Zap
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 

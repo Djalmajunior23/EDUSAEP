@@ -4,8 +4,8 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Question, QuestionAsset } from '../../types';
-import { Code, Image as ImageIcon, Table as TableIcon, FileText, LayoutIcon, ZoomIn, CheckCircle2, Sparkles, XCircle, Brain } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Code, FileText, LayoutIcon, ZoomIn, CheckCircle2, Sparkles, Brain } from 'lucide-react';
+import { motion } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

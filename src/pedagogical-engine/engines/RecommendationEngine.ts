@@ -1,4 +1,4 @@
-import { Recommendation, RiskAnalysis, PriorityLevel, StudentMetrics } from '../types';
+import { Recommendation, RiskAnalysis, StudentMetrics } from '../types';
 
 export class RecommendationEngine {
   public static generateRecommendations(

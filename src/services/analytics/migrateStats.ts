@@ -1,6 +1,5 @@
 import { db } from '../../firebase';
 import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { AggregationService } from './aggregationService';
 
 /**
  * Migration script to process existing data and populate stats.

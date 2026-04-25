@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  Plus, Upload, Database, BrainCircuit, Sparkles, 
+import { Database, BrainCircuit, Sparkles, 
   HelpCircle, ChevronRight, X, Loader2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 
 interface DiagnosticInputViewProps {

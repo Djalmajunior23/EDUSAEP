@@ -1,13 +1,8 @@
 import { db } from '../firebase';
 import { 
-  collection, 
   doc, 
-  getDoc, 
-  getDocs,
-  query,
-  where,
-  setDoc,
-  Timestamp
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 
 export interface FeatureFlag {

@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { 
   Activity, Users, AlertTriangle, CheckCircle2,
   TrendingDown, TrendingUp, Target, Zap, Bot,
-  Award, FileText, ArrowRight, Play, BookOpen,
+  Award, FileText, Play, BookOpen,
   Sword
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

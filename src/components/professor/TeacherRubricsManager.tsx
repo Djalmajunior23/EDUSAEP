@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { FileText, Plus, Trash2, Copy, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Trash2, Copy, Save, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';

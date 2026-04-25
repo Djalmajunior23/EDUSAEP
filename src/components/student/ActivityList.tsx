@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   FileText, 
   Clock, 
@@ -8,8 +8,7 @@ import {
   AlertCircle,
   ArrowRight,
   Target,
-  Plus,
-  Link as LinkIcon
+  Plus
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { 
@@ -18,8 +17,7 @@ import {
   where, 
   onSnapshot, 
   addDoc, 
-  serverTimestamp,
-  orderBy
+  serverTimestamp
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

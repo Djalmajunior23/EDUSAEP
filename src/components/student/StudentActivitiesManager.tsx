@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { FileText, CheckCircle2, Clock, Send, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Activity, ActivitySubmission, Rubric } from '../../types/edusaep.types';
 import Markdown from 'react-markdown';
 import { gamificationService } from '../../services/gamificationService';

@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  User as UserIcon, 
   Settings, 
   Zap, 
-  Sun, 
-  Moon, 
   Loader2, 
-  CheckCircle2, 
-  Bell
+  CheckCircle2
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';

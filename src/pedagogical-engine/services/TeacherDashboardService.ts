@@ -1,6 +1,5 @@
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { PedagogicalEngineService } from './PedagogicalEngineService';
 
 export interface ClassHealthMetric {
   status: 'HEALTHY' | 'ATTENTION' | 'CRITICAL';

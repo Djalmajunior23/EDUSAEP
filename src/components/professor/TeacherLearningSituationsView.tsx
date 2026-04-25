@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, CheckCircle2, Clock, Users, Loader2, Eye, Edit2, Copy, Trash2, Save, X } from 'lucide-react';
+import { BookOpen, Clock, Users, Loader2, Eye, Edit2, Copy, Trash2, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
-import { collection, getDocs, query, where, updateDoc, doc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, updateDoc, doc, deleteDoc, addDoc } from 'firebase/firestore';
 import { LearningSituation, SASubmission } from '../../types/edusaep.types';
 
 export function TeacherLearningSituationsView({ userProfile }: { userProfile: any }) {

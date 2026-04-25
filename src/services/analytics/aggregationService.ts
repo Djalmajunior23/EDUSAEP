@@ -1,5 +1,5 @@
 import { db } from '../../firebase';
-import { doc, getDoc, updateDoc, setDoc, increment, serverTimestamp, collection, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
+import { doc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 
 /**
  * Service to manage the aggregation of class statistics for the Dashboard.

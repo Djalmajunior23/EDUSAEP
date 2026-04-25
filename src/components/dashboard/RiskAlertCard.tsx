@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, TrendingDown, Info } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 export const RiskAlertCard: React.FC<{ 
   score: number, 

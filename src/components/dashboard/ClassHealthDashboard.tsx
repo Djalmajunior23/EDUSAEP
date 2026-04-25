@@ -5,7 +5,6 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   TrendingUp, 
-  TrendingDown, 
   Users,
   Brain,
   MessageSquare,

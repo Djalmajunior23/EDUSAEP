@@ -3,12 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Puzzle, 
   Plus, 
-  Search, 
   Clock, 
   Brain, 
-  ChevronRight, 
-  CheckCircle2, 
-  XCircle,
+  CheckCircle2,
   Trophy,
   Sparkles,
   Gamepad2,

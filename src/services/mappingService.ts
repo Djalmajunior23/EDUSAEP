@@ -1,5 +1,5 @@
 // src/services/mappingService.ts
-import { Discipline, Question } from '../types';
+import { Discipline } from '../types';
 import { generateContentWrapper, safeParseJson, DEFAULT_CONFIG } from './geminiService';
 
 export async function mapExternalDiscipline(

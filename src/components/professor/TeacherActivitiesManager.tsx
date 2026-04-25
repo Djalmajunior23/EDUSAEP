@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { FileText, Plus, Users, Calendar, CheckCircle2, XCircle, Clock, Loader2, Sparkles, AlertCircle, TrendingUp } from 'lucide-react';
+import { FileText, Plus, Users, Calendar, CheckCircle2, Clock, Loader2, Sparkles, AlertCircle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
@@ -164,8 +164,8 @@ export function TeacherActivitiesManager({ userProfile, selectedModel }: { userP
           userId: selectedSubmission.studentId,
           title: gradeData.status === 'returned' ? 'Atividade Devolvida' : 'Atividade Corrigida',
           message: gradeData.status === 'returned' 
-            ? `Sua entrega de "${selectedActivity.title}" foi devolvida para ajustes.` 
-            : `Sua entrega de "${selectedActivity.title}" foi avaliada. Nota: ${gradeData.grade}`,
+            ? `Sua entrega de "${selectedActivity?.title ?? 'atividade'}" foi devolvida para ajustes.` 
+            : `Sua entrega de "${selectedActivity?.title ?? 'atividade'}" foi avaliada. Nota: ${gradeData.grade}`,
           type: gradeData.status === 'returned' ? 'activity_returned' : 'activity_graded',
           link: '/student-activities'
         });

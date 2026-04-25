@@ -1,6 +1,4 @@
 // import { toast } from 'sonner';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 segundos

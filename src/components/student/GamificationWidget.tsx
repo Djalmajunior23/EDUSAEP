@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Star, Zap, Target, Medal, ChevronRight, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Trophy, Star, Zap, Target, Medal } from 'lucide-react';
 import { gamificationEngine, GamificationProfile, XP_PER_LEVEL } from '../../services/gamificationService';
 import { useAuth } from '../../contexts/AuthContext';
 

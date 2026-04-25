@@ -7,11 +7,10 @@ import { db } from '../../firebase';
 import { collection, query, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { exportQuestionsToGoogleForms, exportExamToGoogleForms, syncFormResponses } from '../../services/googleFormsService';
 import { 
-  Share2, FileText, ExternalLink, CheckCircle2, 
-  AlertCircle, Loader2, Search, Filter, 
-  Calendar, Users, ArrowRight, Globe, Lock, RefreshCw
+  Share2, FileText, ExternalLink, CheckCircle2, Loader2, Search, 
+  Calendar, Users, Globe, Lock, RefreshCw
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 

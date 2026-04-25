@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { GamificationProfile } from '../types';
-import { XP_PER_LEVEL } from './gamificationService';
 
 interface LevelInfo {
   name: string;

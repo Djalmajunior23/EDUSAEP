@@ -4,7 +4,6 @@ import {
   FileText, 
   CheckCircle2, 
   AlertCircle, 
-  BookOpen, 
   ArrowRight,
   Brain,
   Target

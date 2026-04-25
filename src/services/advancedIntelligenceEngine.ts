@@ -1,6 +1,4 @@
 // src/services/advancedIntelligenceEngine.ts
-import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
 import { 
   CognitiveLoadMetric, 
   FalseLearningDetection, 
@@ -8,12 +6,11 @@ import {
   ErrorMapEntry,
   InvisibleGapDetection,
   ResponseTimeAnalysis,
-  KnowledgeRetentionMetric,
-  StudentConsistencyMetric
+  KnowledgeRetentionMetric
 } from '../types';
 
 /**
- * MOTOR DE INTELIGÊNCIA PEDAGÓGICA AVANÇADA (EDUSAEP)
+ * MOTOR DE INTELIGÊNCIA PEDAGÓGICA AVANÇADA (EDUAI CORE)
  * Core Implementation for 20 Advanced Educational Modules
  */
 

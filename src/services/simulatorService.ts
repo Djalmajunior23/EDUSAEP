@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp, query, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Simulator } from '../types';
 import { gamificationService } from './gamificationService';

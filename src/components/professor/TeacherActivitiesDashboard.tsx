@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Activity, ActivitySubmission } from '../../types/edusaep.types';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { Loader2, TrendingUp, CheckCircle2, Clock, AlertCircle, FileText, ArrowLeft } from 'lucide-react';
+import { Loader2, TrendingUp, CheckCircle2, Clock, FileText, ArrowLeft } from 'lucide-react';
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6366F1'];
 

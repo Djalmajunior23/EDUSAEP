@@ -1,9 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  FileText, Target, TrendingUp, AlertTriangle, CheckCircle, 
-  ArrowRight, Download, Share2, Brain, ChevronRight, 
-  ShieldAlert, Sparkles, Zap, MessageCircle
+import { Target, AlertTriangle, CheckCircle, 
+  ArrowRight, Download, Share2, Brain, 
+  ShieldAlert, Sparkles, MessageCircle
 } from 'lucide-react';
 import { DiagnosticResult } from '../../services/geminiService';
 import { UserProfile } from '../../types';
@@ -115,7 +114,7 @@ export function DiagnosticResultView({ result, userProfile, onNavigateToChat }: 
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {result.sugestao_intervencao.map((item, i) => (
+              {result.sugestao_intervencao?.map((item, i) => (
                 <div key={i} className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-emerald-200 transition-colors">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black uppercase">

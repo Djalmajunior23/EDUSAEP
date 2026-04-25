@@ -43,7 +43,7 @@ export function ConsolidatedReportView({ history, onReset }: ConsolidatedReportV
 
     const competencyStats: Record<string, { totalAccuracy: number; count: number }> = {};
     let totalAccuracySum = 0;
-    let totalStudents = new Set();
+    const totalStudents = new Set();
     const trendDataMap: Record<string, { date: string; accuracy: number; count: number }> = {};
 
     filteredHistory.forEach(diagnostic => {
@@ -224,7 +224,7 @@ export function ConsolidatedReportView({ history, onReset }: ConsolidatedReportV
                 <XAxis type="number" domain={[0, 1]} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} />
                 <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
                 <Tooltip 
-                  formatter={(value: number) => [`${(value * 100).toFixed(1)}%`, 'Média']}
+                  formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, 'Média']}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
                 <Bar dataKey="average" radius={[0, 4, 4, 0]}>

@@ -6,21 +6,10 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Sparkles, 
-  RefreshCw, 
-  ChevronRight, 
-  ArrowRight, 
-  Target, 
-  Settings,
-  HelpCircle,
-  FileText,
+  ChevronRight,
   Search,
-  Filter,
   Loader2,
   Brain,
-  MessageSquare,
-  ThumbsUp,
-  ThumbsDown,
-  Edit2,
   Check
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
@@ -28,10 +17,7 @@ import {
   collection, 
   query, 
   onSnapshot, 
-  where, 
-  getDocs, 
   doc, 
-  getDoc, 
   updateDoc, 
   serverTimestamp 
 } from 'firebase/firestore';

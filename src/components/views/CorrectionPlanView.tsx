@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Loader2, BookOpen, Target, Sparkles, Wand2, Download, ExternalLink, Calendar,
-  CheckCircle2, Triangle, Lightbulb, ArrowRight, Save, User as UserIcon
+import { Loader2, Sparkles, Wand2,
+  CheckCircle2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { db } from '../../firebase';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { 
-  collection, query, where, getDocs, updateDoc, doc, limit, orderBy, onSnapshot, addDoc, serverTimestamp
+  collection, query, where, orderBy, onSnapshot
 } from 'firebase/firestore';
-import { User } from 'firebase/auth';
-import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
-import { generateContentWrapper, DEFAULT_CONFIG, safeParseJson } from '../../services/geminiService';
-import { Type } from '@google/genai';
 
 interface CorrectionPlanViewProps {
   studentId: string;

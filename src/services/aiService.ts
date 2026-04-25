@@ -1,5 +1,4 @@
 import { auth } from "../firebase";
-import { UserRole } from "../types";
 
 export type AIProvider = 'gemini' | 'openai' | 'groq' | 'deepseek' | 'cohere' | 'together';
 

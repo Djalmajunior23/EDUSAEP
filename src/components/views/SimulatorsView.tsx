@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Gamepad, 
   Play, 
-  ChevronRight, 
   Star, 
   AlertCircle, 
   CheckCircle2, 
@@ -309,7 +308,7 @@ export function SimulatorsView() {
                   <AlertCircle size={14} /> Dica de Performance
                 </h4>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Analise o console cuidadosamente antes de tomar uma decisão. No EduSAEP Ultra, erros reduzem o bônus final de XP.
+                  Analise o console cuidadosamente antes de tomar uma decisão. No EduAI Core Ultra, erros reduzem o bônus final de XP.
                 </p>
               </div>
             </div>

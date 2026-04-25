@@ -1,6 +1,6 @@
-# ARQUITETURA EDUSAEP - 10 MÓDULOS ESTRATÉGICOS
+# ARQUITETURA EDUAI CORE - 10 MÓDULOS ESTRATÉGICOS
 
-Este documento detalha o planejamento arquitetural elaborado para elevar o sistema EDUSAEP a um nível avançado de inteligência pedagógica, tomada de decisão e personalização institucional, preservando rigorosamente a regra de ouro: *simplicidade, protagonismo docente e foco educacional*.
+Este documento detalha o planejamento arquitetural elaborado para elevar o sistema EDUAI CORE a um nível avançado de inteligência pedagógica, tomada de decisão e personalização institucional, preservando rigorosamente a regra de ouro: *simplicidade, protagonismo docente e foco educacional*.
 
 ---
 

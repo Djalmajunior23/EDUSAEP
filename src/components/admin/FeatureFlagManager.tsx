@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { 
   Shield, 
   Settings, 
@@ -7,15 +6,13 @@ import {
   Cpu, 
   Database, 
   Terminal,
-  Clock,
   AlertOctagon,
-  RefreshCw,
   Zap,
   DollarSign,
   Layers,
   CheckCircle2
 } from 'lucide-react';
-import { ConfigService, FeatureFlag } from '../../services/configService';
+import { FeatureFlag } from '../../services/configService';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 

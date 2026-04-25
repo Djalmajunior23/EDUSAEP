@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Plus, 
   Search, 
-  Calendar, 
   BookOpen, 
   Sparkles, 
   Loader2, 
-  ChevronRight, 
   Trash2, 
   Clock,
-  Filter,
   Layout
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
@@ -26,7 +22,7 @@ import {
   getDocs,
   orderBy
 } from 'firebase/firestore';
-import { generateLessonPlan, LessonPlanResult } from '../../services/geminiService';
+import { generateLessonPlan } from '../../services/geminiService';
 import { LessonPlan } from './LessonPlan';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';

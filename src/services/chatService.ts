@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { DiagnosticResult, generateContentWrapper } from "./geminiService";
 
 // const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -15,7 +14,7 @@ export async function getChatResponse(
   const isSocratic = context.mode === 'socratic';
 
   const systemInstruction = isSocratic 
-    ? `Você é o Tutor Socrático do EDUSAEP. Sua missão NÃO é dar respostas prontas, mas guiar o aluno através de perguntas provocativas.
+    ? `Você é o Tutor Socrático do EDUAI CORE. Sua missão NÃO é dar respostas prontas, mas guiar o aluno através de perguntas provocativas.
        Quando um aluno tiver dúvida sobre uma questão ou conceito:
        1. Faça perguntas que o levem a identificar o erro de lógica ou conceito por conta própria.
        2. Use andaimes (scaffolding): comece com perguntas amplas e vá estreitando.
@@ -24,7 +23,7 @@ export async function getChatResponse(
        
        CONTEXTO DA QUESTÃO: ${context.questionContext || "Conceitos gerais de aprendizagem"}
        `
-    : `Você é um Assistente Pedagógico Especialista do EDUSAEP.
+    : `Você é um Assistente Pedagógico Especialista do EDUAI CORE.
        Seu objetivo é ajudar professores e alunos a entenderem seus diagnósticos educacionais e planos de estudos.
 
        CONTEXTO ATUAL DO DIAGNÓSTICO:

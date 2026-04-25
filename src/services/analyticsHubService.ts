@@ -3,9 +3,7 @@ import {
   collection, 
   query, 
   where, 
-  getDocs, 
-  orderBy,
-  limit,
+  getDocs,
   Timestamp
 } from 'firebase/firestore';
 

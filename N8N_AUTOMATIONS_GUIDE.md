@@ -1,6 +1,6 @@
-# Guia de Automações n8n - EduSAEP
+# Guia de Automações n8n - EduAI Core
 
-Este diretório contém os templates JSON para reconstruir todas as automações do sistema EduSAEP no seu n8n.
+Este diretório contém os templates JSON para reconstruir todas as automações do sistema EduAI Core no seu n8n.
 
 ## Como Importar
 
@@ -11,30 +11,30 @@ Este diretório contém os templates JSON para reconstruir todas as automações
 
 ## Workflows Disponíveis
 
-### 1. EduSAEP - Alertas e Planos (`edusaep-study-plan.json`)
+### 1. EduAI Core - Alertas e Planos (`edusaep-study-plan.json`)
 Este workflow recebe notificações do sistema quando:
 - Um **Plano de Aula** é gerado pelo professor.
 - Uma **Recomendação Pedagógica** é gerada para um aluno.
 - Um **Plano de Recuperação** é gerado.
 
 **Configuração necessária:**
-- Atualize a URL do Webhook gerada pelo n8n nas configurações globais do EduSAEP (Painel Admin -> Configurações -> Webhook Global) ou no perfil do usuário.
+- Atualize a URL do Webhook gerada pelo n8n nas configurações globais do EduAI Core (Painel Admin -> Configurações -> Webhook Global) ou no perfil do usuário.
 - Configure os nós de notificação (ex: Telegram, Slack, Email) com suas credenciais.
 
-### 2. EduSAEP - Importação SIAC (`import-siac.json`)
-Este workflow é responsável por receber arquivos de planilhas (Excel/CSV) enviados pela tela de "Importação de Dados" do EduSAEP, processá-los e enviá-los de volta para a API do sistema.
+### 2. EduAI Core - Importação SIAC (`import-siac.json`)
+Este workflow é responsável por receber arquivos de planilhas (Excel/CSV) enviados pela tela de "Importação de Dados" do EduAI Core, processá-los e enviá-los de volta para a API do sistema.
 
 **Configuração necessária:**
-- Atualize a URL do Webhook gerada pelo n8n nas configurações globais do EduSAEP.
-- Configure o nó "Enviar para EduSAEP" com a URL correta da sua API de importação.
+- Atualize a URL do Webhook gerada pelo n8n nas configurações globais do EduAI Core.
+- Configure o nó "Enviar para EduAI Core" com a URL correta da sua API de importação.
 
-### 3. EduSAEP - Formulários Externos (`external-forms.json`)
+### 3. EduAI Core - Formulários Externos (`external-forms.json`)
 Este workflow integra formulários externos (como Google Forms) com a plataforma de simulados.
 
 **Configuração necessária:**
 - Configure o gatilho (Trigger) para o seu provedor de formulários (ex: Google Forms Trigger).
-- Mapeie os campos corretamente no nó "Enviar para EduSAEP".
-- A URL de destino deve apontar para o endpoint de webhooks da sua aplicação EduSAEP (`/api/webhooks/forms`).
+- Mapeie os campos corretamente no nó "Enviar para EduAI Core".
+- A URL de destino deve apontar para o endpoint de webhooks da sua aplicação EduAI Core (`/api/webhooks/forms`).
 
 ## Atualizações no Código
 

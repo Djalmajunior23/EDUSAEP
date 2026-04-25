@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP - Geração Automatizada de Relatórios Semanais",
+  "name": "EduAI Core - Geração Automatizada de Relatórios Semanais",
   "nodes": [
     {
       "parameters": {
@@ -87,7 +87,7 @@
     {
       "parameters": {
         "model": "gemini-3.1-pro",
-        "prompt": "=Você é um sistema de Inteligência Artificial Analítica da plataforma EduSAEP.\n\nAnalise os seguintes logs do sistema dessa semana e gere um relatório de 3 parágrafos focando em:\n1. Nível de engajamento.\n2. Quantidade de alunos que caíram na régua de risco.\n3. Pontos de sucesso nas intervenções.\n\nJSON de Dados: \n{{ JSON.stringify($json.documents) }}\n"
+        "prompt": "=Você é um sistema de Inteligência Artificial Analítica da plataforma EduAI Core.\n\nAnalise os seguintes logs do sistema dessa semana e gere um relatório de 3 parágrafos focando em:\n1. Nível de engajamento.\n2. Quantidade de alunos que caíram na régua de risco.\n3. Pontos de sucesso nas intervenções.\n\nJSON de Dados: \n{{ JSON.stringify($json.documents) }}\n"
       },
       "id": "c138af64-160a-4298-b7ab-8f9dafc126b8",
       "name": "Google Gemini (Análise de Dados)",
@@ -100,7 +100,7 @@
       "credentials": {
         "googleGeminiApi": {
           "id": "sua-credencial-gemini",
-          "name": "EduSAEP Gemini API"
+          "name": "EduAI Core Gemini API"
         }
       }
     },
@@ -108,8 +108,8 @@
       "parameters": {
         "fromEmail": "relatorios@edusaep.com",
         "toEmail": "diretoria@escola.com",
-        "subject": "EduSAEP - Relatório de Inteligência Pedagógica Semanal",
-        "html": "=Prezada Diretoria,<br><br>Segue abaixo o relatório automático gerado pelo motor de inteligência do EduSAEP referente aos dados coletados na última semana:<br><br><hr><br><strong>{{ $json.text }}</strong><br><hr><br>Qualquer dúvida, verifiquem o Painel Administrativo em <i>Backstage Governance</i> da plataforma.<br><br>Att,<br>Equipe Automática EduSAEP."
+        "subject": "EduAI Core - Relatório de Inteligência Pedagógica Semanal",
+        "html": "=Prezada Diretoria,<br><br>Segue abaixo o relatório automático gerado pelo motor de inteligência do EduAI Core referente aos dados coletados na última semana:<br><br><hr><br><strong>{{ $json.text }}</strong><br><hr><br>Qualquer dúvida, verifiquem o Painel Administrativo em <i>Backstage Governance</i> da plataforma.<br><br>Att,<br>Equipe Automática EduAI Core."
       },
       "id": "8340d2ba-c25e-40af-b5b4-7d5a5cf2b5a2",
       "name": "Enviar Relatório (Email)",

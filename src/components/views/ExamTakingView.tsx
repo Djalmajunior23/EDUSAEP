@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ChevronLeft, BookOpen, Zap, CheckCircle2, XCircle,
-  Loader2, Brain, AlertCircle 
+  ChevronLeft, Zap, CheckCircle2, XCircle,
+  Loader2 
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { collection, addDoc, serverTimestamp, doc, getDocFromServer, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Exam, UserProfile, ExamSubmission } from '../../types';
@@ -73,7 +73,7 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
       const competencyResults: { [key: string]: { correct: number, total: number } } = {};
 
       exam.questions.forEach((q, idx) => {
-        const correctIdx = q.alternativas.findIndex(a => a.id === q.respostaCorreta);
+        const correctIdx = q.alternativas?.findIndex(a => a.id === q.respostaCorreta) ?? -1;
         const isCorrect = answers[idx] === (correctIdx !== -1 ? correctIdx : 0);
         const weight = 1;
         maxScore += weight;
@@ -275,8 +275,8 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
         </div>
 
         <div className="space-y-3">
-          {currentQuestion.alternativas.map((opt, idx) => {
-            const correctIdx = currentQuestion.alternativas.findIndex(a => a.id === currentQuestion.respostaCorreta);
+          {currentQuestion.alternativas?.map((opt, idx) => {
+            const correctIdx = currentQuestion.alternativas?.findIndex(a => a.id === currentQuestion.respostaCorreta) ?? -1;
             const isCorrectOption = idx === (correctIdx !== -1 ? correctIdx : 0);
             
             return (

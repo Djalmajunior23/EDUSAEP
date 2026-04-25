@@ -3,10 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Brain, 
   ChevronRight, 
-  Loader2, 
-  CheckCircle2, 
-  XCircle,
-  AlertCircle,
+  Loader2,
   ArrowRight
 } from 'lucide-react';
 import { UserRole } from '../../types';

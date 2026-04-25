@@ -409,4 +409,4 @@ export function HistoryView({
   );
 }
 
-import { X, CheckCircle2 } from 'lucide-react';
+import { X } from 'lucide-react';

@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP - Importação SIAC",
+  "name": "EduAI Core - Importação SIAC",
   "nodes": [
     {
       "parameters": {
@@ -36,7 +36,7 @@
         },
         "options": {}
       },
-      "name": "Enviar para EduSAEP",
+      "name": "Enviar para EduAI Core",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
       "position": [650, 300]
@@ -58,7 +58,7 @@
       "main": [
         [
           {
-            "node": "Enviar para EduSAEP",
+            "node": "Enviar para EduAI Core",
             "type": "main",
             "index": 0
           }
@@ -67,5 +67,5 @@
     }
   },
   "settings": {},
-  "tags": ["EduSAEP", "SIAC"]
+  "tags": ["EduAI Core", "SIAC"]
 }

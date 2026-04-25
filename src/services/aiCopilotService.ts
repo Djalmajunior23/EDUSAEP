@@ -1,5 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-import { generateContentWrapper, DEFAULT_CONFIG } from './geminiService';
+import { generateContentWrapper } from './geminiService';
 
 export const aiCopilotService = {
   generateQuiz: async (topic: string, level: string, numQuestions: number = 5) => {
@@ -39,7 +38,7 @@ export const aiCopilotService = {
   },
 
   analyzeClassEngagement: async (metrics: any) => {
-    const prompt = `Atue como um Coordenador Pedagógico do EduSAEP. Analise os seguintes dados de engajamento da turma:
+    const prompt = `Atue como um Coordenador Pedagógico do EduAI Core. Analise os seguintes dados de engajamento da turma:
     ${JSON.stringify(metrics)}
     
     Identifique:

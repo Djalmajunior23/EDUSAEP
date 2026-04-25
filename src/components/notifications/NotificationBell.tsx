@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Check, Trash2, ExternalLink, Info, AlertCircle, CheckCircle2, MessageSquare, Calendar } from 'lucide-react';
+import { Bell, Check, Info, AlertCircle, CheckCircle2, MessageSquare, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../services/notificationService';
 import { AppNotification } from '../../types/edusaep.types';

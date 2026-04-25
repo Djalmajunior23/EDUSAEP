@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 
 export function ExamEditor({ exam, onSave }: { exam: any, onSave: (updatedExam: any) => void }) {
   const [editedExam, setEditedExam] = useState(exam);

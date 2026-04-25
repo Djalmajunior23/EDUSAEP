@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP - Formulários Externos",
+  "name": "EduAI Core - Formulários Externos",
   "nodes": [
     {
       "parameters": {
@@ -35,7 +35,7 @@
         },
         "options": {}
       },
-      "name": "Enviar para EduSAEP",
+      "name": "Enviar para EduAI Core",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
       "position": [500, 300]
@@ -46,7 +46,7 @@
       "main": [
         [
           {
-            "node": "Enviar para EduSAEP",
+            "node": "Enviar para EduAI Core",
             "type": "main",
             "index": 0
           }
@@ -55,5 +55,5 @@
     }
   },
   "settings": {},
-  "tags": ["EduSAEP", "Forms"]
+  "tags": ["EduAI Core", "Forms"]
 }

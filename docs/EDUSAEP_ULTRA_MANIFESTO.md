@@ -1,10 +1,10 @@
-# 🚀 PROMPT MESTRE — EDUSAEP ULTRA (PLATAFORMA DE INTELIGÊNCIA PEDAGÓGICA DE ALTA PERFORMANCE)
+# 🚀 PROMPT MESTRE — EDUAI CORE ULTRA (PLATAFORMA DE INTELIGÊNCIA PEDAGÓGICA DE ALTA PERFORMANCE)
 
 **Status:** ATIVO
 **Revisão:** 1.0
 **Foco:** Escala, Inteligência Pedagógica Avançada e Protagonismo Docente
 
-Este documento é a estrela-guia (North Star) do desenvolvimento da plataforma EduSAEP. Todas as próximas funcionalidades, integrações e refatorações DEVEM estar alinhadas a estas 80 epics e aos pilares de arquitetura aqui definidos.
+Este documento é a estrela-guia (North Star) do desenvolvimento da plataforma EduAI Core. Todas as próximas funcionalidades, integrações e refatorações DEVEM estar alinhadas a estas 80 epics e aos pilares de arquitetura aqui definidos.
 
 ## 🎯 OBJETIVO GLOBAL
 Construir um sistema que ajude o professor a decidir melhor, reduza drasticamente o trabalho manual, automatize processos pedagógicos, analise profundamente o aprendizado, identifique problemas antes que aconteçam, aumente a qualidade do ensino e escale para múltiplas instituições com segurança e performance.

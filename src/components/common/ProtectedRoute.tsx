@@ -22,7 +22,7 @@ export function ProtectedRoute({ children, userProfile, allowedRoles }: Protecte
   const normalizedRole = userProfile.role.toUpperCase();
   const normalizedAllowedRoles = allowedRoles?.map(r => r.toUpperCase());
 
-  if (allowedRoles && !normalizedAllowedRoles.includes(normalizedRole)) {
+  if (allowedRoles && !normalizedAllowedRoles?.includes(normalizedRole)) {
     console.warn(`Access denied for role: ${normalizedRole}. Allowed: ${normalizedAllowedRoles}`);
     return <Navigate to="/" />;
   }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { Question } from '../../types';
-import { Loader2, Code, Image as ImageIcon, Table as TableIcon, Layout, FileText, Search } from 'lucide-react';
+import { Loader2, Code, Image as ImageIcon, Table as TableIcon, Layout, FileText } from 'lucide-react';
 
 export function GeneratedAssetsView({ onClose }: { onClose: () => void }) {
   const [assets, setAssets] = useState<any[]>([]);

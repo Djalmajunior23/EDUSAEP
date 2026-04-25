@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { BrainCircuit, Loader2, Save, Sparkles, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
-import Markdown from 'react-markdown';
 import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, increment, getDocs, query, orderBy } from 'firebase/firestore';
 import { LearningSituation } from '../../types/edusaep.types';

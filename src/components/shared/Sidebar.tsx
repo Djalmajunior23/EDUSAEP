@@ -5,7 +5,6 @@ import {
   Telescope, 
   BookOpen, 
   CheckSquare, 
-  Archive, 
   Map as MapIcon, 
   Calendar, 
   MessageSquare, 
@@ -18,20 +17,13 @@ import {
   BrainCircuit, 
   Activity, 
   Database, 
-  Upload, 
-  ExternalLink, 
   BarChart3, 
-  BarChart2, 
   Users, 
   Layout, 
   Library, 
   Shield, 
-  Settings, 
-  Share2, 
   LogOut,
-  ChevronDown,
   BarChart3 as LogoIcon,
-  Bell,
   FileText,
   Brain,
   Bot,
@@ -40,7 +32,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationBell } from '../notifications/NotificationBell';
-import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -165,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LogoIcon size={24} />
           </div>
           <div className="overflow-hidden">
-            <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">EDUSAEP</h1>
+            <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white truncate">EDUAI CORE</h1>
             <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider truncate">Plataforma Ultra</p>
           </div>
         </div>

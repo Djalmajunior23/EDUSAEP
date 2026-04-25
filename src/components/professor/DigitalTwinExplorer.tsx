@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Brain, Zap, TrendingUp, AlertTriangle, Play, 
@@ -6,7 +6,7 @@ import {
   ChevronRight, Gauge, Activity, Cpu, Loader2, Sparkles
 } from 'lucide-react';
 import { 
-  ResponsiveContainer, Tooltip, RadarChart, PolarGrid, 
+  ResponsiveContainer, RadarChart, PolarGrid, 
   PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
 import { simulateDigitalTwin, TwinSimulationResult } from '../../services/geminiService';

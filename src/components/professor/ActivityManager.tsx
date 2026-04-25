@@ -4,15 +4,9 @@ import {
   Plus, 
   Search, 
   Calendar, 
-  FileText, 
-  Edit2, 
-  Trash2, 
-  CheckCircle2, 
-  Clock,
-  AlertCircle,
+  FileText,
   Users,
   ChevronRight,
-  Filter,
   MoreVertical,
   Target
 } from 'lucide-react';
@@ -23,9 +17,6 @@ import {
   where, 
   onSnapshot, 
   addDoc, 
-  deleteDoc, 
-  doc, 
-  updateDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
 import { format } from 'date-fns';

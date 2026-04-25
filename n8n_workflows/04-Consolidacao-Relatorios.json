@@ -1,5 +1,5 @@
 {
-  "name": "EduSAEP-Relatorio-Consolidado",
+  "name": "EduAI Core-Relatorio-Consolidado",
   "nodes": [
     {
       "parameters": {
@@ -47,7 +47,7 @@
         "resource": "message",
         "operation": "send",
         "to": "diretoria@escola.com",
-        "subject": "Relatório Semanal de Inteligência Pedagógica - EduSAEP",
+        "subject": "Relatório Semanal de Inteligência Pedagógica - EduAI Core",
         "text": "=Segue o resumo gerado pela IA:\n{{$json.output}}",
         "options": {}
       },

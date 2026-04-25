@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Loader2, CheckCircle2, XCircle, AlertCircle, 
-  ArrowRight, Timer, Brain, Trophy 
+  Loader2, CheckCircle2, 
+  ArrowRight, Brain, Trophy 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { UserProfile, Question } from '../../types';
 import { User } from 'firebase/auth';
-import { generateQuestionVariation } from '../../services/geminiService';
 import { toast } from 'sonner';
 
 interface AdaptiveExamViewProps {
@@ -38,7 +37,7 @@ export function AdaptiveExamView({ user, userProfile, selectedModel }: AdaptiveE
           where('status', '==', 'publicado')
         );
         const snap = await getDocs(q);
-        let list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
         
         // If not enough questions, generate a variation or just shuffle
         if (list.length < 5) {

@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  ScatterChart, Scatter, XAxis, YAxis, ZAxis, 
-  CartesianGrid, Tooltip, ResponsiveContainer, 
-  Cell, Legend, LineChart, Line, AreaChart, Area
+import { XAxis, YAxis, 
+  CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import { 
-  collection, query, onSnapshot, getDocs, limit 
+  collection, query, getDocs, limit 
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { 
@@ -14,14 +12,9 @@ import {
   Brain, 
   Users, 
   AlertTriangle, 
-  CheckCircle2, 
-  HelpCircle,
-  BarChart2,
-  GitBranch,
-  Layers,
+  CheckCircle2,
   ArrowRight
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { calculateProbability, TRIParameters } from '../../services/triService';
 import { cn } from '../../lib/utils';
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, Megaphone, Plus, Send, User, Clock, Trash2, Loader2, MessageCircle, ChevronRight, ArrowLeft } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, query, getDocs, addDoc, serverTimestamp, orderBy, where, doc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, addDoc, serverTimestamp, orderBy, where, doc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Announcement, ForumComment } from '../../types/edusaep.types';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';

@@ -403,7 +403,7 @@
     "connections": {}
   },
   {
-    "name": "EduSAEP - Gerador de Questões",
+    "name": "EduAI Core - Gerador de Questões",
     "nodes": [
       {
         "parameters": {
@@ -472,7 +472,7 @@
     "connections": {}
   },
   {
-    "name": "EduSAEP - Relatório Semanal",
+    "name": "EduAI Core - Relatório Semanal",
     "nodes": [
       {
         "parameters": {
@@ -527,7 +527,7 @@
     "connections": {}
   },
   {
-    "name": "EduSAEP - Alerta Evasão",
+    "name": "EduAI Core - Alerta Evasão",
     "nodes": [
       {
         "parameters": {
@@ -572,7 +572,7 @@
     "connections": {}
   },
   {
-    "name": "EduSAEP - Agendamento Simulado",
+    "name": "EduAI Core - Agendamento Simulado",
     "nodes": [
       {
         "parameters": {

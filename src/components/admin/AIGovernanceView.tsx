@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  BarChart, Bar, LineChart, Line, AreaChart, Area, 
+  BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Cell, Legend, PieChart, Pie 
+  Cell 
 } from 'recharts';
 import { 
-  collection, query, orderBy, limit, onSnapshot, Timestamp 
+  collection, query, orderBy, limit, onSnapshot 
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { 
@@ -14,9 +14,7 @@ import {
   DollarSign, 
   Users, 
   AlertCircle, 
-  CheckCircle2, 
-  Clock, 
-  Filter,
+  CheckCircle2,
   RefreshCw,
   Search,
   Brain,

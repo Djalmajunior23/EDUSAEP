@@ -2,7 +2,6 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { db } from '../firebase';
 
 export function exportStudentsToCSV(students: any[], filename: string = "export_alunos.csv") {
   const csv = Papa.unparse(students);
@@ -86,7 +85,7 @@ export async function exportDashboardToPDF(stats: any, disciplinePerformance: an
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
-    doc.text(`EduSAEP ULTRA - Página ${i} de ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+    doc.text(`EduAI Core ULTRA - Página ${i} de ${pageCount}`, 14, doc.internal.pageSize.height - 10);
   }
 
   doc.save(`Relatorio_SAEP_${dateStr.replace(/\//g, '-')}.pdf`);

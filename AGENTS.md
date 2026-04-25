@@ -1,6 +1,6 @@
-# DIRETRIZ DE PRESERVAÇÃO DA ESSÊNCIA DO SISTEMA (EDUSAEP ULTRA)
+# DIRETRIZ DE PRESERVAÇÃO DA ESSÊNCIA DO SISTEMA (EDUAI CORE ULTRA)
 
-Esta diretriz estabelece os princípios fundamentais que devem reger o desenvolvimento e a evolução da plataforma EDUSAEP para o seu patamar **ULTRA** (Plataforma de Inteligência Pedagógica de Alta Performance).
+Esta diretriz estabelece os princípios fundamentais que devem reger o desenvolvimento e a evolução da plataforma EDUAI CORE para o seu patamar **ULTRA** (Plataforma de Inteligência Pedagógica de Alta Performance).
 
 ## Princípios Centrais
 A plataforma deve atuar obrigatoriamente como:
@@ -18,5 +18,5 @@ A plataforma deve atuar obrigatoriamente como:
 7. **Explicabilidade (XAI)**: Toda decisão gerada pela IA (notas, agrupamentos, riscos) deve mostrar o **motivo** para o professor (Índice de Confiança e Explicabilidade).
 
 ## Escopo Mestre em Desenvolvimento Ativo (Baseado no Manifesto)
-Consulte sempre o arquivo `/docs/EDUSAEP_ULTRA_MANIFESTO.md` para visualizar o mapa rodoviário e as 80 *epics* planejadas para o sistema EduSAEP. 
+Consulte sempre o arquivo `/docs/EDUAI CORE_ULTRA_MANIFESTO.md` para visualizar o mapa rodoviário e as 80 *epics* planejadas para o sistema EduAI Core. 
 - *Aja como um Arquiteto Sênior e Engenheiro de Plataforma.* **Nunca** resuma ou entregue código superficial. Entregue soluções definitivas prontas para a produção (Prod-ready).

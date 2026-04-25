@@ -1,20 +1,14 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { 
   Activity, 
   TrendingUp, 
-  AlertCircle, 
-  CheckCircle, 
-  Users, 
   Target,
   ArrowUpRight,
-  ArrowDownRight,
-  RefreshCw,
-  Info
+  RefreshCw
 } from 'lucide-react';
 import { AnalyticsHubService, ClassHealthData } from '../../services/analyticsHubService';
 import { db } from '../../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 export function ClassHealthDashboard() {
   const [selectedClassId, setSelectedClassId] = useState<string>('');

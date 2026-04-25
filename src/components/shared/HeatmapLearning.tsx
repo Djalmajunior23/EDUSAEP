@@ -7,24 +7,14 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Cell,
-  Radar, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis 
+  Cell 
 } from 'recharts';
 import { 
   Flame, 
-  AlertTriangle, 
-  TrendingUp, 
-  Users, 
-  Target,
-  ChevronDown,
-  Search
+  AlertTriangle
 } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, query, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 export function HeatmapLearning() {
   const [turmas, setTurmas] = useState<any[]>([]);

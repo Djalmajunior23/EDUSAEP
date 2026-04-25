@@ -17,16 +17,13 @@ import {
   Activity, 
   BarChart3, 
   Cpu, 
-  Settings2, 
   History, 
   CheckCircle2, 
-  XCircle, 
-  AlertTriangle,
+  XCircle,
   Zap,
   TrendingDown,
   DollarSign,
   Info,
-  Save,
   Plus
 } from 'lucide-react';
 import { cn } from '../../lib/utils';

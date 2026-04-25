@@ -1,5 +1,3 @@
-import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export interface WorkloadHealth {
   studentId: string;

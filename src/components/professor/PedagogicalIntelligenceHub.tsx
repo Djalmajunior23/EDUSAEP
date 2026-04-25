@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { GeneratedAssetsView } from './GeneratedAssetsView';
 import { 
   BrainCircuit, 
   Activity, 
-  Target, 
   AlertTriangle, 
   Zap, 
-  TrendingUp, 
-  Users, 
   Eye, 
-  BookOpen, 
   Loader2,
   RefreshCw,
   Gauge,
@@ -19,7 +14,7 @@ import {
 } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid 
+  ResponsiveContainer, Tooltip 
 } from 'recharts';
 import { IntelligenceEngine } from '../../services/advancedIntelligenceEngine';
 import { ErrorMapEntry } from '../../types';
@@ -76,7 +71,7 @@ export function PedagogicalIntelligenceHub() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-gray-900 to-indigo-900 p-8 rounded-3xl text-white shadow-xl">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-indigo-200 text-xs font-bold uppercase tracking-wider mb-2">
-            <SparkleIcon /> EDUSAEP OS 2.0
+            <SparkleIcon /> EDUAI CORE OS 2.0
           </div>
           <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
             <BrainCircuit className="text-indigo-400" size={36} /> Central de Inteligência

@@ -1,6 +1,6 @@
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
-import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { generateContentWrapper } from '../../services/geminiService';
 import { AnalyticsHubService } from '../../services/analyticsHubService';
 
 export class TeacherCopilotService {
@@ -54,7 +54,7 @@ export class TeacherCopilotService {
     const teacherContext = await this.getTeacherContext(teacherId);
 
     const systemPrompt = `
-      Você é o COPILOTO PEDAGÓGICO do EduSAEP, um assistente formidável focado no Sucesso do Aluno e produtividade do Professor.
+      Você é o COPILOTO PEDAGÓGICO do EduAI Core, um assistente formidável focado no Sucesso do Aluno e produtividade do Professor.
       Seu objetivo é:
       - Ajudar na priorização diária (quem precisa de ajuda).
       - Sugerir intervenções pedagógicas baseadas em DADOS.

@@ -3,19 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Database, 
   Search, 
-  Filter, 
   Plus, 
-  MoreVertical, 
   Edit2, 
-  Copy, 
   Trash2, 
-  CheckCircle2, 
   AlertCircle, 
   BrainCircuit,
-  BarChart3,
   Tag,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   Sparkles,
   History,
@@ -23,21 +16,19 @@ import {
   FileUp,
   FileText,
   Table,
-  FileSpreadsheet,
   X,
   Save,
   ExternalLink,
   Zap,
   Code,
   Image as ImageIcon,
-  Archive,
   Layout as LayoutIcon,
   Activity
 } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { generateContentWrapper, getSystemInstruction, parseQuestionsFromText, generateQuestionVariation, generateMultipleQuestionVariations, analyzeQuestionByPerformance, QuestionAnalysisResult } from '../../services/geminiService';
+import { parseQuestionsFromText, generateMultipleQuestionVariations, analyzeQuestionByPerformance, QuestionAnalysisResult } from '../../services/geminiService';
 import { exportQuestionsToGoogleForms } from '../../services/googleFormsService';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
@@ -47,7 +38,7 @@ import Papa from 'papaparse';
 import { Question } from '../../types';
 import { AdvancedQuestionGenerator } from './AdvancedQuestionGenerator';
 import { QuestionRenderer } from '../common/QuestionRenderer';
-import { Eye, ChevronDown as ChevronDownIcon, ChevronUp as ChevronUpIcon } from 'lucide-react';
+import { Eye, ChevronUp as ChevronUpIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 // Configuração do worker do PDF.js
@@ -386,7 +377,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
 
     try {
       toast.info("Preparando exportação para Google Forms...");
-      const result = await exportQuestionsToGoogleForms("Banco de Questões - EDUSAEP", filteredQuestions);
+      const result = await exportQuestionsToGoogleForms("Banco de Questões - EDUAI CORE", filteredQuestions);
       if (result.success) {
         toast.success("Exportação concluída!");
         window.open(result.formUrl, '_blank');
