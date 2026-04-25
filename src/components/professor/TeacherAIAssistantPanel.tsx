@@ -56,6 +56,7 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
     { id: 'code', label: 'Desafio de Código', icon: Code, desc: 'Problemas de programação' },
     { id: 'practical', label: 'Desafio Prático', icon: BrainCircuit, desc: 'Projetos e mãos na massa' },
     { id: 'lesson_plan', label: 'Plano de Aula', icon: BookOpen, desc: 'Roteiro completo de aula' },
+    { id: 'flipped_classroom', label: 'Aula Invertida', icon: Zap, desc: 'Metodologia ativa' },
     { id: 'exercise_list', label: 'Lista de Exercícios', icon: ListChecks, desc: 'Conjunto de questões variadas' }
   ];
 
@@ -91,6 +92,14 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
           5. Atividade Prática Sugerida;
           6. Forma de Avaliação;
           7. Fechamento da Aula.
+        `;
+      } else if (activeTab === 'flipped_classroom') {
+        aiPrompt += `
+          O roteiro de Aula Invertida deve conter:
+          1. Conteúdo de Estudo Prévio (links sugeridos, vídeos ou textos);
+          2. Guia de Estudo (perguntas norteadoras para o aluno antes da aula);
+          3. Atividade de Sala (desafio prático ou debate);
+          4. Avaliação Formativa Rápida para o início da aula.
         `;
       } else if (activeTab === 'exercise_list') {
         aiPrompt += `

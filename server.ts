@@ -243,7 +243,7 @@ async function startServer() {
 
       // 1. Gather data
       const [submissions, engagement, activities, profile] = await Promise.all([
-        db.collection('exam_submissions').where('studentId', '==', studentId).limit(10).get(),
+        db.collection('resultados').where('studentId', '==', studentId).limit(10).get(),
         db.collection('engagement_logs').where('userId', '==', studentId).orderBy('timestamp', 'desc').limit(20).get(),
         db.collection('activity_submissions').where('studentId', '==', studentId).get(),
         db.collection('users').doc(studentId).get()

@@ -29,7 +29,7 @@ export function StudentExamsView({ user, userProfile, selectedModel }: StudentEx
     
     // Fetch published exams (Simulados only)
     const examsQuery = query(
-      collection(db, 'exams'), 
+      collection(db, 'avaliacoes'), 
       where('status', '==', 'published'),
       where('type', '==', 'simulado')
     );
@@ -37,16 +37,16 @@ export function StudentExamsView({ user, userProfile, selectedModel }: StudentEx
       const examsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
       setExams(examsData);
     }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'exams');
+      handleFirestoreError(err, OperationType.LIST, 'avaliacoes');
     });
 
     // Fetch user submissions
-    const submissionsQuery = query(collection(db, 'exam_submissions'), where('studentId', '==', user.uid));
+    const submissionsQuery = query(collection(db, 'resultados'), where('studentId', '==', user.uid));
     const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
       const submissionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSubmission));
       setSubmissions(submissionsData);
     }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'exam_submissions');
+      handleFirestoreError(err, OperationType.LIST, 'resultados');
     });
 
     // Fetch active forms

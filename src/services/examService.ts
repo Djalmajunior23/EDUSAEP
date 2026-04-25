@@ -1,77 +1,88 @@
 
-import { GoogleGenAI } from "@google/genai";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { generateSmartContent } from "./geminiService";
 
 export interface ExamCriteria {
   theme: string;
   competency: string;
   questionCount: number;
   difficulty: 'fácil' | 'médio' | 'difícil';
-  type: 'objetiva' | 'discursiva' | 'mista';
+  type: 'objetiva' | 'discursiva' | 'mista' | 'simulado';
   bloomTaxonomy: string;
   idealResponseExample?: string;
 }
 
-export async function generateExam(criteria: ExamCriteria) {
-  const prompt = `Você é um especialista em avaliação educacional e design instrucional. 
-  Gere uma prova baseada nos critérios abaixo, seguindo rigorosamente a Taxonomia de Bloom para nivelar a dificuldade das questões:
+export async function generateExam(criteria: ExamCriteria, modelName: string = "gemini-1.5-flash") {
+  const isSimulado = criteria.type === "simulado";
+  // Simulado SAEP usually requires 40 questions
+  const finalQuestionCount = isSimulado ? 40 : (criteria.questionCount || 10);
+
+  const prompt = `Você é um especialista em avaliação educacional e design instrucional, focado no padrão SAEP/SENAI. 
+  Gere um ${isSimulado ? 'Simulado Estruturado' : 'Exame'} baseado nos critérios abaixo, seguindo rigorosamente a Taxonomia de Bloom:
 
   Critérios:
   - Tema: ${criteria.theme}
   - Competência: ${criteria.competency}
-  - Quantidade: ${criteria.questionCount}
+  - Quantidade: ${finalQuestionCount} questões.
   - Dificuldade: ${criteria.difficulty}
   - Tipo: ${criteria.type}
   - Nível Bloom Aplicado: ${criteria.bloomTaxonomy}
-  ${criteria.idealResponseExample ? `- Exemplo de resposta desejada: ${criteria.idealResponseExample}` : ''}
+  ${criteria.idealResponseExample ? `- Exemplo de contexto: ${criteria.idealResponseExample}` : ''}
 
-  Regras rígidas para a geração:
-  1. As questões devem avaliar a competência listada com clareza.
-  2. Se tipo 'objetiva', forneça 5 alternativas (a-e) com distratores pedagogicamente coerentes.
-  3. Se tipo 'discursiva', forneça os critérios de avaliação (rubrica) detalhados e um gabarito de referência baseado no exemplo enviado, se existir.
-  4. O gabarito deve ser comentado.
-  5. O estilo de linguagem deve ser profissional.
+  REGRAS RÍGIDAS:
+  1. Retorne EXATAMENTE ${finalQuestionCount} questões. Se for simulado, garanta equilíbrio entre as competências.
+  2. Para questões objetivas, forneça 5 alternativas (A-E).
+  3. Para cada questão, inclua feedback/justificativa para a resposta correta.
+  4. O gabarito deve ser comentado detalhadamente.
+  5. Você DEVE retornar um JSON válido.
 
-  Retorne APENAS um JSON estritamente no formato:
+  ESTRUTURA DO JSON:
   {
     "title": "Título da Prova",
-    "description": "Descrição detalhada dos objetivos desta avaliação",
+    "description": "Objetivos desta avaliação",
     "questions": [
       {
         "type": "objetiva" | "discursiva",
-        "enunciado": "...",
-        "options": ["...", "...", "...", "...", "..."], // Apenas se objetiva
-        "answer": "...", // Texto da resposta correta ou gabarito estruturado
-        "commentary": "...", // Explicação pedagógica detalhada
-        "explanation": "...",
-        "comentarioGabarito": "Explicação detalhada para a resposta correta."
+        "enunciado": "Texto da questão",
+        "options": ["A) ...", "B) ...", "C) ...", "D) ...", "E) ..."],
+        "answer": "A", // Identificador da correta
+        "explanation": "Explicação técnica da IA",
+        "comentarioGabarito": "Justificativa para o aluno"
       }
-    ],
-    "rubric": "Critérios de correção para as questões discursivas" // Se aplicável
+    ]
   }`;
 
-  const result = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: prompt,
-  });
-  const text = (result.text || "").replace(/```json|```/g, '').trim();
-  const jsonResponse = JSON.parse(text);
+  try {
+    const result = await generateSmartContent({
+      tipo: 'simulado',
+      perfil: 'professor',
+      disciplina: criteria.theme,
+      nivel: criteria.difficulty,
+      prompt: prompt
+    }, modelName);
 
-  // Save to Firestore
-  const docRef = await addDoc(collection(db, "assessments"), {
-    ...jsonResponse,
-    criteria,
-    createdAt: serverTimestamp(),
-    status: 'draft'
-  });
+    if (!result || !result.questions || !Array.isArray(result.questions) || result.questions.length === 0) {
+      throw new Error("A IA gerou um exame sem questões úteis. Tente novamente.");
+    }
 
-  return { id: docRef.id, ...jsonResponse };
+    // Save to Firestore using the user requested collection 'avaliacoes'
+    const docRef = await addDoc(collection(db, "avaliacoes"), {
+      ...result,
+      criteria,
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser?.uid || 'system',
+      status: 'draft'
+    });
+
+    return { id: docRef.id, ...result };
+  } catch (error) {
+    console.error("Error generating exam:", error);
+    throw error;
+  }
 }
 
-export async function generateSingleQuestion(criteria: Omit<ExamCriteria, 'questionCount'>) {
+export async function generateSingleQuestion(criteria: Omit<ExamCriteria, 'questionCount'>, modelName: string = "gemini-1.5-flash") {
   const prompt = `Gere uma única questão teórica de múltipla escolha sobre:
   - Tema: ${criteria.theme}
   - Competência: ${criteria.competency}
@@ -80,27 +91,25 @@ export async function generateSingleQuestion(criteria: Omit<ExamCriteria, 'quest
 
   Regras:
   1. Forneça 5 alternativas (A, B, C, D, E).
-  2. Inclua feedback para todas as alternativas (explique o erro se for distrator, ou o acerto).
-  3. Indique a alternativa correta.
-  4. Inclua comentário gabarito.                
-  5. Inclua explicação da IA sobre o raciocínio da dificuldade/abordagem (campo 'explanation').
+  2. Inclua feedback detalhado.
+  3. Retorne APENAS um JSON válido.
 
-  Retorne APENAS JSON:
+  FORMATO:
   {
       "enunciado": "...",
       "options": ["A: ...", "B: ...", "C: ...", "D: ...", "E: ..."],
-      "feedback": ["...", "...", "...", "...", "..."],
       "answer": "...",
-      "commentary": "...",
       "explanation": "...",
       "comentarioGabarito": "..."
   }`;
 
-  const result = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: prompt,
-  });
-  
-  const text = (result.text || "").replace(/```json|```/g, '').trim();
-  return JSON.parse(text);
+  const result = await generateSmartContent({
+    tipo: 'questoes',
+    perfil: 'professor',
+    disciplina: criteria.theme,
+    nivel: criteria.difficulty,
+    prompt: prompt
+  }, modelName);
+
+  return result;
 }

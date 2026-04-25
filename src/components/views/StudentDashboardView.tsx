@@ -8,6 +8,7 @@ import { db } from '../../firebase';
 import { UserProfile } from '../../types';
 import { Skeleton } from '../common/Skeleton';
 import { DropoutRiskCard } from '../shared/DropoutRiskCard';
+import { StudentLearningPath } from '../shared/StudentLearningPath';
 
 interface StudentDashboardViewProps {
   user: User | null;
@@ -282,8 +283,8 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
               </div>
             </div>
           </div>
-
-          <StudentLearningPath studyPlan={studyPlan} />
+          
+          <StudentLearningPath plan={studyPlan} />
 
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-bold text-gray-900">Seus Diagnósticos</h3>
@@ -352,67 +353,6 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
           </div>
         </div>
         
-      </div>
-    </div>
-  );
-}
-
-function StudentLearningPath({ studyPlan }: { studyPlan: any }) {
-  if (!studyPlan) return null;
-
-  return (
-    <div className="bg-white rounded-3xl p-8 border border-emerald-100 shadow-sm relative overflow-hidden mt-8 mb-8">
-      <div className="flex items-center gap-3 mb-6">
-        <Target className="text-emerald-500" size={28} />
-        <h3 className="text-2xl font-bold text-gray-900">Seu Plano de Estudos (IA)</h3>
-      </div>
-      
-      {studyPlan.mensagem_motivacional && (
-        <p className="text-gray-700 bg-emerald-50 p-4 rounded-xl mb-6 font-medium">
-          {studyPlan.mensagem_motivacional}
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2">
-        <div>
-          <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-500" /> Tópicos Prioritários
-          </h4>
-          <div className="space-y-3">
-            {studyPlan.priorityTopics?.map((topic: any, idx: number) => (
-              <div key={idx} className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl">
-                <h5 className="font-bold text-amber-900">{topic.topic}</h5>
-                {topic.reason && <p className="text-sm text-amber-700 mt-1">{topic.reason}</p>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <BookOpen size={18} className="text-indigo-500" /> Atividades Recomendadas
-          </h4>
-          <div className="space-y-3">
-            {studyPlan.recommendedExercises?.length > 0 ? (
-              studyPlan.recommendedExercises.map((ex: any, idx: number) => (
-                <a 
-                  key={idx} 
-                  href={ex.link || '#'} 
-                  className="block bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl hover:bg-indigo-50 transition-colors"
-                >
-                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{ex.competency}</span>
-                  <h5 className="font-bold text-gray-900 mt-1">{ex.title}</h5>
-                </a>
-              ))
-            ) : (
-                studyPlan.recommendations?.map((rec: string, idx: number) => (
-                    <div key={idx} className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
-                        <p className="text-sm font-medium text-gray-700">{rec}</p>
-                    </div>
-                ))
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );

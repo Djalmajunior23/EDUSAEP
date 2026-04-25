@@ -91,6 +91,8 @@ export function SmartContentGenerator({ userProfile, selectedModel }: SmartConte
                 { id: 'questoes', label: 'Questões', icon: CheckCircle2 },
                 { id: 'plano_estudo', label: 'Plano de Estudo', icon: LayoutDashboard },
                 { id: 'simulado', label: 'Simulado', icon: Target },
+                { id: 'estudo_caso', label: 'Estudo de Caso', icon: FileText },
+                { id: 'aula_invertida', label: 'Aula Invertida', icon: BrainCircuit },
                 { id: 'analise_desempenho', label: 'Análise BI', icon: FileText },
               ].map((item) => (
                 <button

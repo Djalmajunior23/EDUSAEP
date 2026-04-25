@@ -100,7 +100,7 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
         competencyResults
       };
 
-      const docRef = await addDoc(collection(db, 'exam_submissions'), submission);
+      const docRef = await addDoc(collection(db, 'resultados'), submission);
       
       await n8nEvents.examCompleted({
         studentId: user?.uid || '',
@@ -154,7 +154,7 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
       localStorage.removeItem(`exam_progress_${exam.id}`);
       toast.success("Avaliação enviada com sucesso!");
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'exam_submissions');
+      handleFirestoreError(err, OperationType.WRITE, 'resultados');
     } finally {
       setIsSubmitting(false);
     }

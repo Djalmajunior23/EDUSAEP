@@ -108,7 +108,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
         questionIds.push(qRef.id);
       }
 
-      const examRef = doc(collection(db, 'exams'));
+      const examRef = doc(collection(db, 'avaliacoes'));
       batch.set(examRef, {
         title: `Importado: ${file.name.split('.')[0]}`,
         description: `Avaliação importada do arquivo ${file.name}`,
@@ -142,7 +142,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
     setLoading(true);
     try {
       const q = query(
-        collection(db, 'exams'),
+        collection(db, 'avaliacoes'),
         where('createdBy', '==', user.uid),
         ...(filterType !== 'all' ? [where('type', '==', filterType)] : []),
         orderBy('createdAt', 'desc')
@@ -205,10 +205,10 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       };
 
       if (currentExam.id) {
-        await updateDoc(doc(db, 'exams', currentExam.id), examToSave);
+        await updateDoc(doc(db, 'avaliacoes', currentExam.id), examToSave);
         toast.success("Avaliação atualizada!");
       } else {
-        await addDoc(collection(db, 'exams'), {
+        await addDoc(collection(db, 'avaliacoes'), {
           ...examToSave,
           createdBy: user.uid,
           createdAt: serverTimestamp()
@@ -229,7 +229,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
     if (!examToDelete) return;
     
     try {
-      await deleteDoc(doc(db, 'exams', examToDelete));
+      await deleteDoc(doc(db, 'avaliacoes', examToDelete));
       toast.success("Simulado excluído com sucesso.");
       fetchExams();
     } catch (error) {
