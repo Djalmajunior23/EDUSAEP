@@ -235,6 +235,85 @@ async function startServer() {
     }
   });
 
+  // Dropout Risk Calculation
+  app.post("/api/ai/dropout-risk", async (req, res) => {
+    try {
+      const { studentId, userId, userRole } = req.body;
+      if (!studentId) return res.status(400).json({ error: "studentId is required" });
+
+      // 1. Gather data
+      const [submissions, engagement, activities, profile] = await Promise.all([
+        db.collection('exam_submissions').where('studentId', '==', studentId).limit(10).get(),
+        db.collection('engagement_logs').where('userId', '==', studentId).orderBy('timestamp', 'desc').limit(20).get(),
+        db.collection('activity_submissions').where('studentId', '==', studentId).get(),
+        db.collection('users').doc(studentId).get()
+      ]);
+
+      const subData = submissions.docs.map(d => ({ score: d.data().score, max: d.data().maxScore, date: d.data().completedAt }));
+      const engData = engagement.docs.map(d => ({ action: d.data().action, date: d.data().timestamp }));
+      const actData = activities.docs.map(d => ({ status: d.data().status, date: d.data().submittedAt }));
+      const userData = profile.exists ? profile.data() : { displayName: "Aluno desconhecido" };
+
+      const prompt = `
+        Analise os dados deste aluno e calcule o Risco de Evasão (0 a 100).
+        Dê o resultado em formato JSON com os campos: "score" (number), "riskLevel" (string: Baixo, Médio, Alto, Crítico), "justifications" (string array).
+
+        Dados do Aluno: ${userData?.displayName}
+        
+        Histórico de Notas (últimas 10):
+        ${JSON.stringify(subData)}
+
+        Engajamento (últimas 20 ações):
+        ${JSON.stringify(engData)}
+
+        Atividades (compleção):
+        ${JSON.stringify(actData)}
+
+        Considere:
+        - Notas baixas ou em declínio aumentam o risco.
+        - Longos períodos sem acesso ou pouca variedade de ações aumentam o risco.
+        - Muitas atividades pendentes ou não entregues aumentam o risco.
+      `;
+
+      const aiResult = await executeAIRequest({
+        prompt,
+        systemInstruction: "Você é um especialista em retenção escolar e IA pedagógica. Sua missão é identificar sinais de evasão baseados em dados frios.",
+        responseFormat: "json",
+        task: "dropout_risk",
+        userId: userId || "system",
+        userRole: userRole || "TEACHER"
+      });
+
+      const parsedResult = JSON.parse(aiResult.text);
+
+      // Save to student_risk_scores for the specialized panel
+      await db.collection('studentRiskScores').doc(studentId).set({
+        score: parsedResult.score,
+        level: parsedResult.riskLevel === 'Crítico' ? 'HIGH' : (parsedResult.riskLevel === 'Alto' ? 'HIGH' : 'MEDIUM'),
+        justifications: parsedResult.justifications,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      // Save to SmartAlerts for management
+      if (parsedResult.score > 30) {
+        await db.collection('smart_alerts').add({
+          targetUserId: studentId,
+          type: "Risco de Evasão",
+          message: `Risco de ${parsedResult.riskLevel} (${parsedResult.score}%) identificado para ${userData?.displayName}. Principais motivos: ${parsedResult.justifications.join(', ')}`,
+          severity: parsedResult.riskLevel === "Crítico" ? "Crítica" : (parsedResult.riskLevel === "Alto" ? "Alta" : "Média"),
+          status: "Novo",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          metadata: parsedResult
+        });
+      }
+
+      res.json(parsedResult);
+    } catch (error: any) {
+      console.error("[Dropout Risk] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to calculate dropout risk" });
+    }
+  });
+
   // Existing n8n and other endpoints...
   app.post("/api/n8n/generate-questions", async (req, res) => {
     try {

@@ -413,6 +413,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /smart_alerts/{alertId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.targetUserId == request.auth.uid);
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /studentRiskScores/{studentId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || studentId == request.auth.uid);
+      allow write: if isAdmin() || isProfessor();
+    }
+
     // Default catch-all (MOVE TO END)
     match /{document=**} {
       allow read, write: if isAdmin();

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { StudyPlanView } from "./components/views/StudyPlanView";
 import { ExamTakingView } from "./components/views/ExamTakingView";
 import { AdminUsersView } from "./components/views/AdminUsersView";
+import { SecurityDashboardView } from "./components/views/SecurityDashboardView";
 import { AlunoView } from "./components/views/AlunoView";
 import { ProfessorDashboardView } from "./components/views/ProfessorDashboardView";
 import { StudentDashboardView } from "./components/views/StudentDashboardView";
@@ -788,6 +789,13 @@ function AppContent() {
         description: "Avisos e Fórum",
       },
       { id: "admin-users", label: "Gestão", icon: Users, path: "/admin-users" },
+      {
+        id: "security-hub",
+        label: "Cybersecurity",
+        icon: Shield,
+        path: "/security-hub",
+        description: "EuAiCore SecOps",
+      },
       {
         id: "ai-governance",
         label: "Governança IA",
@@ -2950,6 +2958,17 @@ function AppContent() {
                         userProfile={userProfile}
                         selectedModel={selectedModel}
                       />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/security-hub"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["ADMIN", "TEACHER", "COORDINATOR"]}
+                    >
+                      <SecurityDashboardView />
                     </ProtectedRoute>
                   }
                 />

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { AlertTriangle, AlertCircle, ArrowRight } from 'lucide-react';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { AlertTriangle, AlertCircle, ArrowRight, Brain, Loader2 } from 'lucide-react';
 import { Student360Drawer } from '../professor/command-center/Student360Drawer';
 
 export function RiskStudentsPanel({ classId }: { classId?: string }) {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
 
   useEffect(() => {
@@ -21,8 +22,21 @@ export function RiskStudentsPanel({ classId }: { classId?: string }) {
         where('level', 'in', ['HIGH', 'MEDIUM'])
       );
       const snap = await getDocs(q);
-      const result = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setStudents(result);
+      
+      const results = await Promise.all(snap.docs.map(async (d) => {
+        const data = d.data();
+        let name = "Aluno " + d.id.substring(0, 5);
+        
+        // Try to fetch name
+        try {
+          const userDoc = await getDoc(doc(db, 'users', d.id));
+          if (userDoc.exists()) name = userDoc.data().displayName || name;
+        } catch (e) {}
+
+        return { id: d.id, name, ...data };
+      }));
+
+      setStudents(results);
     } catch (err) {
       console.error(err);
     } finally {
@@ -30,7 +44,29 @@ export function RiskStudentsPanel({ classId }: { classId?: string }) {
     }
   };
 
-  if (loading) return <div className="animate-pulse h-32 bg-gray-100 rounded-xl"></div>;
+  const handleScanAll = async () => {
+    setScanning(true);
+    try {
+      // For demo / simple implementation, we'll scan all students found in 'users' collection
+      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'STUDENT')));
+      
+      for (const student of usersSnap.docs) {
+        await fetch('/api/ai/dropout-risk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentId: student.id })
+        });
+      }
+      
+      await fetchRiskStudents();
+    } catch (err) {
+      console.error("Scan error:", err);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  if (loading && !scanning) return <div className="animate-pulse h-32 bg-gray-100 rounded-xl"></div>;
 
   return (
     <>
@@ -38,11 +74,16 @@ export function RiskStudentsPanel({ classId }: { classId?: string }) {
         <div className="p-5 border-b border-gray-50 flex items-center justify-between">
           <h3 className="font-bold flex items-center gap-2">
             <AlertTriangle className="text-red-500" size={18} />
-            Alunos em Risco Pedagógico
+            Evasão (IA Dropout Risk)
           </h3>
-          <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-black">
-            {students.length} CRÍTICOS
-          </span>
+          <button 
+            onClick={handleScanAll}
+            disabled={scanning}
+            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+          >
+            {scanning ? <Loader2 className="animate-spin" size={12} /> : <Brain size={12} />}
+            {scanning ? 'Analisando...' : 'Escanear'}
+          </button>
         </div>
         
         <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
@@ -55,8 +96,8 @@ export function RiskStudentsPanel({ classId }: { classId?: string }) {
                   {st.level === 'HIGH' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate">ID: {st.id.substring(0, 8)}...</p>
-                  <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-bold">Risk Score: {st.score}</p>
+                  <p className="font-bold text-sm truncate">{st.name}</p>
+                  <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-bold">Risco: {st.score}%</p>
                   
                   <div className="mt-3 space-y-1">
                     {(st.justifications || []).map((j: string, idx: number) => (

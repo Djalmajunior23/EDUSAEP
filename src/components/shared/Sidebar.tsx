@@ -138,6 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'data-import', label: 'Importação SIAC', icon: Database, path: '/data-import' },
       
       { type: 'header', id: 'h-sys', label: 'Sistema' },
+      { id: 'security-hub', label: 'Cybersecurity', icon: Shield, path: '/security-hub', description: 'EuAiCore SecOps' },
       { id: 'system-governance', label: 'Governança IA', icon: Shield, path: '/system-governance' },
       { id: 'admin-users', label: 'Usuários', icon: Users, path: '/admin-users' },
       { id: 'profile', label: 'Perfil', icon: UserIcon, path: '/profile' },
