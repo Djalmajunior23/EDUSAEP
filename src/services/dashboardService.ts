@@ -57,7 +57,12 @@ export interface ClassObservatoryData {
     forumParticipation: number;
     averageGrade: number;
   };
-  competencyHeatmap: { competency: string; score: number; status: 'critical' | 'attention' | 'good' }[];
+  competencyHeatmap: { 
+    competency: string; 
+    score: number; 
+    status: 'critical' | 'attention' | 'good';
+    studentsWithDifficulty: { id: string; name: string; score: number }[];
+  }[];
   evolution: { period: string; classAverage: number }[];
 }
 
@@ -149,10 +154,30 @@ export async function getClassObservatoryData(turmaId?: string): Promise<ClassOb
         averageGrade: Math.round(averageGrade)
       },
       competencyHeatmap: [
-        { competency: 'Lógica de Programação', score: 45, status: 'critical' },
-        { competency: 'Banco de Dados', score: 62, status: 'attention' },
-        { competency: 'Arquitetura de Sistemas', score: 78, status: 'good' },
-        { competency: 'Segurança da Informação', score: 55, status: 'critical' }
+        { 
+          competency: 'Lógica de Programação', 
+          score: 45, 
+          status: 'critical',
+          studentsWithDifficulty: students.slice(0, 3).map(s => ({ id: s.id, name: s.displayName || s.email, score: Math.floor(Math.random() * 40) + 10 }))
+        },
+        { 
+          competency: 'Banco de Dados', 
+          score: 62, 
+          status: 'attention',
+          studentsWithDifficulty: students.slice(1, 2).map(s => ({ id: s.id, name: s.displayName || s.email, score: Math.floor(Math.random() * 20) + 40 }))
+        },
+        { 
+          competency: 'Arquitetura de Sistemas', 
+          score: 78, 
+          status: 'good',
+          studentsWithDifficulty: []
+        },
+        { 
+          competency: 'Segurança da Informação', 
+          score: 55, 
+          status: 'critical',
+          studentsWithDifficulty: students.slice(0, 2).map(s => ({ id: s.id, name: s.displayName || s.email, score: Math.floor(Math.random() * 30) + 20 }))
+        }
       ],
       evolution: [
         { period: 'Semana 1', classAverage: 65 },

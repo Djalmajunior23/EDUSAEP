@@ -5,7 +5,9 @@ import { UserRole } from '../../types';
 import { db, auth } from '../../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
-import { generateContentWrapper, DEFAULT_CONFIG, getSystemInstruction } from '../../services/geminiService';
+import { intelligenceEngine } from '../../services/eduai/intelligenceEngine';
+
+// ... (início mantido igual, apenas substituiremos a chamada de gerar resposta)
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -92,15 +94,8 @@ export function SocraticTutor({
       
       Inicie a conversa cumprimentando o aluno e fazendo uma pergunta inicial sobre o que ele entendeu da questão ou qual parte está sendo mais difícil.`;
 
-      const response = await generateContentWrapper({
-        model: selectedModel,
-        contents: [{ role: 'user', parts: [{ text: initialPrompt }] }],
-        config: {
-          systemInstruction: getSystemInstruction(userRole, 'simulados'),
-          ...DEFAULT_CONFIG,
-        }
-      });
-      const initialMessage = response.text;
+      const response = await intelligenceEngine.process(initialPrompt, auth.currentUser.uid);
+      const initialMessage = response.response;
 
       const newSession = {
         aluno_id: auth.currentUser.uid,
@@ -127,7 +122,7 @@ export function SocraticTutor({
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || isLoading || !sessionId) return;
+    if (!inputText.trim() || isLoading || !sessionId || !auth.currentUser) return;
 
     const userMessage: Message = {
       text: inputText,
@@ -141,22 +136,8 @@ export function SocraticTutor({
     setIsLoading(true);
 
     try {
-      const chatHistory = updatedMessages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
-      }));
-
-      const response = await generateContentWrapper({
-        model: selectedModel,
-        contents: chatHistory,
-        config: {
-          systemInstruction: getSystemInstruction(userRole, 'simulados'),
-          ...DEFAULT_CONFIG,
-          maxOutputTokens: 500,
-        }
-      });
-      
-      const botResponse = response.text;
+      const response = await intelligenceEngine.process(inputText, auth.currentUser.uid);
+      const botResponse = response.response;
 
       const botMessage: Message = {
         text: botResponse,

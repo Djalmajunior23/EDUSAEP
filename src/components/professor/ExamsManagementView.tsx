@@ -28,7 +28,7 @@ import {
   Save
 } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch, limit } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { exportExamToGoogleForms } from '../../services/googleFormsService';
 import { parseQuestionsFromText } from '../../services/geminiService';
@@ -56,6 +56,8 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
 
   // Generative State
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [autoFill, setAutoFill] = useState(false);
+  const [autoFillCount, setAutoFillCount] = useState(10);
 
   useEffect(() => {
     fetchExams();
@@ -163,6 +165,8 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
   };
 
   const handleCreate = () => {
+    setAutoFill(false);
+    setAutoFillCount(10);
     setCurrentExam({
       title: '',
       description: '',
@@ -178,6 +182,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
   };
 
   const handleEdit = (exam: Exam) => {
+    setAutoFill(false);
     setCurrentExam({
       ...exam,
       dueDate: exam.dueDate ? exam.dueDate.split('T')[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // formats string for input date
@@ -191,18 +196,29 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
 
     setIsSaving(true);
     try {
+      let finalQuestions = currentExam.questions || [];
+      // Only autofill on creation if enabled
+      if (!currentExam.id && autoFill && finalQuestions.length === 0) {
+        const qSnap = await getDocs(query(collection(db, 'questions'), limit(autoFillCount)));
+        finalQuestions = qSnap.docs.map(d => d.id);
+      }
+
+      const examToSave = {
+        ...currentExam,
+        questions: finalQuestions,
+        totalQuestions: finalQuestions.length,
+        totalPoints: finalQuestions.length * 10,
+        updatedAt: serverTimestamp()
+      };
+
       if (currentExam.id) {
-        await updateDoc(doc(db, 'exams', currentExam.id), {
-          ...currentExam,
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(doc(db, 'exams', currentExam.id), examToSave);
         toast.success("Avaliação atualizada!");
       } else {
         await addDoc(collection(db, 'exams'), {
-          ...currentExam,
+          ...examToSave,
           createdBy: user.uid,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          createdAt: serverTimestamp()
         });
         toast.success("Avaliação criada!");
       }
@@ -537,6 +553,39 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
                     />
                   </div>
                 </div>
+
+                {!currentExam.id && (
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Preenchimento Automático</p>
+                        <p className="text-[10px] text-gray-500">Selecionar questões aleatórias do banco</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={autoFill}
+                          onChange={e => setAutoFill(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                      </label>
+                    </div>
+                    {autoFill && (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Quantidade de Questões (até 40)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="40"
+                          value={autoFillCount}
+                          onChange={e => setAutoFillCount(parseInt(e.target.value) || 1)}
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">

@@ -37,6 +37,7 @@ import { db } from '../../firebase';
 import { collection, getDocs, query } from 'firebase/firestore';
 
 import { StudentCompetencyModal } from './StudentCompetencyModal';
+import { ClassHeatmapDashboard } from './ClassHeatmapDashboard';
 
 export function ClassObservatoryView() {
   const [data, setData] = useState<ClassObservatoryData | null>(null);
@@ -341,34 +342,7 @@ export function ClassObservatoryView() {
         <div className="lg:col-span-2 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Competency Heatmap */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <Target className="text-indigo-600" size={20} /> Mapa de Competências
-              </h3>
-              <div className="space-y-4">
-                {data.competencyHeatmap.map((comp, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-700">{comp.competency}</span>
-                      <span className={
-                        comp.status === 'critical' ? 'text-red-600' : 
-                        comp.status === 'attention' ? 'text-amber-600' : 'text-emerald-600'
-                      }>{comp.score}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${comp.score}%` }}
-                        className={`h-full rounded-full ${
-                          comp.status === 'critical' ? 'bg-red-500' : 
-                          comp.status === 'attention' ? 'bg-amber-500' : 'bg-emerald-500'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ClassHeatmapDashboard data={data.competencyHeatmap} />
 
             {/* Engagement Distribution */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
