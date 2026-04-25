@@ -265,9 +265,14 @@ export const DEFAULT_CONFIG = {
  */
 function unwrapParsedJson(parsed: any): any {
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    if (Array.isArray(parsed.questoes)) return parsed.questoes;
-    if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
-    if (parsed.question && typeof parsed.question === 'object') return parsed.question;
+    const keys = Object.keys(parsed);
+    // Only unwrap if it's the only key and it's a known wrapper key
+    if (keys.length === 1) {
+      if (Array.isArray(parsed.questoes)) return parsed.questoes;
+      if (Array.isArray(parsed.questions)) return parsed.questions;
+      if (parsed.questao && typeof parsed.questao === 'object') return parsed.questao;
+      if (parsed.question && typeof parsed.question === 'object') return parsed.question;
+    }
   }
   return parsed;
 }

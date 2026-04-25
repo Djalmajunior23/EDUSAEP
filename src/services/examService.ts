@@ -58,7 +58,8 @@ export async function generateExam(criteria: ExamCriteria, modelName: string = "
       tipo: 'simulado',
       perfil: 'professor',
       disciplina: criteria.theme,
-      nivel: criteria.difficulty,
+      nivel: (criteria.difficulty === 'fácil' ? 'facil' : (criteria.difficulty === 'difícil' ? 'dificil' : 'medio')) as any,
+      competencias: [criteria.competency],
       prompt: prompt
     }, modelName);
 
@@ -69,10 +70,15 @@ export async function generateExam(criteria: ExamCriteria, modelName: string = "
     // Save to Firestore using the user requested collection 'avaliacoes'
     const docRef = await addDoc(collection(db, "avaliacoes"), {
       ...result,
+      totalQuestions: result.questions.length,
+      totalPoints: result.questions.length * 10,
       criteria,
+      type: criteria.type,
       createdAt: serverTimestamp(),
       createdBy: auth.currentUser?.uid || 'system',
-      status: 'draft'
+      status: 'draft',
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      duration: criteria.type === 'simulado' ? 240 : 120
     });
 
     return { id: docRef.id, ...result };
@@ -107,7 +113,8 @@ export async function generateSingleQuestion(criteria: Omit<ExamCriteria, 'quest
     tipo: 'questoes',
     perfil: 'professor',
     disciplina: criteria.theme,
-    nivel: criteria.difficulty,
+    nivel: (criteria.difficulty === 'fácil' ? 'facil' : (criteria.difficulty === 'difícil' ? 'dificil' : 'medio')) as any,
+    competencias: [criteria.competency],
     prompt: prompt
   }, modelName);
 

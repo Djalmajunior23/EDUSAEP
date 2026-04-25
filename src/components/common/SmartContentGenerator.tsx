@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Loader2, Zap, BookOpen, FileText, LayoutDashboard, Target, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Loader2, Zap, BookOpen, FileText, LayoutDashboard, Target, CheckCircle2, BrainCircuit } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';

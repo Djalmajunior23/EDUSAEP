@@ -58,10 +58,14 @@ export function ExamGenerator({ isOpen, onClose }: { isOpen: boolean, onClose: (
         <select 
           className="w-full p-3 border rounded-lg"
           value={criteria.type}
-          onChange={e => setCriteria({...criteria, type: e.target.value as any})}
+          onChange={e => {
+            const newType = e.target.value as any;
+            setCriteria({...criteria, type: newType, questionCount: newType === 'simulado' ? 40 : criteria.questionCount});
+          }}
         >
           <option value="objetiva">Objetiva</option>
           <option value="discursiva">Discursiva</option>
+          <option value="simulado">Simulado SAEP (40 Questões)</option>
         </select>
 
         {criteria.type === 'discursiva' && (

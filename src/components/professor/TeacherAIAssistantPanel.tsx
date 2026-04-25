@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, FileText, Code, Briefcase, BrainCircuit, Loader2, CheckCircle2, ListChecks, BookOpen, Target } from 'lucide-react';
+import { 
+  Sparkles, 
+  FileText, 
+  Code, 
+  Briefcase, 
+  BrainCircuit, 
+  Loader2, 
+  CheckCircle2, 
+  ListChecks, 
+  BookOpen, 
+  Target, 
+  Zap as ZapIcon 
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
@@ -8,7 +20,7 @@ import Markdown from 'react-markdown';
 import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
 
 export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userProfile: any, selectedModel: string }) {
-  const [activeTab, setActiveTab] = useState<'discursive' | 'case_study' | 'code' | 'practical' | 'lesson_plan' | 'exercise_list'>('case_study');
+  const [activeTab, setActiveTab] = useState<'discursive' | 'case_study' | 'code' | 'practical' | 'lesson_plan' | 'exercise_list' | 'flipped_classroom'>('case_study');
   const [prompt, setPrompt] = useState('');
   const [context, setContext] = useState('');
   const [difficulty, setDifficulty] = useState<'facil' | 'medio' | 'dificil'>('medio');
@@ -56,7 +68,7 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
     { id: 'code', label: 'Desafio de Código', icon: Code, desc: 'Problemas de programação' },
     { id: 'practical', label: 'Desafio Prático', icon: BrainCircuit, desc: 'Projetos e mãos na massa' },
     { id: 'lesson_plan', label: 'Plano de Aula', icon: BookOpen, desc: 'Roteiro completo de aula' },
-    { id: 'flipped_classroom', label: 'Aula Invertida', icon: Zap, desc: 'Metodologia ativa' },
+    { id: 'flipped_classroom', label: 'Aula Invertida', icon: ZapIcon, desc: 'Metodologia ativa' },
     { id: 'exercise_list', label: 'Lista de Exercícios', icon: ListChecks, desc: 'Conjunto de questões variadas' }
   ];
 

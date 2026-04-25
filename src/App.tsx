@@ -99,7 +99,7 @@ import {
   HelpCircle,
   Menu,
   Database,
-  Zap,
+  Zap as ZapIcon,
   ArrowRight,
   Target,
   Trophy,
@@ -527,7 +527,7 @@ function AppContent() {
           path: "/smart-content",
           description: "Conteúdo Personalizado",
         },
-        { id: "study-plan", label: "Plano IA", icon: Zap, path: "/study-plan" },
+        { id: "study-plan", label: "Plano IA", icon: ZapIcon, path: "/study-plan" },
         { type: "header", label: "Outros" },
         { id: "history", label: "Histórico", icon: History, path: "/history" },
         {
@@ -652,7 +652,7 @@ function AppContent() {
       {
         id: "question-optimizer",
         label: "Otimizador IA",
-        icon: Zap,
+        icon: ZapIcon,
         path: "/question-optimizer",
         description: "Refatoração de Itens",
       },
@@ -712,7 +712,7 @@ function AppContent() {
       {
         id: "pedagogical-rules",
         label: "Regras do Sistema",
-        icon: Zap,
+        icon: ZapIcon,
         path: "/pedagogical-rules",
         description: "Central de Regras",
       },

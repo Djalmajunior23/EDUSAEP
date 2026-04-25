@@ -12,6 +12,7 @@ import { UserProfile } from '../../types';
 import { ActivityManager } from '../professor/ActivityManager';
 import { HeatmapLearning } from '../shared/HeatmapLearning';
 import { RiskStudentsPanel } from '../analytics/RiskStudentsPanel';
+import { PedagogicalDecisionsWidget } from '../professor/PedagogicalDecisionsWidget';
 
 interface ProfessorDashboardViewProps {
   user: User | null;
@@ -259,6 +260,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
             </div>
 
             <div className="space-y-6">
+              <PedagogicalDecisionsWidget />
               <RiskStudentsPanel />
               
               <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
