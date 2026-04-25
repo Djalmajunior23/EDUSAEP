@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { generateSAEPQuestion } from '../../services/geminiService';
+import { generateSAEPQuestion, generateDiscursiveQuestion } from '../../services/geminiService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -22,6 +22,8 @@ interface SAEPItemGeneratorProps {
 export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItemGeneratorProps) {
   const [competency, setCompetency] = useState('');
   const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
+  const [questionType, setQuestionType] = useState<'multipla_escolha' | 'discursiva'>('multipla_escolha');
+  const [caseStudy, setCaseStudy] = useState('');
   const [localModel, setLocalModel] = useState(selectedModel || 'gemini-3-flash-preview');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
@@ -43,10 +45,21 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
       return;
     }
 
+    if (questionType === 'discursiva' && !caseStudy.trim()) {
+      toast.error("Informe o estudo de caso para gerar a questão discursiva.");
+      return;
+    }
+
     setIsGenerating(true);
     setGeneratedQuestion(null);
     try {
-      const question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'TEACHER');
+      let question;
+      if (questionType === 'multipla_escolha') {
+        question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'TEACHER');
+      } else {
+        const promptParams = `Baseado neste estudo de caso exclusivo:\n"${caseStudy}"\n\nCrie uma questão discursiva avaliando a competência. Extrapole os pontos fundamentais do caso para formar o enunciado da questão.`;
+        question = await generateDiscursiveQuestion(promptParams, difficulty, localModel, userProfile?.role as any || 'TEACHER', competency);
+      }
       setGeneratedQuestion(question);
       toast.success("Questão gerada com sucesso!");
     } catch (err: any) {
@@ -66,26 +79,33 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
       return;
     }
 
-    if (!generatedQuestion.alternativas || !Array.isArray(generatedQuestion.alternativas) || generatedQuestion.alternativas.length < 2) {
-      toast.error("A questão deve ter pelo menos duas alternativas.");
-      return;
-    }
+    if (generatedQuestion.tipoQuestao !== 'Discursiva') {
+      if (!generatedQuestion.alternativas || !Array.isArray(generatedQuestion.alternativas) || generatedQuestion.alternativas.length < 2) {
+        toast.error("A questão deve ter pelo menos duas alternativas.");
+        return;
+      }
 
-    const emptyAlternatives = generatedQuestion.alternativas.some((a: any) => !a.texto || a.texto.trim().length === 0);
-    if (emptyAlternatives) {
-      toast.error("Todas as alternativas devem ter um texto preenchido.");
-      return;
-    }
+      const emptyAlternatives = generatedQuestion.alternativas.some((a: any) => !a.texto || a.texto.trim().length === 0);
+      if (emptyAlternatives) {
+        toast.error("Todas as alternativas devem ter um texto preenchido.");
+        return;
+      }
 
-    if (!generatedQuestion.respostaCorreta) {
-      toast.error("A resposta correta deve ser definida.");
-      return;
-    }
+      if (!generatedQuestion.respostaCorreta) {
+        toast.error("A resposta correta deve ser definida.");
+        return;
+      }
 
-    const validCorrectAnswer = generatedQuestion.alternativas.some((a: any) => a.id === generatedQuestion.respostaCorreta);
-    if (!validCorrectAnswer) {
-      toast.error("A resposta correta selecionada é inválida.");
-      return;
+      const validCorrectAnswer = generatedQuestion.alternativas.some((a: any) => a.id === generatedQuestion.respostaCorreta);
+      if (!validCorrectAnswer) {
+        toast.error("A resposta correta selecionada é inválida.");
+        return;
+      }
+    } else {
+      if (!generatedQuestion.respostaEsperada || generatedQuestion.respostaEsperada.trim().length === 0) {
+        toast.error("A resposta esperada não pode estar vazia.");
+        return;
+      }
     }
 
     try {
@@ -136,6 +156,18 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
           </div>
 
           <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tipo de Questão</label>
+            <select 
+              value={questionType}
+              onChange={(e) => setQuestionType(e.target.value as any)}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
+            >
+              <option value="multipla_escolha">Múltipla Escolha (Matriz SAEP)</option>
+              <option value="discursiva">Discursiva com Estudo de Caso</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Nível de Dificuldade</label>
             <select 
               value={difficulty}
@@ -148,7 +180,7 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
             </select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 md:col-span-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Modelo de Inteligência Artificial</label>
             <select 
               value={localModel}
@@ -160,6 +192,19 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
               <option value="gemini-flash-latest">Gemini Flash Latest</option>
             </select>
           </div>
+
+          {questionType === 'discursiva' && (
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estudo de Caso / Contexto (Obrigatório)</label>
+              <textarea 
+                value={caseStudy}
+                onChange={(e) => setCaseStudy(e.target.value)}
+                placeholder="Cole ou digite aqui o caso prático que servirá de base para a questão discursiva..."
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white resize-y"
+                rows={4}
+              />
+            </div>
+          )}
         </div>
 
         <button 
@@ -210,40 +255,82 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
                 />
               </div>
               
-              <div className="grid grid-cols-1 gap-3">
-                {generatedQuestion.alternativas.map((opt: { id: string, texto: string }, idx: number) => (
-                  <div 
-                    key={opt.id}
-                    className={cn(
-                      "p-4 rounded-xl border transition-all text-sm flex items-start gap-3",
-                      opt.id === generatedQuestion.respostaCorreta 
-                        ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-medium" 
-                        : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400"
-                    )}
-                  >
-                    <input 
-                      type="radio"
-                      name="correct-answer-gen"
-                      checked={opt.id === generatedQuestion.respostaCorreta}
-                      onChange={() => setGeneratedQuestion({ ...generatedQuestion, respostaCorreta: opt.id })}
-                      className="mt-1 w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              {generatedQuestion.respostaEsperada !== undefined ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Resposta Esperada</label>
+                    <textarea 
+                      value={generatedQuestion.respostaEsperada}
+                      onChange={(e) => setGeneratedQuestion({ ...generatedQuestion, respostaEsperada: e.target.value })}
+                      className="w-full bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30 text-emerald-900 dark:text-emerald-100 outline-none focus:ring-2 focus:ring-emerald-500/20 rounded-lg p-4 resize-none"
+                      rows={5}
                     />
-                    <div className="flex-1 flex items-start gap-2">
-                      <span className="font-bold mt-0.5">{opt.id})</span>
-                      <textarea 
-                        value={opt.texto}
-                        onChange={(e) => {
-                          const newAlts = [...generatedQuestion.alternativas];
-                          newAlts[idx] = { ...newAlts[idx], texto: e.target.value };
-                          setGeneratedQuestion({ ...generatedQuestion, alternativas: newAlts });
-                        }}
-                        className="w-full bg-transparent outline-none focus:ring-2 focus:ring-emerald-500/20 rounded-lg p-1 resize-none"
-                        rows={1}
-                      />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Critérios de Avaliação</label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {generatedQuestion.criteriosAvaliacao?.map((crit: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700 flex flex-col gap-2">
+                          <input 
+                            value={crit.criterio}
+                            onChange={(e) => {
+                              const newCrits = [...generatedQuestion.criteriosAvaliacao];
+                              newCrits[idx] = { ...newCrits[idx], criterio: e.target.value };
+                              setGeneratedQuestion({ ...generatedQuestion, criteriosAvaliacao: newCrits });
+                            }}
+                            className="font-bold bg-transparent outline-none w-full dark:text-white"
+                          />
+                          <textarea 
+                            value={crit.descricao}
+                            onChange={(e) => {
+                              const newCrits = [...generatedQuestion.criteriosAvaliacao];
+                              newCrits[idx] = { ...newCrits[idx], descricao: e.target.value };
+                              setGeneratedQuestion({ ...generatedQuestion, criteriosAvaliacao: newCrits });
+                            }}
+                            className="text-sm bg-transparent outline-none w-full text-gray-600 dark:text-gray-400"
+                            rows={2}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {generatedQuestion.alternativas?.map((opt: { id: string, texto: string }, idx: number) => (
+                    <div 
+                      key={opt.id}
+                      className={cn(
+                        "p-4 rounded-xl border transition-all text-sm flex items-start gap-3",
+                        opt.id === generatedQuestion.respostaCorreta 
+                          ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-medium" 
+                          : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                      )}
+                    >
+                      <input 
+                        type="radio"
+                        name="correct-answer-gen"
+                        checked={opt.id === generatedQuestion.respostaCorreta}
+                        onChange={() => setGeneratedQuestion({ ...generatedQuestion, respostaCorreta: opt.id })}
+                        className="mt-1 w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <div className="flex-1 flex items-start gap-2">
+                        <span className="font-bold mt-0.5">{opt.id})</span>
+                        <textarea 
+                          value={opt.texto}
+                          onChange={(e) => {
+                            const newAlts = [...generatedQuestion.alternativas];
+                            newAlts[idx] = { ...newAlts[idx], texto: e.target.value };
+                            setGeneratedQuestion({ ...generatedQuestion, alternativas: newAlts });
+                          }}
+                          className="w-full bg-transparent outline-none focus:ring-2 focus:ring-emerald-500/20 rounded-lg p-1 resize-none"
+                          rows={1}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 space-y-3">

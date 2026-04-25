@@ -224,6 +224,10 @@ import { LabsView } from "./components/views/LabsView";
 import { SimulatorsView } from "./components/views/SimulatorsView";
 import { cn } from "./lib/utils";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/common/ProtectedRoute";
+import { ObservatorioAlunoView } from "./components/observatory/ObservatorioAlunoView";
+import { EvidencePortfolioView } from "./components/portfolio/EvidencePortfolioView";
 
 function DarkModeToggle({
   darkMode,
