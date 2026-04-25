@@ -38,6 +38,16 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
     localStorage.setItem(`exam_progress_${exam.id}`, JSON.stringify(answers));
   }, [answers, exam.id]);
 
+  if (exam.questions.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto p-12 text-center space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900">Este simulado não possui questões.</h2>
+        <p className="text-gray-500">Aguarde a atualização do professor ou tente outro simulado.</p>
+        <button onClick={onCancel} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold">Voltar</button>
+      </div>
+    );
+  }
+
   const currentQuestion = exam.questions[currentQuestionIdx];
 
   const handleAnswer = (optionIdx: number) => {

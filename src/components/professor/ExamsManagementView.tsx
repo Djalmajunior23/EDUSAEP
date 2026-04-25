@@ -18,7 +18,8 @@ import {
   Upload,
   X,
   BrainCircuit,
-  Save
+  Save,
+  Check
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch, limit } from 'firebase/firestore';
@@ -49,6 +50,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
 
   // Generative State
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showQuestionSelector, setShowQuestionSelector] = useState(false);
   const [autoFill, setAutoFill] = useState(false);
   const [autoFillCount, setAutoFillCount] = useState(10);
 
@@ -547,6 +549,41 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
                   </div>
                 </div>
 
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                       <label className="block text-sm font-bold text-gray-700">Questões Selecionadas ({currentExam.questions?.length || 0})</label>
+                       <button 
+                         type="button"
+                         onClick={() => setShowQuestionSelector(true)}
+                         className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                       >
+                         <Search size={14} /> Selecionar do Banco
+                       </button>
+                    </div>
+                    
+                    <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-xl bg-gray-50 p-2 space-y-2">
+                      {currentExam.questions && currentExam.questions.length > 0 ? (
+                        currentExam.questions.map((q: any, idx: number) => (
+                          <div key={q.id || idx} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-100 text-xs shadow-sm">
+                            <span className="truncate flex-1 font-medium">Questão #{idx + 1}: {q.enunciado?.substring(0, 50)}...</span>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newQs = currentExam.questions?.filter((item: any) => (item.id || item.questionUid) !== (q.id || q.questionUid)) || [];
+                                setCurrentExam({...currentExam, questions: newQs});
+                              }}
+                              className="text-red-500 hover:text-red-700 px-1"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-gray-400 text-center py-4 italic">Nenhuma questão selecionada manualmente.</p>
+                      )}
+                    </div>
+                  </div>
+
                 {!currentExam.id && (
                   <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
@@ -657,6 +694,135 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
         onClose={() => setShowGenerateModal(false)} 
       />
 
+      {/* QUESTION SELECTOR MODAL */}
+      <AnimatePresence>
+        {showQuestionSelector && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-6 border-b flex justify-between items-center bg-indigo-600 text-white">
+                <div>
+                  <h3 className="text-xl font-bold">Selecionar Questões do Banco</h3>
+                  <p className="text-xs opacity-80">Escolha as questões que farão parte deste simulado.</p>
+                </div>
+                <button onClick={() => setShowQuestionSelector(false)} className="p-2 hover:bg-white/10 rounded-full transition-all">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <BankQuestionPicker 
+                  currentSelected={currentExam?.questions || []}
+                  onToggle={(question) => {
+                    if (!currentExam) return;
+                    const prev = (currentExam.questions || []) as any[];
+                    const questionId = question.id || question.questionUid;
+                    const isSelected = prev.some(q => (q.id || q.questionUid) === questionId);
+                    const next = isSelected 
+                      ? prev.filter(q => (q.id || q.questionUid) !== questionId) 
+                      : [...prev, question];
+                    setCurrentExam({...currentExam, questions: next});
+                  }}
+                />
+              </div>
+
+              <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
+                <span className="text-sm font-bold text-gray-500">
+                  {currentExam?.questions?.length || 0} questões selecionadas
+                </span>
+                <button 
+                  onClick={() => setShowQuestionSelector(false)}
+                  className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg transition-all"
+                >
+                  Concluir Seleção
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}
+
+function BankQuestionPicker({ currentSelected, onToggle }: { currentSelected: any[], onToggle: (q: any) => void }) {
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'questions'), orderBy('createdAt', 'desc'), limit(100)));
+        setQuestions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        toast.error("Erro ao carregar banco");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetch();
+  }, []);
+
+  const filtered = questions.filter(q => 
+    q.enunciado.toLowerCase().includes(search.toLowerCase()) || 
+    q.competenciaNome?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const isSelected = (q: any) => currentSelected.some(s => (s.id || s.questionUid) === (q.id || q.questionUid));
+
+  return (
+    <div className="space-y-4">
+      <div className="sticky top-0 bg-white z-10 pb-2">
+        <input 
+          type="text" 
+          placeholder="Filtrar por enunciado ou competência..."
+          className="w-full p-3 border rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="animate-spin text-indigo-600" size={32} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3">
+          {filtered.map(q => (
+            <button
+              key={q.id}
+              onClick={() => onToggle(q)}
+              className={`p-4 text-left border-2 rounded-2xl transition-all flex justify-between items-start gap-4 ${
+                isSelected(q)
+                  ? 'border-indigo-500 bg-indigo-50 shadow-md' 
+                  : 'border-gray-100 hover:border-indigo-200 bg-white'
+              }`}
+            >
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center gap-2">
+                   <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                     {q.competenciaNome || 'Geral'}
+                   </span>
+                   <span className="text-[10px] font-black uppercase text-gray-400">
+                     {q.dificuldade || 'médio'}
+                   </span>
+                </div>
+                <p className="text-sm font-medium text-gray-700 line-clamp-2">{q.enunciado}</p>
+              </div>
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                isSelected(q) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200'
+              }`}>
+                {isSelected(q) && <Check size={14} />}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

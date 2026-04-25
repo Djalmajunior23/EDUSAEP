@@ -59,6 +59,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
   const [isGeneratingVariation, setIsGeneratingVariation] = useState<string | null>(null);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [showAdvancedGenerator, setShowAdvancedGenerator] = useState(false);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
 
   // Analysis states
   const [isAnalyzingQuestion, setIsAnalyzingQuestion] = useState<string | null>(null);
@@ -677,17 +678,88 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
 
       {/* Questions List */}
       <div className="space-y-4">
+        {selectedQuestionIds.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="sticky top-20 z-30 flex items-center justify-between p-4 bg-indigo-600 text-white rounded-2xl shadow-xl border border-indigo-500"
+          >
+            <div className="flex items-center gap-4">
+              <input 
+                type="checkbox" 
+                checked={selectedQuestionIds.length === filteredQuestions.length}
+                onChange={() => {
+                  if (selectedQuestionIds.length === filteredQuestions.length) {
+                    setSelectedQuestionIds([]);
+                  } else {
+                    setSelectedQuestionIds(filteredQuestions.map(q => q.id!));
+                  }
+                }}
+                className="w-5 h-5 rounded border-indigo-400 text-indigo-500 focus:ring-white"
+              />
+              <span className="text-sm font-bold">{selectedQuestionIds.length} questões selecionadas</span>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={async () => {
+                   const selectedQuestions = questions.filter(q => selectedQuestionIds.includes(q.id!));
+                   await exportQuestionsToGoogleForms(`Exportação Banco de Questões (${new Date().toLocaleDateString()})`, selectedQuestions);
+                }}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+              >
+                <ExternalLink size={14} /> Exportar Forms
+              </button>
+              <button 
+                onClick={async () => {
+                  if (window.confirm(`Excluir ${selectedQuestionIds.length} questões permanentemente?`)) {
+                    const batch = writeBatch(db);
+                    selectedQuestionIds.forEach(id => batch.delete(doc(db, 'questions', id)));
+                    await batch.commit();
+                    toast.success("Exclusão concluída");
+                    setSelectedQuestionIds([]);
+                    fetchQuestions();
+                  }
+                }}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+              >
+                <Trash2 size={14} /> Excluir em Massa
+              </button>
+              <button onClick={() => setSelectedQuestionIds([])} className="p-2 hover:bg-white/10 rounded-full">
+                <X size={20} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {filteredQuestions.map(question => (
           <motion.div 
             key={question.id}
             layout
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all group"
+            className={cn(
+              "bg-white p-6 rounded-3xl shadow-sm border transition-all group flex gap-6",
+              selectedQuestionIds.includes(question.id!) ? "border-indigo-500 bg-indigo-50/30" : "border-gray-100"
+            )}
           >
-            <div className="flex justify-between items-start gap-6">
-              <div className="flex-1 space-y-4">
-                <div className="flex items-center gap-3 flex-wrap">
+            <div className="pt-2">
+              <input 
+                type="checkbox" 
+                checked={selectedQuestionIds.includes(question.id!)}
+                onChange={() => {
+                  setSelectedQuestionIds(prev => 
+                    prev.includes(question.id!) 
+                      ? prev.filter(id => id !== question.id)
+                      : [...prev, question.id!]
+                  );
+                }}
+                className="w-6 h-6 rounded-lg border-gray-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer shadow-sm"
+              />
+            </div>
+            
+            <div className="flex-1">
+              <div className="flex justify-between items-start gap-6">
+                <div className="flex-1 space-y-4">
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
                     question.dificuldade === 'difícil' ? 'bg-red-100 text-red-700' :
                     question.dificuldade === 'médio' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
