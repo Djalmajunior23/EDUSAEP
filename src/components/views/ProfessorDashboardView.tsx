@@ -13,6 +13,7 @@ import { ActivityManager } from '../professor/ActivityManager';
 import { HeatmapLearning } from '../shared/HeatmapLearning';
 import { RiskStudentsPanel } from '../analytics/RiskStudentsPanel';
 import { PedagogicalDecisionsWidget } from '../professor/PedagogicalDecisionsWidget';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 interface ProfessorDashboardViewProps {
   user: User | null;
@@ -24,6 +25,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalExams: 0,
+    totalSubmissions: 0,
     avgScore: 0,
     recentActivity: [] as any[]
   });
@@ -38,22 +40,29 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
         const studentsQuery = query(collection(db, 'users'), where('role', '==', 'STUDENT'));
         const studentsSnap = await getDocs(studentsQuery);
         
-        const diagQuery = query(collection(db, 'diagnostics'), orderBy('createdAt', 'desc'), limit(50));
-        const diagSnap = await getDocs(diagQuery);
-        const diags = diagSnap.docs.map(doc => doc.data());
+        // Use avaliacoes for exam count
+        const examsQuery = query(collection(db, 'avaliacoes'), where('createdBy', '==', user.uid));
+        const examsSnap = await getDocs(examsQuery);
         
-        const totalExams = diags.length;
-        const totalScore = diags.reduce((acc, curr) => acc + (curr.result?.summary?.acuracia_geral * 100 || 0), 0);
-        const avgScore = totalExams > 0 ? totalScore / totalExams : 0;
+        // Use resultados for average score and submissions
+        const resultsQuery = query(collection(db, 'resultados'), orderBy('submittedAt', 'desc'), limit(100));
+        const resultsSnap = await getDocs(resultsQuery);
+        const results = resultsSnap.docs.map(doc => doc.data());
+        
+        const totalSubmissions = results.length;
+        const totalScore = results.reduce((acc, curr) => acc + (curr.score || 0), 0);
+        const totalMaxScore = results.reduce((acc, curr) => acc + (curr.maxScore || 100), 0);
+        const avgScore = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
 
         setStats({
           totalStudents: studentsSnap.size,
-          totalExams,
+          totalExams: examsSnap.size,
+          totalSubmissions,
           avgScore,
-          recentActivity: diagSnap.docs.slice(0, 5).map(doc => ({ id: doc.id, ...doc.data() }))
+          recentActivity: resultsSnap.docs.slice(0, 5).map(doc => ({ id: doc.id, ...doc.data() }))
         });
       } catch (err) {
-        console.error("Error fetching professor stats:", err);
+        handleFirestoreError(err, OperationType.LIST, 'dashboard_stats');
       } finally {
         setLoading(false);
       }
@@ -282,15 +291,19 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
                     {stats.recentActivity.map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => navigate(`/aluno/${item.id}`)}
+                        onClick={() => navigate(`/aluno/${item.studentId}`)}
                         className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left flex items-center justify-between group"
                       >
                         <div>
-                          <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{item.aluno}</p>
-                          <p className="text-[10px] text-gray-500">{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Recent'}</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{item.studentName || 'Aluno'}</p>
+                          <p className="text-[10px] text-gray-500">
+                            {item.submittedAt?.seconds ? new Date(item.submittedAt.seconds * 1000).toLocaleDateString() : 'Recente'} - {item.examTitle || 'Atividade'}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-emerald-600">{(item.result?.summary?.acuracia_geral * 100)?.toFixed(1)}%</p>
+                          <p className="text-sm font-black text-emerald-600">
+                            {((item.score / (item.maxScore || 100)) * 100).toFixed(1)}%
+                          </p>
                           <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Acerto</p>
                         </div>
                       </button>

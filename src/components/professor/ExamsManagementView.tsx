@@ -29,8 +29,8 @@ import { parseQuestionsFromText } from '../../services/geminiService';
 import { Exam } from '../../types/edusaep.types';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
-
 import { ExamGenerator } from './exam/ExamGenerator';
+import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 export function ExamsManagementView({ user, userProfile, selectedModel, defaultType = 'simulado' }: { user: any, userProfile: any, selectedModel: string, defaultType?: 'simulado' | 'exercicio' }) {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -47,6 +47,52 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
   const [currentExam, setCurrentExam] = useState<Partial<Exam> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedExamForDetails, setSelectedExamForDetails] = useState<Exam | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  const fetchFullQuestions = async (exam: Exam) => {
+    if (!exam.questions || exam.questions.length === 0) return exam.questions;
+    
+    // Check if we already have objects
+    if (typeof exam.questions[0] === 'object' && exam.questions[0] !== null) {
+      return exam.questions;
+    }
+
+    try {
+      setIsLoadingDetails(true);
+      const questionIds = exam.questions;
+      // Firestore 'in' query supports up to 30 items
+      const chunks = [];
+      for (let i = 0; i < questionIds.length; i += 30) {
+        chunks.push(questionIds.slice(i, i + 30));
+      }
+
+      let allFullQuestions: any[] = [];
+      for (const chunk of chunks) {
+        const qSnap = await getDocs(query(
+          collection(db, 'questions'),
+          where('__name__', 'in', chunk)
+        ));
+        allFullQuestions = [...allFullQuestions, ...qSnap.docs.map(d => ({ id: d.id, ...d.data() }))];
+      }
+      return allFullQuestions;
+    } catch (error) {
+      console.error("Error fetching full questions for details:", error);
+      toast.error("Erro ao carregar detalhes das questões.");
+      return exam.questions;
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  const handleShowDetails = async (exam: Exam) => {
+    setSelectedExamForDetails(exam);
+    setShowDetails(true);
+    
+    const fullQuestions = await fetchFullQuestions(exam);
+    setSelectedExamForDetails({ ...exam, questions: fullQuestions });
+  };
 
   // Generative State
   const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -98,16 +144,18 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       const batch = writeBatch(db);
       const questionIds: string[] = [];
 
+      const savedQuestions: any[] = [];
       for (const q of questions) {
         const qRef = doc(collection(db, 'questions'));
-        batch.set(qRef, {
+        const qData = {
           ...q,
           createdBy: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           usoTotal: 0
-        });
-        questionIds.push(qRef.id);
+        };
+        batch.set(qRef, qData);
+        savedQuestions.push({ id: qRef.id, ...qData });
       }
 
       const examRef = doc(collection(db, 'avaliacoes'));
@@ -116,9 +164,9 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
         description: `Avaliação importada do arquivo ${file.name}`,
         type: filterType === 'all' ? 'simulado' : filterType,
         status: 'rascunho',
-        questions: questionIds,
-        totalQuestions: questionIds.length,
-        totalPoints: questionIds.length * 10,
+        questions: savedQuestions,
+        totalQuestions: savedQuestions.length,
+        totalPoints: savedQuestions.length * 10,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -129,9 +177,9 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       setImportProgress(100);
       toast.success("Avaliação importada com sucesso!");
       fetchExams();
-    } catch (error: any) {
-      console.error("Import Error:", error);
-      toast.error(`Erro ao importar: ${error.message}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'avaliacoes');
+      toast.error("Erro ao importar avaliação.");
     } finally {
       setTimeout(() => {
         setIsImporting(false);
@@ -152,8 +200,8 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       const snap = await getDocs(q);
       setExams(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam)));
     } catch (error) {
-      console.error("Error fetching exams:", error);
-      toast.error(`Erro ao carregar ${filterType === 'simulado' ? 'simulados' : 'exercícios'}.`);
+      handleFirestoreError(error, OperationType.LIST, 'avaliacoes');
+      toast.error(`Erro ao carregar simulados.`);
     } finally {
       setLoading(false);
     }
@@ -195,7 +243,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       // Only autofill on creation if enabled
       if (!currentExam.id && autoFill && finalQuestions.length === 0) {
         const qSnap = await getDocs(query(collection(db, 'questions'), limit(autoFillCount)));
-        finalQuestions = qSnap.docs.map(d => d.id);
+        finalQuestions = qSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
 
       const examToSave = {
@@ -220,7 +268,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       setIsModalOpen(false);
       fetchExams();
     } catch (error) {
-      console.error("Error saving exam:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'avaliacoes');
       toast.error("Erro ao salvar avaliação.");
     } finally {
       setIsSaving(false);
@@ -235,7 +283,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       toast.success("Simulado excluído com sucesso.");
       fetchExams();
     } catch (error) {
-      console.error("Error deleting exam:", error);
+      handleFirestoreError(error, OperationType.DELETE, 'avaliacoes');
       toast.error("Erro ao excluir simulado.");
     } finally {
       setExamToDelete(null);
@@ -249,12 +297,17 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
     try {
       toast.info("Exportando para Google Forms...");
       
-      // Fetch full question data
-      const questionsSnap = await getDocs(query(
-        collection(db, 'questions'),
-        where('__name__', 'in', exam.questions)
-      ));
-      const fullQuestions = questionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // If questions are already objects, use them. Otherwise fetch.
+      let fullQuestions = [];
+      if (exam.questions.length > 0 && typeof exam.questions[0] === 'object') {
+        fullQuestions = exam.questions;
+      } else {
+        const questionsSnap = await getDocs(query(
+          collection(db, 'questions'),
+          where('__name__', 'in', exam.questions)
+        ));
+        fullQuestions = questionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
 
       const result = await exportExamToGoogleForms(exam.title, fullQuestions);
       
@@ -439,7 +492,10 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
               </div>
             </div>
 
-            <button className="mt-6 w-full py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={() => handleShowDetails(exam)}
+              className="mt-6 w-full py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2"
+            >
               <Eye size={18} /> Ver Detalhes
             </button>
           </motion.div>
@@ -682,6 +738,145 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
                 >
                   Excluir
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DETAILS MODAL */}
+      <AnimatePresence>
+        {showDetails && selectedExamForDetails && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-8 border-b bg-indigo-600 text-white flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase">
+                      {selectedExamForDetails.type}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                      selectedExamForDetails.status === 'publicado' ? 'bg-emerald-400 text-emerald-950' : 'bg-gray-400 text-gray-950'
+                    }`}>
+                      {selectedExamForDetails.status}
+                    </span>
+                  </div>
+                  <h3 className="text-3xl font-black">{selectedExamForDetails.title}</h3>
+                  <p className="mt-2 text-indigo-100 font-medium">{selectedExamForDetails.description}</p>
+                </div>
+                <button 
+                  onClick={() => setShowDetails(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-all"
+                >
+                  <X size={28} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 bg-gray-50/50">
+                {isLoadingDetails ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="animate-spin text-indigo-600" size={48} />
+                    <p className="text-gray-500 font-bold">Carregando conteúdo da avaliação...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Questões</p>
+                    <p className="text-2xl font-black text-gray-900">{selectedExamForDetails.totalQuestions}</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Duração</p>
+                    <p className="text-2xl font-black text-gray-900">{selectedExamForDetails.duration} min</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Entregas</p>
+                    <p className="text-2xl font-black text-gray-900">{selectedExamForDetails.submissionsCount || 0}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <FileText className="text-indigo-600" /> Conteúdo da Avaliação
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    {selectedExamForDetails.questions && selectedExamForDetails.questions.length > 0 ? (
+                      selectedExamForDetails.questions.map((q: any, idx: number) => {
+                        const isObject = typeof q === 'object' && q !== null;
+                        return (
+                          <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                              <span className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black text-sm">
+                                {idx + 1}
+                              </span>
+                              {isObject && (
+                                <span className="text-[10px] font-black uppercase text-gray-400">
+                                  Dificuldade: {q.dificuldade || 'médio'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-800 font-medium leading-relaxed">
+                              {isObject ? q.enunciado : `ID da Questão: ${q}`}
+                            </p>
+                            {isObject && q.opcoes && (
+                              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {q.opcoes.map((opt: string, oIdx: number) => (
+                                  <div 
+                                    key={oIdx}
+                                    className={`p-3 rounded-xl border text-sm flex gap-3 ${
+                                      oIdx === q.respostaCorreta ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-gray-50 border-gray-100 text-gray-600'
+                                    }`}
+                                  >
+                                    <span className="font-bold">{String.fromCharCode(65 + oIdx)})</span>
+                                    <span>{opt}</span>
+                                    {oIdx === q.respostaCorreta && (
+                                      <Check size={16} className="ml-auto text-emerald-600" />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 border-dashed">
+                         <AlertCircle size={48} className="mx-auto mb-4 text-gray-300" />
+                         <p className="text-gray-500 font-medium">Nenhuma questão vinculada a esta avaliação.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+              <div className="p-8 border-t bg-gray-50 flex justify-between items-center">
+                <p className="text-sm font-bold text-gray-500">
+                  Criado em: {selectedExamForDetails.createdAt?.seconds ? new Date(selectedExamForDetails.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                </p>
+                <div className="flex gap-4">
+                   <button 
+                    onClick={() => {
+                      setShowDetails(false);
+                      handleEdit(selectedExamForDetails);
+                    }}
+                    className="px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all flex items-center gap-2"
+                   >
+                     <Edit2 size={18} /> Editar
+                   </button>
+                   <button 
+                    onClick={() => setShowDetails(false)}
+                    className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
+                   >
+                     Fechar
+                   </button>
+                </div>
               </div>
             </motion.div>
           </div>

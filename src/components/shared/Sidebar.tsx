@@ -1,34 +1,57 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  Telescope, 
-  BookOpen, 
-  CheckSquare, 
-  Map as MapIcon, 
-  Calendar, 
-  MessageSquare, 
-  Sparkles, 
-  Zap as ZapIcon, 
-  History, 
-  Target, 
-  User as UserIcon, 
-  Trophy, 
-  BrainCircuit, 
-  Activity, 
-  Database, 
-  BarChart3, 
-  Users, 
-  Layout, 
-  Library, 
-  Shield, 
+  LayoutDashboard,
+  Telescope,
+  BookOpen,
+  CheckSquare,
+  Plus,
+  Pencil,
+  Lock,
+  Sun,
+  Moon,
+  MessageSquare,
+  Send,
+  Loader2,
+  User as UserIcon,
+  Search,
+  ChevronLeft,
+  ExternalLink,
+  Users,
+  X,
+  Check,
+  XCircle,
+  HelpCircle,
+  Menu,
+  Database,
+  Zap as ZapIcon,
+  ArrowRight,
+  Target,
+  Trophy,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  Mail,
+  RotateCcw,
+  Star,
+  Brain,
+  BrainCircuit,
+  Archive,
+  BarChart2,
+  Layout,
+  Activity,
+  Map as MapIcon,
+  Library,
+  Shield,
   LogOut,
+  BarChart3,
   BarChart3 as LogoIcon,
   FileText,
-  Brain,
   Bot,
   MonitorPlay,
-  Beaker
+  Beaker,
+  History,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationBell } from '../notifications/NotificationBell';
@@ -217,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
                title={darkMode ? "Modo Claro" : "Modo Escuro"}
             >
-              {darkMode ? <Sparkles size={16} /> : <UserIcon size={16} />} 
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />} 
             </button>
             <button 
               onClick={handleLogout}

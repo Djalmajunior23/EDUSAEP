@@ -2035,11 +2035,78 @@ export interface QuestionQualityAnalysis {
   questionId: string;
   originalEnunciado: string;
   suggestedEnunciado?: string;
-  originalAlternativas: Array<{ id: string, texto: string }>;
-  suggestedAlternativas: Array<{ id: string, texto: string }>;
+  originalAlternativas: any[];
+  suggestedAlternativas: any[];
+  originalRespostaEsperada?: string;
+  suggestedRespostaEsperada?: string;
+  originalCriterios?: any[];
+  suggestedCriterios?: any[];
   analysis: string;
   improvements: string[];
   cognitiveErrorsAddressed: string[];
+}
+
+export async function analyzeDiscursiveQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
+  const response = await generateContentWrapper({
+    model: modelName,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Como um Especialista em Avaliação Educacional e Design de Itens Discursivos (especialista em questões abertas e rubricas), analise esta QUESTÃO DISCURSIVA que apresenta baixo desempenho ou dificuldade em discriminar alunos que dominam o conteúdo.
+
+            DADOS DA QUESTÃO:
+            ${JSON.stringify({
+              enunciado: question.enunciado,
+              respostaEsperada: question.respostaEsperada,
+              criteriosAvaliacao: question.criteriosAvaliacao,
+              competencia: question.competenciaNome,
+              nivel: question.dificuldade
+            })}
+            
+            DADOS DE ERROS/DIFICULDADES IDENTIFICADOS:
+            ${JSON.stringify(errors.map(e => ({ category: e.category, explanation: e.explanation })))}
+            
+            Sua missão é REFORMULAR a questão para aumentar o seu PODER DE DISCRIMINAÇÃO.
+            Discriminação significa que a questão deve ser clara o suficiente para que o aluno que domina o conteúdo consiga responder corretamente, enquanto o aluno que não domina não encontre brechas ou ambiguidades que permitam chutes plausíveis ou respostas parciais vagas.
+
+            ÁREAS DE FOCO:
+            1. CLAREZA DO COMANDO: O verbo de ação (Taxonomia de Bloom) está claro? O aluno sabe exatamente o que deve entregar?
+            2. PADRÃO DE RESPOSTA (RESPOSTA ESPERADA): A resposta esperada é técnica, precisa e cobre todos os pontos do enunciado?
+            3. RUBRICA (CRITÉRIOS): Os critérios de avaliação permitem uma correção justa e objetiva? Eles discriminam níveis de domínio (ex: erro de conceito vs erro de processo)?
+            
+            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
+            {
+              "questionId": "${question.id || question.questionUid}",
+              "originalEnunciado": string,
+              "suggestedEnunciado": string,
+              "originalRespostaEsperada": string,
+              "suggestedRespostaEsperada": string,
+              "originalCriterios": Array<any>,
+              "suggestedCriterios": Array<{criterio, pontuacao, descricao}>,
+              "analysis": string (Análise pedagógica da falha de discriminação na questão original),
+              "improvements": string[] (Lista de melhorias implementadas),
+              "cognitiveErrorsAddressed": string[]
+            }`
+          }
+        ]
+      }
+    ],
+    config: {
+      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
+      responseMimeType: "application/json",
+      ...DEFAULT_CONFIG,
+    }
+  });
+
+  return safeParseJson(response.text, {
+    questionId: question.id || question.questionUid,
+    originalEnunciado: question.enunciado,
+    analysis: "Não foi possível gerar análise para questão discursiva.",
+    improvements: [],
+    cognitiveErrorsAddressed: []
+  });
 }
 
 export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {

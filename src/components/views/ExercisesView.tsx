@@ -30,7 +30,7 @@ export function ExercisesView({ user, userProfile, selectedModel }: ExercisesVie
     const q = query(
       collection(db, 'avaliacoes'), 
       where('type', '==', 'exercicio'),
-      where('status', '==', 'published')
+      where('status', '==', 'publicado')
     );
     const unsubscribeExams = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));

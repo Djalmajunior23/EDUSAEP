@@ -30,7 +30,7 @@ export function StudentExamsView({ user, userProfile, selectedModel }: StudentEx
     // Fetch published exams (Simulados only)
     const examsQuery = query(
       collection(db, 'avaliacoes'), 
-      where('status', '==', 'published'),
+      where('status', '==', 'publicado'),
       where('type', '==', 'simulado')
     );
     const unsubscribeExams = onSnapshot(examsQuery, (snapshot) => {

@@ -189,7 +189,7 @@ export interface Exam {
   duration: number; // minutes
   totalQuestions: number;
   totalPoints: number;
-  questions: string[]; // IDs das questões
+  questions: any[]; // IDs ou Objetos das questões (Smart Exams usam Objetos)
   isAdaptive?: boolean; // Se ativado, a ordem das questões muda baseada no desempenho
   adaptiveConfig?: {
     startDifficulty: 'fácil' | 'médio';

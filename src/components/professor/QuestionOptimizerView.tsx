@@ -21,7 +21,7 @@ import {
   updateDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { analyzeQuestionQuality, QuestionQualityAnalysis } from '../../services/geminiService';
+import { analyzeQuestionQuality, analyzeDiscursiveQuestionQuality, QuestionQualityAnalysis } from '../../services/geminiService';
 import { UserProfile, Question } from '../../types';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
@@ -131,7 +131,14 @@ export function QuestionOptimizerView({ userProfile }: { userProfile: UserProfil
     
     try {
       const perf = questionPerformance[question.id!] || questionPerformance[question.questionUid] || { errorDetails: [] };
-      const result = await analyzeQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'TEACHER');
+      let result: QuestionQualityAnalysis;
+      
+      if (question.tipoQuestao === 'discursiva') {
+        result = await analyzeDiscursiveQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'TEACHER');
+      } else {
+        result = await analyzeQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'TEACHER');
+      }
+      
       setSelectedAnalysis(result);
       toast.success("Análise de qualidade concluída!");
     } catch (error) {
@@ -156,6 +163,14 @@ export function QuestionOptimizerView({ userProfile }: { userProfile: UserProfil
       
       if (selectedAnalysis.suggestedAlternativas && selectedAnalysis.suggestedAlternativas.length > 0) {
         updates.alternativas = selectedAnalysis.suggestedAlternativas;
+      }
+
+      if (selectedAnalysis.suggestedRespostaEsperada) {
+        updates.respostaEsperada = selectedAnalysis.suggestedRespostaEsperada;
+      }
+
+      if (selectedAnalysis.suggestedCriterios && selectedAnalysis.suggestedCriterios.length > 0) {
+        updates.criteriosAvaliacao = selectedAnalysis.suggestedCriterios;
       }
 
       await updateDoc(qRef, updates);
@@ -335,17 +350,26 @@ export function QuestionOptimizerView({ userProfile }: { userProfile: UserProfil
                   <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 opacity-70">
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Original</h4>
                     <div className="space-y-4">
-                      <div className="bg-white p-4 rounded-xl border border-gray-200 text-sm text-gray-600 line-clamp-4">
+                      <div className="bg-white p-4 rounded-xl border border-gray-200 text-sm text-gray-600">
+                        <div className="font-bold mb-1 text-[10px] text-gray-400 uppercase">Enunciado</div>
                         {selectedAnalysis.originalEnunciado}
                       </div>
-                      <div className="space-y-2">
-                        {selectedAnalysis.originalAlternativas.map(alt => (
-                          <div key={alt.id} className="flex gap-3 text-xs bg-white/50 p-2 rounded-lg">
-                            <span className="font-bold text-gray-400">{alt.id}</span>
-                            <span className="text-gray-500">{alt.texto}</span>
-                          </div>
-                        ))}
-                      </div>
+                      
+                      {selectedAnalysis.originalAlternativas && selectedAnalysis.originalAlternativas.length > 0 ? (
+                        <div className="space-y-2">
+                          {selectedAnalysis.originalAlternativas.map(alt => (
+                            <div key={alt.id} className="flex gap-3 text-xs bg-white/50 p-2 rounded-lg">
+                              <span className="font-bold text-gray-400">{alt.id}</span>
+                              <span className="text-gray-500">{alt.texto}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : selectedAnalysis.originalRespostaEsperada ? (
+                        <div className="bg-white p-4 rounded-xl border border-gray-200 text-xs text-gray-500">
+                           <div className="font-bold mb-1 text-[10px] text-gray-400 uppercase">Resposta Esperada</div>
+                           {selectedAnalysis.originalRespostaEsperada}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -359,16 +383,42 @@ export function QuestionOptimizerView({ userProfile }: { userProfile: UserProfil
                     </div>
                     <div className="space-y-4">
                       <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 text-sm text-gray-900 font-medium">
+                        <div className="font-bold mb-1 text-[10px] text-emerald-600 uppercase">Enunciado</div>
                         {selectedAnalysis.suggestedEnunciado || selectedAnalysis.originalEnunciado}
                       </div>
-                      <div className="space-y-2">
-                        {selectedAnalysis.suggestedAlternativas.map(alt => (
-                          <div key={alt.id} className="flex gap-3 text-xs bg-white p-3 rounded-xl border border-gray-100 hover:border-emerald-200 transition-colors">
-                            <span className="font-bold text-emerald-600">{alt.id}</span>
-                            <span className="text-gray-900">{alt.texto}</span>
+
+                      {selectedAnalysis.suggestedAlternativas && selectedAnalysis.suggestedAlternativas.length > 0 ? (
+                        <div className="space-y-2">
+                          {selectedAnalysis.suggestedAlternativas.map(alt => (
+                            <div key={alt.id} className="flex gap-3 text-xs bg-white p-3 rounded-xl border border-gray-100 hover:border-emerald-200 transition-colors">
+                              <span className="font-bold text-emerald-600">{alt.id}</span>
+                              <span className="text-gray-900">{alt.texto}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : selectedAnalysis.suggestedRespostaEsperada ? (
+                        <div className="space-y-4">
+                          <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 text-xs text-gray-900">
+                            <div className="font-bold mb-1 text-[10px] text-emerald-600 uppercase">Resposta Esperada</div>
+                            {selectedAnalysis.suggestedRespostaEsperada}
                           </div>
-                        ))}
-                      </div>
+                          
+                          {selectedAnalysis.suggestedCriterios && selectedAnalysis.suggestedCriterios.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="font-bold text-[10px] text-emerald-600 uppercase tracking-wider">Nova Rubrica de Avaliação</div>
+                              {selectedAnalysis.suggestedCriterios.map((crit, idx) => (
+                                <div key={idx} className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-[10px]">
+                                  <div className="flex justify-between font-bold mb-1">
+                                    <span className="text-gray-900">{crit.criterio}</span>
+                                    <span className="text-emerald-600">{crit.pontuacao} pts</span>
+                                  </div>
+                                  <p className="text-gray-500">{crit.descricao}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
