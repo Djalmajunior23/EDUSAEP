@@ -13,6 +13,7 @@ import { ActivityManager } from '../professor/ActivityManager';
 import { HeatmapLearning } from '../shared/HeatmapLearning';
 import { RiskStudentsPanel } from '../analytics/RiskStudentsPanel';
 import { PedagogicalDecisionsWidget } from '../professor/PedagogicalDecisionsWidget';
+import { PedagogicalSummaryCard } from '../professor/PedagogicalSummaryCard';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 interface ProfessorDashboardViewProps {
@@ -269,6 +270,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
             </div>
 
             <div className="space-y-6">
+              <PedagogicalSummaryCard />
               <PedagogicalDecisionsWidget />
               <RiskStudentsPanel />
               
