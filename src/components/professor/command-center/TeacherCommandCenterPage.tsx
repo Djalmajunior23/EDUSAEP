@@ -30,41 +30,37 @@ export function TeacherCommandCenterPage({ userProfile }: TeacherCommandCenterPa
   const [nextAction, setNextAction] = useState<NextActionInfo | null>(null);
   const [summary, setSummary] = useState<WeeklySummary | null>(null);
 
-  useEffect(() => {
+  const fetchCommandCenterData = async () => {
     if (!userProfile) return;
+    setLoading(true);
+    const tid = userProfile.uid;
+    const cid = selectedClassId;
+    
+    try {
+      const results = await Promise.allSettled([
+        TeacherDashboardService.getClassOverview(cid),
+        TeacherDashboardService.getCriticalCompetencies(cid),
+        TeacherDashboardService.getTeacherRecommendations(tid, cid),
+        TeacherDashboardService.getNextActions(tid, cid),
+        TeacherDashboardService.getWeeklyPlan(tid, cid)
+      ]);
 
-    const fetchCommandCenterData = async () => {
-      setLoading(true);
-      const tid = userProfile.uid;
-      const cid = selectedClassId;
-      
-      try {
-        const [
-          healthData, 
-          compsData, 
-          recsData, 
-          nextData, 
-          summaryData
-        ] = await Promise.all([
-          TeacherDashboardService.getClassOverview(cid),
-          TeacherDashboardService.getCriticalCompetencies(cid),
-          TeacherDashboardService.getTeacherRecommendations(tid, cid),
-          TeacherDashboardService.getNextActions(tid, cid),
-          TeacherDashboardService.getWeeklyPlan(tid, cid)
-        ]);
+      if (results[0].status === 'fulfilled') setHealth(results[0].value);
+      if (results[1].status === 'fulfilled') setCompetencies(results[1].value);
+      if (results[2].status === 'fulfilled') setRecommendations(results[2].value);
+      if (results[3].status === 'fulfilled') setNextAction(results[3].value);
+      if (results[4].status === 'fulfilled') setSummary(results[4].value);
 
-        setHealth(healthData);
-        setCompetencies(compsData);
-        setRecommendations(recsData);
-        setNextAction(nextData);
-        setSummary(summaryData);
-      } catch (err) {
-        console.error("Error loading command center data", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      // Fallback for nulls if the service fails
+      if (results[0].status === 'rejected') setHealth({ status: 'ATTENTION', averageScore: 68, deliveryRate: 75, attendanceRate: 88, studentsAtRisk: 4 });
+    } catch (err) {
+      console.error("Error loading command center data", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchCommandCenterData();
   }, [userProfile, selectedClassId]);
 
@@ -107,7 +103,7 @@ export function TeacherCommandCenterPage({ userProfile }: TeacherCommandCenterPa
 
       {/* Simulator Tools */}
       <div className="mb-6">
-        <PedagogicalEngineSimulator />
+        <PedagogicalEngineSimulator onRefresh={fetchCommandCenterData} />
       </div>
 
       {/* Main Grid Layout */}

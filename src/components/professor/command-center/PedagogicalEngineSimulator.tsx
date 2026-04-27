@@ -4,7 +4,7 @@ import { Play, Database, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-rea
 import { toast } from 'sonner';
 import { PedagogicalEngineClient } from '../../../pedagogical-engine/services/PedagogicalEngineClient';
 
-export function PedagogicalEngineSimulator() {
+export function PedagogicalEngineSimulator({ onRefresh }: { onRefresh?: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<{ id: string, text: string, type: 'info' | 'success' | 'error' }[]>([]);
 
@@ -31,6 +31,7 @@ export function PedagogicalEngineSimulator() {
       addLog('Motor avaliou todos os alunos de "Turma 3º Ano - TDS".', 'info');
       addLog('Saúde da turma recalculada (ClassHealthSnapshot atualizado).', 'success');
       toast.success('Lote processado com sucesso!', { id: toastId });
+      if (onRefresh) onRefresh();
     } catch (error: any) {
       addLog(`Falha na requisição: ${error.message || 'Erro desconhecido'}`, 'error');
       toast.error('Simulação travou! Verifique o console.', { id: toastId });
@@ -40,6 +41,7 @@ export function PedagogicalEngineSimulator() {
          addLog('[MOCK] Motor avaliou todos os alunos (Fallback Local).', 'success');
          toast.success('Mock Finalizado!', { id: toastId });
          setIsProcessing(false);
+         if (onRefresh) onRefresh();
       }, 1500);
       return;
     } finally {
