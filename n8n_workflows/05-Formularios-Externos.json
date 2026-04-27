@@ -3,28 +3,15 @@
   "nodes": [
     {
       "parameters": {
-        "pollTimes": {
-          "item": [
-            {
-              "mode": "everyMinute"
-            }
-          ]
-        },
-        "documentId": {
+        "formId": {
           "__rl": true,
           "value": "",
           "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "",
-          "mode": "name"
-        },
-        "options": {}
+        }
       },
       "id": "e3b8f1d7-2c9a-4e5f-a1b2-c3d4e5f6a7b8",
-      "name": "Google Forms Responses",
-      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "name": "Google Forms",
+      "type": "n8n-nodes-base.googleFormsTrigger",
       "typeVersion": 1,
       "position": [
         200,
@@ -43,20 +30,16 @@
         "values": {
           "string": [
             {
-              "name": "studentName",
-              "value": "={{ $json['Nome do Aluno'] || $json.name || '' }}"
+              "name": "formId",
+              "value": "={{ $json.formId || '' }}"
             },
             {
-              "name": "studentEmail",
-              "value": "={{ $json['E-mail'] || $json.email || '' }}"
+              "name": "alunoEmail",
+              "value": "={{ $json.responderUri || $json.email || '' }}"
             },
             {
-              "name": "turmaId",
-              "value": "={{ $json['Turma'] || $json.classId || '' }}"
-            },
-            {
-              "name": "responses",
-              "value": "={{ JSON.stringify($json) }}"
+              "name": "respostas",
+              "value": "={{ JSON.stringify($json.answers || $json) }}"
             }
           ],
           "number": [],
@@ -92,11 +75,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"studentName\": \"{{$json.studentName}}\",\n  \"studentEmail\": \"{{$json.studentEmail}}\",\n  \"turmaId\": \"{{$json.turmaId}}\",\n  \"rawData\": {{$json.responses}}\n}",
+        "jsonBody": "={\n  \"formId\": \"{{$json.formId}}\",\n  \"alunoEmail\": \"{{$json.alunoEmail}}\",\n  \"respostas\": {{$json.respostas}}\n}",
         "options": {}
       },
       "id": "a5d0b3f9-4e1c-6a7b-c3d4-e5f6a7b8c9d0",
-      "name": "API EduAI Core",
+      "name": "Enviar para EduAI Core",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
@@ -191,7 +174,7 @@
     }
   ],
   "connections": {
-    "Google Forms Responses": {
+    "Google Forms": {
       "main": [
         [
           {
@@ -206,14 +189,14 @@
       "main": [
         [
           {
-            "node": "API EduAI Core",
+            "node": "Enviar para EduAI Core",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "API EduAI Core": {
+    "Enviar para EduAI Core": {
       "main": [
         [
           {
