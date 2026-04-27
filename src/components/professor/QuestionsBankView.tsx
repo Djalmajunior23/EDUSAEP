@@ -214,7 +214,6 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log(`[Import] Iniciando importação: ${file.name} (${file.size} bytes)`);
     setIsImporting(true);
 
     try {
@@ -246,7 +245,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
           setImportProgress(Math.round((i / pdf.numPages) * 100));
         }
         text = fullText;
-      } else if (fileName.endsWith('.docx')) {
+      } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
         const data = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer: data });
         text = result.value;
@@ -254,7 +253,6 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         throw new Error("Formato não suportado");
       }
 
-      console.log(`[Import] Conteúdo extraído. Comprimento: ${text.length} caracteres.`);
       await processImportedQuestions(text);
     } catch (error) {
       console.error("[Import] Erro ao ler arquivo:", error);
@@ -274,11 +272,8 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     setImportProgress(0);
     try {
       toast.info("A IA está processando o conteúdo... aguarde.");
-      console.log("[Import] Chamando parseQuestionsFromText");
       const parsedQuestions = await parseQuestionsFromText(text, selectedModel, 'TEACHER');
       
-      console.log(`[Import] IA retornou ${parsedQuestions?.length || 0} questões`);
-
       if (!parsedQuestions || parsedQuestions.length === 0) {
         toast.error("Nenhuma questão foi identificada pela IA.");
         return;
@@ -484,7 +479,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
-        accept=".csv,.xlsx,.xls,.pdf,.docx"
+        accept=".csv,.xlsx,.xls,.pdf,.docx,.doc"
         className="hidden"
       />
 

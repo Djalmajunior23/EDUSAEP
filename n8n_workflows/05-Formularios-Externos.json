@@ -1,0 +1,248 @@
+{
+  "name": "EduAI Core - Formulários Externos",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e3b8f1d7-2c9a-4e5f-a1b2-c3d4e5f6a7b8",
+      "name": "Google Forms Responses",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "GOOGLE_API_CREDENTIALS",
+          "name": "Google API Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "studentName",
+              "value": "={{ $json['Nome do Aluno'] || $json.name || '' }}"
+            },
+            {
+              "name": "studentEmail",
+              "value": "={{ $json['E-mail'] || $json.email || '' }}"
+            },
+            {
+              "name": "turmaId",
+              "value": "={{ $json['Turma'] || $json.classId || '' }}"
+            },
+            {
+              "name": "responses",
+              "value": "={{ JSON.stringify($json) }}"
+            }
+          ],
+          "number": [],
+          "boolean": []
+        },
+        "options": {}
+      },
+      "id": "f4c9a2e8-3d0b-5f6a-b2c3-d4e5f6a7b8c9",
+      "name": "Mapear Campos",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.edusaep.com/v1/forms/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.EDUAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"studentName\": \"{{$json.studentName}}\",\n  \"studentEmail\": \"{{$json.studentEmail}}\",\n  \"turmaId\": \"{{$json.turmaId}}\",\n  \"rawData\": {{$json.responses}}\n}",
+        "options": {}
+      },
+      "id": "a5d0b3f9-4e1c-6a7b-c3d4-e5f6a7b8c9d0",
+      "name": "API EduAI Core",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_SHEET_ID_DE_LOGS",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs_Atividades",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Workflow": "={{ $workflow.id }}",
+            "Nome": "={{ $json.body && ($json.body.studentName || $json.body.professorName) || 'Sistema' }}",
+            "Tipo_Acao": "={{ $node.name }}",
+            "Data_Hora": "={{ new Date().toISOString() }}",
+            "Status": "={{ $execution.error ? 'Erro' : 'Sucesso' }}",
+            "Resultado_IA": "={{ $json.aiResult || '' }}",
+            "Tempo_Execucao": "={{ $execution.duration || 0 }}"
+          },
+          "matchingColumns": [],
+          "schemaMode": "auto"
+        }
+      },
+      "id": "d1e2f3a4-5b6c-7d8e-9f0a-b1c2d3e4f5a6",
+      "name": "Log no Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b6e1c4a0-5f2d-7b8c-d4e5-f6a7b8c9d0e1",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_SHEET_ID_DE_LOGS",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs_Atividades",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Workflow": "={{ $workflow.id }}",
+            "Nome": "={{ $json.body && ($json.body.studentName || $json.body.professorName) || 'Sistema' }}",
+            "Tipo_Acao": "={{ $node.name }}",
+            "Data_Hora": "={{ new Date().toISOString() }}",
+            "Status": "={{ $execution.error ? 'Erro' : 'Sucesso' }}",
+            "Resultado_IA": "={{ $json.aiResult || '' }}",
+            "Tempo_Execucao": "={{ $execution.duration || 0 }}"
+          },
+          "matchingColumns": [],
+          "schemaMode": "auto"
+        }
+      },
+      "id": "c7f2d5b1-6a3e-8c9d-e5f6-a7b8c9d0e1f2",
+      "name": "Log de Erro",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [
+        420,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Google Forms Responses": {
+      "main": [
+        [
+          {
+            "node": "Mapear Campos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear Campos": {
+      "main": [
+        [
+          {
+            "node": "API EduAI Core",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API EduAI Core": {
+      "main": [
+        [
+          {
+            "node": "Log no Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Log de Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "A4D27CAE693B",
+  "tags": []
+}

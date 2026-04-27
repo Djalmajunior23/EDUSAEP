@@ -1,0 +1,674 @@
+[
+  {
+    "name": "EduAI Core - Motor de Triagem e Alertas em Tempo Real",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "edusaep-event-bus",
+          "options": {}
+        },
+        "id": "e21b8fbf-ec58-472e-84b2-29fcb16e8810",
+        "name": "Webhook Central EduAI Core",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          220,
+          340
+        ],
+        "webhookId": "edusaep-webhook-id-replace-me"
+      },
+      {
+        "parameters": {
+          "dataType": "string",
+          "value1": "={{ $json.body.type }}",
+          "rules": {
+            "rules": [
+              {
+                "value2": "performance.below_threshold",
+                "output": 0
+              },
+              {
+                "value2": "intervention.triggered",
+                "output": 1
+              },
+              {
+                "value2": "insight.generated",
+                "output": 2
+              }
+            ]
+          }
+        },
+        "id": "b1b7a635-43cf-4273-beb2-2a075dcd5f75",
+        "name": "Roteador de Eventos (EventBus)",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 1,
+        "position": [
+          480,
+          340
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "message",
+          "sendTo": "coordenacao@edusaep.com",
+          "subject": "=🚨 ALERTA CRÍTICO: DESEMPENHO - EduAI Core",
+          "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 Aluno(a/ID): {{ $json.body.userId || 'Sistema' }}\n🔹 Turma: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 Gatilho: {{ JSON.stringify($json.body.data) }}\n\nDiretamente do Painel EduAI Core.",
+          "options": {}
+        },
+        "id": "4facced1-f8e1-455b-b9ab-b427b0b14c5c",
+        "name": "Alerta Coordenação (Gmail)",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          740,
+          140
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "suporte@edusaep.com",
+          "toEmail": "={{ $json.body.data.professorEmail || 'professor@edusaep.com' }}",
+          "subject": "=Aviso: Nova Intervenção Disparada",
+          "html": "=Olá Educador, uma intervenção automática foi disparada na plataforma EduAI Core.<br><br><b>Detalhes da Intervenção:</b><br>{{ JSON.stringify($json.body.data) }}<br><br>Acesse seu Painel para mais informações.",
+          "options": {}
+        },
+        "id": "71bcd7b6-ccac-4b0d-b1aa-0eac9a34bc89",
+        "name": "Notifica Professor (Email)",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          740,
+          340
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "sua-planilha-id-no-google",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "Logs_Insights",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "DATA_HORA": "={{ $now }}",
+              "TIPO_EVENTO": "={{ $json.body.type }}",
+              "DATA_PAYLOAD": "={{ JSON.stringify($json.body.data) }}"
+            }
+          },
+          "options": {}
+        },
+        "id": "70be9f66-1cda-48c0-bc6f-57def6180c55",
+        "name": "Auditoria de Insights (GSheets)",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.1,
+        "position": [
+          740,
+          540
+        ]
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "Webhook Central EduAI Core": {
+        "main": [
+          [
+            {
+              "node": "Roteador de Eventos (EventBus)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Roteador de Eventos (EventBus)": {
+        "main": [
+          [
+            {
+              "node": "Alerta Coordenação (Gmail)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Notifica Professor (Email)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Auditoria de Insights (GSheets)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "versionId": "f7ab0a72-f8c7-4c3e-86b2-60ba1fcfbb0c",
+    "id": "6B5T9cRm4x3VpD2Q",
+    "tags": []
+  },
+  {
+    "name": "EduAI Core - Geração Automatizada de Relatórios Semanais",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 18 * * 5"
+              }
+            ]
+          }
+        },
+        "id": "e2c39d84-a1db-49be-aaec-a1a74d284a12",
+        "name": "Schedule (Toda Sexta às 18h)",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          200,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=SEU_FIREBASE_API_KEY",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "email",
+                "value": "admin@edusaep.com"
+              },
+              {
+                "name": "password",
+                "value": "sua_senha_segura"
+              },
+              {
+                "name": "returnSecureToken",
+                "value": "true"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "2da2913e-f14d-48bd-b1ef-2cb6d22384a4",
+        "name": "Autenticacao Firebase API",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://firestore.googleapis.com/v1/projects/SEU_PROJECT_ID/databases/(default)/documents/system_events",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "pageSize",
+                "value": "100"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "4c947ff9-1bb6-46bd-8e3b-dcb749a2a829",
+        "name": "Busca Dados no Firestore",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [
+          640,
+          300
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "sua-credencial",
+            "name": "Token HTTP Firestore"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "model": "gemini-3.1-pro",
+          "prompt": "=Você é um sistema de Inteligência Artificial Analítica da plataforma EduAI Core.\n\nAnalise os seguintes logs do sistema dessa semana e gere um relatório de 3 parágrafos focando em:\n1. Nível de engajamento.\n2. Quantidade de alunos que caíram na régua de risco.\n3. Pontos de sucesso nas intervenções.\n\nJSON de Dados: \n{{ JSON.stringify($json.documents) }}\n"
+        },
+        "id": "c138af64-160a-4298-b7ab-8f9dafc126b8",
+        "name": "Google Gemini (Análise de Dados)",
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [
+          860,
+          300
+        ],
+        "credentials": {
+          "googleGeminiApi": {
+            "id": "sua-credencial-gemini",
+            "name": "EduAI Core Gemini API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "fromEmail": "relatorios@edusaep.com",
+          "toEmail": "diretoria@escola.com",
+          "subject": "EduAI Core - Relatório de Inteligência Pedagógica Semanal",
+          "html": "=Prezada Diretoria,<br><br>Segue abaixo o relatório automático gerado pelo motor de inteligência do EduAI Core referente aos dados coletados na última semana:<br><br><hr><br><strong>{{ $json.text }}</strong><br><hr><br>Qualquer dúvida, verifiquem o Painel Administrativo em <i>Backstage Governance</i> da plataforma.<br><br>Att,<br>Equipe Automática EduAI Core."
+        },
+        "id": "8340d2ba-c25e-40af-b5b4-7d5a5cf2b5a2",
+        "name": "Enviar Relatório (Email)",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "SEU_SHEET_ID_DE_LOGS",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "Logs_Atividades",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "ID_Workflow": "7Q6R2vWt8o9LpC3F",
+              "Tipo_Acao": "Geração Relatório Semanal",
+              "Data_Hora": "={{ new Date().toISOString() }}",
+              "Status": "Sucesso",
+              "Resultado_IA": "={{ $json.text.substring(0, 50) }}...",
+              "Tempo_Execucao": "={{ $execution.duration }}"
+            },
+            "matchingColumns": [],
+            "schemaMode": "auto"
+          }
+        },
+        "id": "f5123d45-6789-0abc-def1-23456789abcd",
+        "name": "Log no Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.1,
+        "position": [
+          1300,
+          300
+        ]
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "Schedule (Toda Sexta às 18h)": {
+        "main": [
+          [
+            {
+              "node": "Autenticacao Firebase API",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Autenticacao Firebase API": {
+        "main": [
+          [
+            {
+              "node": "Busca Dados no Firestore",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Busca Dados no Firestore": {
+        "main": [
+          [
+            {
+              "node": "Google Gemini (Análise de Dados)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Gemini (Análise de Dados)": {
+        "main": [
+          [
+            {
+              "node": "Enviar Relatório (Email)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Enviar Relatório (Email)": {
+        "main": [
+          [
+            {
+              "node": "Log no Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "versionId": "f00ab9c9-63a2-4dd2-b5e1-8f12a32bfcc9",
+    "id": "7Q6R2vWt8o9LpC3F",
+    "tags": []
+  },
+  {
+    "name": "EduAI Core-Recovery-Email-Workflow",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "n8n/plans",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          240,
+          300
+        ],
+        "id": "webhook-trigger",
+        "name": "Webhook: EnviarPlanoEmail"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json.body.type}}",
+                "value2": "EnviarPlanoEmail"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          460,
+          300
+        ],
+        "id": "filter-trigger",
+        "name": "Filtro: EnviarPlanoEmail"
+      },
+      {
+        "parameters": {
+          "resource": "message",
+          "operation": "send",
+          "to": "={{$json.body.studentEmail}}",
+          "subject": "=Plano de Aula Gerado: {{ $json.body.turmaId }}",
+          "text": "=O plano de aula foi gerado com sucesso.\n\nID do Professor: {{ $json.body.professorId }}\n\nDetalhes do plano: {{ $json.body.plan }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          700,
+          300
+        ],
+        "id": "send-email",
+        "name": "Gmail: Enviar Plano"
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "SEU_SHEET_ID_DE_LOGS",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "Logs_Atividades",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "ID_Workflow": "EduAI Core-Recovery-Email-Workflow",
+              "Tipo_Acao": "Enviar Plano Email",
+              "Data_Hora": "={{ new Date().toISOString() }}",
+              "Status": "Sucesso",
+              "Resultado_IA": "={{ $json.body.studentEmail }}",
+              "Tempo_Execucao": "={{ $execution.duration }}"
+            },
+            "matchingColumns": [],
+            "schemaMode": "auto"
+          }
+        },
+        "id": "f5123d45-6789-0abc-def1-23456789abca",
+        "name": "Log no Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.1,
+        "position": [
+          920,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "webhook-trigger": {
+        "main": [
+          [
+            {
+              "node": "filter-trigger",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "filter-trigger": {
+        "main": [
+          [
+            {
+              "node": "send-email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "send-email": {
+        "main": [
+          [
+            {
+              "node": "Log no Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "name": "EduAI Core-Relatorio-Consolidado",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "weeks",
+                "minutesInterval": 10080
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.cron",
+        "typeVersion": 1,
+        "position": [
+          240,
+          300
+        ],
+        "id": "cron-trigger",
+        "name": "Cron: Relatório Semanal"
+      },
+      {
+        "parameters": {
+          "url": "https://firestore.googleapis.com/v1/projects/seu-projeto/databases/(default)/documents/analytics",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 1,
+        "position": [
+          460,
+          300
+        ],
+        "id": "fetch-data",
+        "name": "Fetch Dados Pedagógicos"
+      },
+      {
+        "parameters": {
+          "model": "gemini-1.5-pro-latest",
+          "promptType": "define",
+          "text": "=Analise estes dados pedagógicos e gere um plano de ação para a semana: {{$json.body}}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleGemini",
+        "typeVersion": 1,
+        "position": [
+          680,
+          300
+        ],
+        "id": "gemini-analysis",
+        "name": "Gemini: Análise de BI"
+      },
+      {
+        "parameters": {
+          "resource": "message",
+          "operation": "send",
+          "to": "diretoria@escola.com",
+          "subject": "Relatório Semanal de Inteligência Pedagógica - EduAI Core",
+          "text": "=Segue o resumo gerado pela IA:\n{{$json.output}}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          900,
+          300
+        ],
+        "id": "send-report",
+        "name": "Gmail: Enviar Relatório"
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "SEU_SHEET_ID_DE_LOGS",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "Logs_Atividades",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "ID_Workflow": "EduAI Core-Relatorio-Consolidado",
+              "Tipo_Acao": "Relatório Consolidado",
+              "Data_Hora": "={{ new Date().toISOString() }}",
+              "Status": "Sucesso",
+              "Resultado_IA": "={{ $json.output.substring(0, 50) }}...",
+              "Tempo_Execucao": "={{ $execution.duration }}"
+            },
+            "matchingColumns": [],
+            "schemaMode": "auto"
+          }
+        },
+        "id": "f5123d45-6789-0abc-def1-23456789abcb",
+        "name": "Log no Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.1,
+        "position": [
+          1120,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "cron-trigger": {
+        "main": [
+          [
+            {
+              "node": "fetch-data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "fetch-data": {
+        "main": [
+          [
+            {
+              "node": "gemini-analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "gemini-analysis": {
+        "main": [
+          [
+            {
+              "node": "send-report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "send-report": {
+        "main": [
+          [
+            {
+              "node": "Log no Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+]

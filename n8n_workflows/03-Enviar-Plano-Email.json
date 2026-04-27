@@ -9,7 +9,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "id": "webhook-trigger",
       "name": "Webhook: EnviarPlanoEmail"
     },
@@ -26,7 +29,10 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [460, 300],
+      "position": [
+        460,
+        300
+      ],
       "id": "filter-trigger",
       "name": "Filtro: EnviarPlanoEmail"
     },
@@ -35,13 +41,16 @@
         "resource": "message",
         "operation": "send",
         "to": "={{$json.body.studentEmail}}",
-        "subject": "Seu Plano de Estudos Personalizado - EduAI Core",
-        "text": "=Olá {{$json.body.studentName}}, seu plano de estudos foi gerado. \nDetalhes: {{$json.body.plan}}",
+        "subject": "=Plano de Aula Gerado: {{ $json.body.turmaId }}",
+        "text": "=O plano de aula foi gerado com sucesso.\n\nID do Professor: {{ $json.body.professorId }}\n\nDetalhes do plano: {{ $json.body.plan }}",
         "options": {}
       },
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [700, 300],
+      "typeVersion": 2.1,
+      "position": [
+        700,
+        300
+      ],
       "id": "send-email",
       "name": "Gmail: Enviar Plano"
     },
@@ -61,12 +70,13 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "ID_Workflow": "EduAI Core-Recovery-Email-Workflow",
-            "Tipo_Acao": "Enviar Plano Email",
+            "ID_Workflow": "={{ $workflow.id }}",
+            "Nome": "={{ $json.body && ($json.body.studentName || $json.body.professorName) || 'Sistema' }}",
+            "Tipo_Acao": "={{ $node.name }}",
             "Data_Hora": "={{ new Date().toISOString() }}",
-            "Status": "Sucesso",
-            "Resultado_IA": "={{ $json.body.studentEmail }}",
-            "Tempo_Execucao": "={{ $execution.duration }}"
+            "Status": "={{ $execution.error ? 'Erro' : 'Sucesso' }}",
+            "Resultado_IA": "={{ $json.aiResult || '' }}",
+            "Tempo_Execucao": "={{ $execution.duration || 0 }}"
           },
           "matchingColumns": [],
           "schemaMode": "auto"
@@ -76,7 +86,10 @@
       "name": "Log no Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.1,
-      "position": [920, 300]
+      "position": [
+        920,
+        300
+      ]
     }
   ],
   "connections": {

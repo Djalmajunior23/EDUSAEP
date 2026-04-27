@@ -14,7 +14,10 @@
       },
       "type": "n8n-nodes-base.cron",
       "typeVersion": 1,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "id": "cron-trigger",
       "name": "Cron: Relatório Semanal"
     },
@@ -25,7 +28,10 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
-      "position": [460, 300],
+      "position": [
+        460,
+        300
+      ],
       "id": "fetch-data",
       "name": "Fetch Dados Pedagógicos"
     },
@@ -38,7 +44,10 @@
       },
       "type": "n8n-nodes-base.googleGemini",
       "typeVersion": 1,
-      "position": [680, 300],
+      "position": [
+        680,
+        300
+      ],
       "id": "gemini-analysis",
       "name": "Gemini: Análise de BI"
     },
@@ -52,8 +61,11 @@
         "options": {}
       },
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [900, 300],
+      "typeVersion": 2.1,
+      "position": [
+        900,
+        300
+      ],
       "id": "send-report",
       "name": "Gmail: Enviar Relatório"
     },
@@ -73,12 +85,13 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "ID_Workflow": "EduAI Core-Relatorio-Consolidado",
-            "Tipo_Acao": "Relatório Consolidado",
+            "ID_Workflow": "={{ $workflow.id }}",
+            "Nome": "={{ $json.body && ($json.body.studentName || $json.body.professorName) || 'Sistema' }}",
+            "Tipo_Acao": "={{ $node.name }}",
             "Data_Hora": "={{ new Date().toISOString() }}",
-            "Status": "Sucesso",
-            "Resultado_IA": "={{ $json.output.substring(0, 50) }}...",
-            "Tempo_Execucao": "={{ $execution.duration }}"
+            "Status": "={{ $execution.error ? 'Erro' : 'Sucesso' }}",
+            "Resultado_IA": "={{ $json.aiResult || '' }}",
+            "Tempo_Execucao": "={{ $execution.duration || 0 }}"
           },
           "matchingColumns": [],
           "schemaMode": "auto"
@@ -88,7 +101,10 @@
       "name": "Log no Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.1,
-      "position": [1120, 300]
+      "position": [
+        1120,
+        300
+      ]
     }
   ],
   "connections": {

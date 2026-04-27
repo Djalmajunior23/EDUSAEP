@@ -106,15 +106,16 @@
     },
     {
       "parameters": {
-        "fromEmail": "relatorios@edusaep.com",
-        "toEmail": "diretoria@escola.com",
         "subject": "EduAI Core - Relatório de Inteligência Pedagógica Semanal",
-        "html": "=Prezada Diretoria,<br><br>Segue abaixo o relatório automático gerado pelo motor de inteligência do EduAI Core referente aos dados coletados na última semana:<br><br><hr><br><strong>{{ $json.text }}</strong><br><hr><br>Qualquer dúvida, verifiquem o Painel Administrativo em <i>Backstage Governance</i> da plataforma.<br><br>Att,<br>Equipe Automática EduAI Core."
+        "html": "=Prezada Diretoria,<br><br>Segue abaixo o relatório automático gerado pelo motor de inteligência do EduAI Core referente aos dados coletados na última semana:<br><br><hr><br><strong>{{ $json.text }}</strong><br><hr><br>Qualquer dúvida, verifiquem o Painel Administrativo em <i>Backstage Governance</i> da plataforma.<br><br>Att,<br>Equipe Automática EduAI Core.",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "diretoria@escola.com"
       },
       "id": "8340d2ba-c25e-40af-b5b4-7d5a5cf2b5a2",
       "name": "Enviar Relatório (Email)",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
       "position": [
         1080,
         300
@@ -136,12 +137,13 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "ID_Workflow": "7Q6R2vWt8o9LpC3F",
-            "Tipo_Acao": "Geração Relatório Semanal",
+            "ID_Workflow": "={{ $workflow.id }}",
+            "Nome": "={{ $json.body && ($json.body.studentName || $json.body.professorName) || 'Sistema' }}",
+            "Tipo_Acao": "={{ $node.name }}",
             "Data_Hora": "={{ new Date().toISOString() }}",
-            "Status": "Sucesso",
-            "Resultado_IA": "={{ $json.text.substring(0, 50) }}...",
-            "Tempo_Execucao": "={{ $execution.duration }}"
+            "Status": "={{ $execution.error ? 'Erro' : 'Sucesso' }}",
+            "Resultado_IA": "={{ $json.aiResult || '' }}",
+            "Tempo_Execucao": "={{ $execution.duration || 0 }}"
           },
           "matchingColumns": [],
           "schemaMode": "auto"

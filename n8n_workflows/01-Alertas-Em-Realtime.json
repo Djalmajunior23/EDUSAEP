@@ -53,12 +53,13 @@
         "sendTo": "coordenacao@edusaep.com",
         "subject": "=🚨 ALERTA CRÍTICO: DESEMPENHO - EduAI Core",
         "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 Aluno(a/ID): {{ $json.body.userId || 'Sistema' }}\n🔹 Turma: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 Gatilho: {{ JSON.stringify($json.body.data) }}\n\nDiretamente do Painel EduAI Core.",
-        "options": {}
+        "options": {},
+        "operation": "send"
       },
       "id": "4facced1-f8e1-455b-b9ab-b427b0b14c5c",
       "name": "Alerta Coordenação (Gmail)",
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
+      "typeVersion": 2.1,
       "position": [
         740,
         140
@@ -66,16 +67,17 @@
     },
     {
       "parameters": {
-        "fromEmail": "suporte@edusaep.com",
-        "toEmail": "={{ $json.body.data.professorEmail || 'professor@edusaep.com' }}",
         "subject": "=Aviso: Nova Intervenção Disparada",
         "html": "=Olá Educador, uma intervenção automática foi disparada na plataforma EduAI Core.<br><br><b>Detalhes da Intervenção:</b><br>{{ JSON.stringify($json.body.data) }}<br><br>Acesse seu Painel para mais informações.",
-        "options": {}
+        "options": {},
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.body.data.professorEmail || 'professor@edusaep.com' }}"
       },
       "id": "71bcd7b6-ccac-4b0d-b1aa-0eac9a34bc89",
       "name": "Notifica Professor (Email)",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
       "position": [
         740,
         340
@@ -97,10 +99,16 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "DATA_HORA": "={{ $now }}",
-            "TIPO_EVENTO": "={{ $json.body.type }}",
-            "DATA_PAYLOAD": "={{ JSON.stringify($json.body.data) }}"
-          }
+            "ID_Workflow": "={{ $workflow.id }}",
+            "Nome": "={{ $json.body && ($json.body.studentName || $json.body.professorName) || 'Sistema' }}",
+            "Tipo_Acao": "={{ $node.name }}",
+            "Data_Hora": "={{ new Date().toISOString() }}",
+            "Status": "={{ $execution.error ? 'Erro' : 'Sucesso' }}",
+            "Resultado_IA": "={{ $json.aiResult || '' }}",
+            "Tempo_Execucao": "={{ $execution.duration || 0 }}"
+          },
+          "matchingColumns": [],
+          "schemaMode": "auto"
         },
         "options": {}
       },

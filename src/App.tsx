@@ -3256,7 +3256,7 @@ function AppContent() {
                           </div>
 
                           {/* Alerts */}
-                          {result.summary.alertas_dados.length > 0 && (
+                          {userProfile?.role !== "STUDENT" && userProfile?.role !== "MONITOR" && result.summary.alertas_dados?.length > 0 && (
                             <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 items-center">
                               <AlertCircle
                                 className="text-amber-600"
@@ -3264,7 +3264,7 @@ function AppContent() {
                               />
                               <div className="flex-1">
                                 <p className="text-sm font-bold text-amber-900">
-                                  Alertas de Dados
+                                  Alertas de Dados / Segurança
                                 </p>
                                 <p className="text-xs text-amber-700">
                                   {result.summary.alertas_dados.join(", ")}
