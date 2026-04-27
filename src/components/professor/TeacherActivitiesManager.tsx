@@ -4,7 +4,7 @@ import { FileText, Plus, Users, Calendar, CheckCircle2, Clock, Loader2, Sparkles
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { Activity, ActivitySubmission, Rubric } from '../../types/edusaep.types';
+import { Activity, ActivitySubmission, Rubric } from '../../types/eduai.types';
 import Markdown from 'react-markdown';
 import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
 import { TeacherActivitiesDashboard } from './TeacherActivitiesDashboard';
@@ -595,7 +595,7 @@ export function TeacherActivitiesManager({ userProfile, selectedModel }: { userP
                                     ...gradeData.rubricScores,
                                     [criterion.id]: { ...gradeData.rubricScores[criterion.id], score }
                                   };
-                                  const totalGrade = Object.values(newScores).reduce((sum, s) => sum + s.score, 0);
+                                  const totalGrade = Object.values(newScores).reduce((sum: number, s: { score: number; feedback: string }) => sum + s.score, 0);
                                   setGradeData({ ...gradeData, rubricScores: newScores, grade: totalGrade });
                                 }}
                                 className="w-16 p-1 border border-gray-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-center"

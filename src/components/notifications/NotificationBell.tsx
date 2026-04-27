@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Check, Info, AlertCircle, CheckCircle2, MessageSquare, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../services/notificationService';
-import { AppNotification } from '../../types/edusaep.types';
+import { AppNotification } from '../../types/eduai.types';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

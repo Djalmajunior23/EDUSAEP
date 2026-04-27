@@ -4,7 +4,7 @@ import { BookOpen, CheckCircle2, Clock, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
-import { LearningSituation, SASubmission } from '../../types/edusaep.types';
+import { LearningSituation, SASubmission } from '../../types/eduai.types';
 import Markdown from 'react-markdown';
 
 export function StudentLearningSituationsView({ userProfile }: { userProfile: any }) {

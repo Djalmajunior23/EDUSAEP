@@ -9,6 +9,7 @@ import { UserProfile } from '../../types';
 import { Skeleton } from '../common/Skeleton';
 import { DropoutRiskCard } from '../shared/DropoutRiskCard';
 import { StudentLearningPath } from '../shared/StudentLearningPath';
+import { StudentProgressCard } from '../student/StudentProgressCard';
 
 interface StudentDashboardViewProps {
   user: User | null;
@@ -231,6 +232,8 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
         {/* Left Col: Pedagogical Copilot Feedback */}
         <div className="lg:col-span-2 space-y-8">
           
+          <StudentProgressCard profile={userProfile} />
+
           <div className="bg-white rounded-3xl p-8 border border-indigo-100 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
             

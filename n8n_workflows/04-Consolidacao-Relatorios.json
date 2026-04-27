@@ -56,6 +56,39 @@
       "position": [900, 300],
       "id": "send-report",
       "name": "Gmail: Enviar Relatório"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_SHEET_ID_DE_LOGS",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs_Atividades",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Workflow": "EduAI Core-Relatorio-Consolidado",
+            "Tipo_Acao": "Relatório Consolidado",
+            "Data_Hora": "={{ new Date().toISOString() }}",
+            "Status": "Sucesso",
+            "Resultado_IA": "={{ $json.output.substring(0, 50) }}...",
+            "Tempo_Execucao": "={{ $execution.duration }}"
+          },
+          "matchingColumns": [],
+          "schemaMode": "auto"
+        }
+      },
+      "id": "f5123d45-6789-0abc-def1-23456789abcb",
+      "name": "Log no Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [1120, 300]
     }
   ],
   "connections": {
@@ -86,6 +119,17 @@
         [
           {
             "node": "send-report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-report": {
+      "main": [
+        [
+          {
+            "node": "Log no Google Sheets",
             "type": "main",
             "index": 0
           }

@@ -26,7 +26,7 @@ import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, s
 import { toast } from 'sonner';
 import { exportExamToGoogleForms } from '../../services/googleFormsService';
 import { parseQuestionsFromText } from '../../services/geminiService';
-import { Exam } from '../../types/edusaep.types';
+import { Exam } from '../../types/eduai.types';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { ExamGenerator } from './exam/ExamGenerator';

@@ -13,7 +13,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { AppNotification, NotificationType } from '../types/edusaep.types';
+import { AppNotification, NotificationType } from '../types/eduai.types';
 
 export const notificationService = {
   /**

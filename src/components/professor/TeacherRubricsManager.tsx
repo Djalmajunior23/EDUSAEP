@@ -4,7 +4,7 @@ import { FileText, Plus, Trash2, Copy, Save, Loader2, CheckCircle2 } from 'lucid
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { Rubric, RubricCriterion } from '../../types/edusaep.types';
+import { Rubric, RubricCriterion } from '../../types/eduai.types';
 
 export function TeacherRubricsManager({ userProfile }: { userProfile: any }) {
   const [rubrics, setRubrics] = useState<Rubric[]>([]);

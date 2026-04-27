@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { generateContentWrapper, getSystemInstruction } from '../../services/geminiService';
 import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, increment, getDocs, query, orderBy } from 'firebase/firestore';
-import { LearningSituation } from '../../types/edusaep.types';
+import { LearningSituation } from '../../types/eduai.types';
 
 interface Props {
   userProfile: any;

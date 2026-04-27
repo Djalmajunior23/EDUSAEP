@@ -44,6 +44,39 @@
       "position": [700, 300],
       "id": "send-email",
       "name": "Gmail: Enviar Plano"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_SHEET_ID_DE_LOGS",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs_Atividades",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Workflow": "EduAI Core-Recovery-Email-Workflow",
+            "Tipo_Acao": "Enviar Plano Email",
+            "Data_Hora": "={{ new Date().toISOString() }}",
+            "Status": "Sucesso",
+            "Resultado_IA": "={{ $json.body.studentEmail }}",
+            "Tempo_Execucao": "={{ $execution.duration }}"
+          },
+          "matchingColumns": [],
+          "schemaMode": "auto"
+        }
+      },
+      "id": "f5123d45-6789-0abc-def1-23456789abca",
+      "name": "Log no Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [920, 300]
     }
   ],
   "connections": {
@@ -63,6 +96,17 @@
         [
           {
             "node": "send-email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-email": {
+      "main": [
+        [
+          {
+            "node": "Log no Google Sheets",
             "type": "main",
             "index": 0
           }

@@ -119,6 +119,42 @@
         1080,
         300
       ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_SHEET_ID_DE_LOGS",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs_Atividades",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Workflow": "7Q6R2vWt8o9LpC3F",
+            "Tipo_Acao": "Geração Relatório Semanal",
+            "Data_Hora": "={{ new Date().toISOString() }}",
+            "Status": "Sucesso",
+            "Resultado_IA": "={{ $json.text.substring(0, 50) }}...",
+            "Tempo_Execucao": "={{ $execution.duration }}"
+          },
+          "matchingColumns": [],
+          "schemaMode": "auto"
+        }
+      },
+      "id": "f5123d45-6789-0abc-def1-23456789abcd",
+      "name": "Log no Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [
+        1300,
+        300
+      ]
     }
   ],
   "pinData": {},
@@ -161,6 +197,17 @@
         [
           {
             "node": "Enviar Relatório (Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Relatório (Email)": {
+      "main": [
+        [
+          {
+            "node": "Log no Google Sheets",
             "type": "main",
             "index": 0
           }

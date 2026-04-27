@@ -214,104 +214,79 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const fileName = file.name.toLowerCase();
-    
-    if (fileName.endsWith('.csv')) {
-      setIsImporting(true);
-      Papa.parse(file, {
-        header: true,
-        complete: async (results) => {
-          const text = JSON.stringify(results.data);
-          await processImportedQuestions(text);
-        },
-        error: (error) => {
-          console.error("CSV Parse Error:", error);
-          toast.error("Erro ao ler arquivo CSV.");
-          setIsImporting(false);
+    console.log(`[Import] Iniciando importação: ${file.name} (${file.size} bytes)`);
+    setIsImporting(true);
+
+    try {
+      const fileName = file.name.toLowerCase();
+      let text = '';
+
+      if (fileName.endsWith('.csv')) {
+        text = await new Promise((resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            complete: (results) => resolve(JSON.stringify(results.data)),
+            error: reject
+          });
+        });
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        text = JSON.stringify(XLSX.utils.sheet_to_json(ws));
+      } else if (fileName.endsWith('.pdf')) {
+        const data = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(data).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+          setImportProgress(Math.round((i / pdf.numPages) * 100));
         }
-      });
-    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-      setIsImporting(true);
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const bstr = evt.target?.result;
-          const wb = XLSX.read(bstr, { type: 'binary' });
-          const wsname = wb.SheetNames[0];
-          const ws = wb.Sheets[wsname];
-          const data = XLSX.utils.sheet_to_json(ws);
-          await processImportedQuestions(JSON.stringify(data));
-        } catch (error) {
-          console.error("Excel Parse Error:", error);
-          toast.error("Erro ao ler arquivo Excel.");
-          setIsImporting(false);
-        }
-      };
-      reader.readAsBinaryString(file);
-    } else if (fileName.endsWith('.pdf')) {
-      setIsImporting(true);
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const typedarray = new Uint8Array(evt.target?.result as ArrayBuffer);
-          const pdf = await pdfjsLib.getDocument(typedarray).promise;
-          let fullText = '';
-          
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item: any) => item.str).join(' ');
-            fullText += pageText + '\n';
-            setImportProgress(Math.round((i / pdf.numPages) * 100));
-          }
-          
-          await processImportedQuestions(fullText);
-        } catch (error) {
-          console.error("PDF Parse Error:", error);
-          toast.error("Erro ao ler arquivo PDF.");
-          setIsImporting(false);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } else if (fileName.endsWith('.docx')) {
-      setIsImporting(true);
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const arrayBuffer = evt.target?.result as ArrayBuffer;
-          const result = await mammoth.extractRawText({ arrayBuffer });
-          await processImportedQuestions(result.value);
-        } catch (error) {
-          console.error("DOCX Parse Error:", error);
-          toast.error("Erro ao ler arquivo DOCX.");
-          setIsImporting(false);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } else {
-      toast.error("Formato de arquivo não suportado. Use CSV, Excel, PDF ou DOCX.");
+        text = fullText;
+      } else if (fileName.endsWith('.docx')) {
+        const data = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: data });
+        text = result.value;
+      } else {
+        throw new Error("Formato não suportado");
+      }
+
+      console.log(`[Import] Conteúdo extraído. Comprimento: ${text.length} caracteres.`);
+      await processImportedQuestions(text);
+    } catch (error) {
+      console.error("[Import] Erro ao ler arquivo:", error);
+      toast.error(`Erro ao ler arquivo: ${error instanceof Error ? error.message : 'Desconhecido'}`);
+    } finally {
+      setIsImporting(false);
+      setImportProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-    
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const processImportedQuestions = async (text: string) => {
+    if (!text || text.trim().length === 0) {
+      toast.error("O arquivo está vazio ou não pôde ser lido.");
+      return;
+    }
     setImportProgress(0);
     try {
-      toast.info("A IA está analisando o conteúdo e extraindo as questões...");
+      toast.info("A IA está processando o conteúdo... aguarde.");
+      console.log("[Import] Chamando parseQuestionsFromText");
       const parsedQuestions = await parseQuestionsFromText(text, selectedModel, 'TEACHER');
       
+      console.log(`[Import] IA retornou ${parsedQuestions?.length || 0} questões`);
+
       if (!parsedQuestions || parsedQuestions.length === 0) {
-        toast.error("Nenhuma questão identificada no arquivo.");
-        setIsImporting(false);
+        toast.error("Nenhuma questão foi identificada pela IA.");
         return;
       }
 
-      // Check for missing competencies
       const uniqueCompetencies = Array.from(new Set(parsedQuestions.map(q => q.competenciaNome)));
-      const existingCompetencies = disciplines.map(d => d.name);
-      const missing = uniqueCompetencies.filter(c => !existingCompetencies.includes(c));
+      const existingCompetencies = disciplines.map(d => d.name || d.nome);
+      const missing = uniqueCompetencies.filter(c => c && !existingCompetencies.includes(c));
 
       if (missing.length > 0) {
         setMissingCompetencies(missing);
@@ -321,13 +296,11 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         await saveImportedQuestions(parsedQuestions);
       }
     } catch (error) {
-      console.error("Error processing questions:", error);
-      toast.error("Erro ao processar questões com IA.");
-    } finally {
-      setIsImporting(false);
-      setImportProgress(0);
+      console.error("[Import] Erro no processamento com IA:", error);
+      toast.error("Erro ao analisar questões com IA.");
     }
   };
+
 
   const saveImportedQuestions = async (questionsToSave: any[]) => {
     try {

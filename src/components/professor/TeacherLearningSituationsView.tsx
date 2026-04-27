@@ -4,7 +4,7 @@ import { BookOpen, Clock, Users, Loader2, Eye, Edit2, Copy, Trash2, Save, X } fr
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, getDocs, query, where, updateDoc, doc, deleteDoc, addDoc } from 'firebase/firestore';
-import { LearningSituation, SASubmission } from '../../types/edusaep.types';
+import { LearningSituation, SASubmission } from '../../types/eduai.types';
 
 export function TeacherLearningSituationsView({ userProfile }: { userProfile: any }) {
   const [situations, setSituations] = useState<LearningSituation[]>([]);

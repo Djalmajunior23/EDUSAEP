@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, BookOpen, CheckSquare, AlertCircle } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, getDocs, where } from 'firebase/firestore';
-import { CalendarEvent, Activity } from '../../types/edusaep.types';
+import { CalendarEvent, Activity } from '../../types/eduai.types';
 
 export function CalendarView({ userProfile }: { userProfile: any }) {
   const [currentDate, setCurrentDate] = useState(new Date());

@@ -49,14 +49,16 @@
     },
     {
       "parameters": {
-        "channel": "=#alertas-pedagogicos",
-        "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO ⚠️\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 *Aluno(a/ID)*: {{ $json.body.userId || 'Sistema' }}\n🔹 *Turma*: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 *Gatilho*: {{ JSON.stringify($json.body.data) }}\n\nPor favor, Coordenação, verificar no Painel EduAI Core imediatamente.",
-        "otherOptions": {}
+        "resource": "message",
+        "sendTo": "coordenacao@edusaep.com",
+        "subject": "=🚨 ALERTA CRÍTICO: DESEMPENHO - EduAI Core",
+        "text": "=⚠️ ALERTA CRÍTICO: DESEMPENHO\n\nIdentificamos uma queda brusca de proficiência!\n\n🔹 Aluno(a/ID): {{ $json.body.userId || 'Sistema' }}\n🔹 Turma: {{ $json.body.turmaId || 'Não Classificada' }}\n🔹 Gatilho: {{ JSON.stringify($json.body.data) }}\n\nDiretamente do Painel EduAI Core.",
+        "options": {}
       },
       "id": "4facced1-f8e1-455b-b9ab-b427b0b14c5c",
-      "name": "Alerta Coordenação (Slack)",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.1,
+      "name": "Alerta Coordenação (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
       "position": [
         740,
         140
@@ -129,7 +131,7 @@
       "main": [
         [
           {
-            "node": "Alerta Coordenação (Slack)",
+            "node": "Alerta Coordenação (Gmail)",
             "type": "main",
             "index": 0
           }

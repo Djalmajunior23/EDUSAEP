@@ -145,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { type: 'header', id: 'h-pedagogical', label: 'Questões e Avaliações' },
       { id: 'questions-bank', label: 'Banco de Itens', icon: Database, path: '/questions-bank', description: 'Acervo' },
       { id: 'generate-questions-quick', label: 'Gerador IA', icon: Sparkles, path: '/generate-questions', description: 'Criação Rápida' },
-      { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Gestão SAEP' },
+      { id: 'exams-management', label: 'Simulados', icon: BookOpen, path: '/exams', description: 'Gestão de Avaliações' },
       { id: 'activity-manager', label: 'Gestão de Atividades', icon: CheckSquare, path: '/activity-manager' },
       { id: 'aula-invertida-mgr', label: 'Aula Invertida', icon: BookOpen, path: '/aula-invertida', description: 'Gestão Flipped' },
       { id: 'estudos-caso-mgr', label: 'Estudos de Caso', icon: FileText, path: '/estudos-caso', description: 'Casos Complexos' },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Map as MapIcon, 
   ChevronRight, 
@@ -12,8 +12,10 @@ import {
   Zap,
   Loader2,
   Trophy,
-  ArrowLeft
+  ArrowLeft,
+  ChevronDown
 } from 'lucide-react';
+// ... (rest of imports keep unchanged)
 import { generateLearningPath } from '../../services/geminiService';
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -29,10 +31,19 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
   const [activePhase, setActivePhase] = useState(0);
   const [activeSimulationContext, setActiveSimulationContext] = useState<string | null>(null);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
+  
+  // Expanded sections state
+  const [expandedSections, setExpandedSections] = useState({
+    topics: true,
+    activities: true,
+    resources: true
+  });
 
-  useEffect(() => {
-    fetchStudentDataAndGeneratePath();
-  }, [userProfile]);
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+// ... (keep fetchStudentDataAndGeneratePath and other functions unchanged)
+// [I will replace the main content block below]
 
   const toggleItemCompletion = (itemKey: string) => {
     const newSet = new Set(completedItems);
@@ -263,106 +274,147 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 gap-6">
               {/* Study Topics */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                  <BookOpen size={18} className="text-indigo-500" /> Tópicos de Estudo
-                </h4>
-                <div className="space-y-2">
-                  {path.fases[activePhase].topicos.map((topic: string, i: number) => {
-                    const isDone = completedItems.has(`${activePhase}-${topic}`);
-                    return (
-                      <div 
-                        key={i} 
-                        onClick={() => toggleItemCompletion(`${activePhase}-${topic}`)}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
-                          isDone ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-100 hover:border-indigo-200"
-                        )}
-                      >
-                        {isDone ? (
-                          <CheckCircle2 size={16} className="text-emerald-500" />
-                        ) : (
-                          <Circle size={16} className="text-gray-300 group-hover:text-indigo-400" />
-                        )}
-                        <span className={cn("text-sm font-medium", isDone ? "text-emerald-900 line-through" : "text-gray-700")}>
-                          {topic}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Practical Activities */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                  <Zap size={18} className="text-amber-500" /> Atividades Práticas
-                </h4>
-                <div className="space-y-2">
-                  {path.fases[activePhase].atividades.map((act: string, i: number) => {
-                    const isDone = completedItems.has(`${activePhase}-${act}`);
-                    return (
-                      <div 
-                        key={i} 
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-xl border transition-all shadow-sm",
-                          isDone ? "bg-emerald-100 border-emerald-300" : "bg-emerald-50 border-emerald-100 hover:border-emerald-300 hover:bg-emerald-100"
-                        )}
-                      >
-                        <div 
-                          className="flex items-center gap-3 cursor-pointer flex-1"
-                          onClick={() => toggleItemCompletion(`${activePhase}-${act}`)}
-                        >
-                          <CheckCircle2 size={16} className={isDone ? "text-emerald-700" : "text-emerald-500"} />
-                          <span className={cn("text-sm font-medium", isDone ? "text-emerald-900 line-through" : "text-emerald-900")}>
-                            {act}
-                          </span>
-                        </div>
-                        <button 
-                          onClick={() => setActiveSimulationContext(act)}
-                          className="text-emerald-600 bg-white p-1.5 rounded-lg shadow-sm hover:scale-110 transition-transform"
-                        >
-                          <ChevronRight size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Resources */}
-            <div className="mt-8 pt-8 border-t border-gray-100">
-              <h4 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2">
-                <Video size={18} className="text-red-500" /> Recursos Recomendados
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {path.fases[activePhase].recursos.map((res: string, i: number) => {
-                  const isDone = completedItems.has(`${activePhase}-${res}`);
-                  return (
-                    <div 
-                      key={i} 
-                      onClick={() => toggleItemCompletion(`${activePhase}-${res}`)}
-                      className={cn(
-                        "p-4 rounded-2xl border transition-all cursor-pointer group relative",
-                        isDone ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-100 hover:bg-white hover:shadow-md"
-                      )}
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <button 
+                  onClick={() => toggleSection('topics')}
+                  className="w-full p-4 flex items-center justify-between text-sm font-black text-gray-900"
+                >
+                  <span className="flex items-center gap-2"><BookOpen size={18} className="text-indigo-500" /> Tópicos de Estudo</span>
+                  <ChevronDown className={cn("transition-transform", expandedSections.topics ? "rotate-180" : "")} size={18} />
+                </button>
+                <AnimatePresence>
+                  {expandedSections.topics && (
+                    <motion.div 
+                      initial={{ height: 0 }}
+                      animate={{ height: 'auto' }}
+                      exit={{ height: 0 }}
+                      className="px-4 pb-4 space-y-2"
                     >
-                      {isDone && <CheckCircle2 className="absolute top-2 right-2 text-emerald-500" size={16} />}
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors",
-                        isDone ? "bg-emerald-100" : "bg-white group-hover:bg-indigo-50"
-                      )}>
-                        {res.toLowerCase().includes('vídeo') ? <Video className="text-red-500" size={20} /> : <FileText className="text-indigo-500" size={20} />}
+                      {path.fases[activePhase].topicos.map((topic: string, i: number) => {
+                        const isDone = completedItems.has(`${activePhase}-${topic}`);
+                        return (
+                          <div 
+                            key={i} 
+                            onClick={() => toggleItemCompletion(`${activePhase}-${topic}`)}
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
+                              isDone ? "bg-emerald-50 border-emerald-200" : "bg-white border-gray-100 hover:border-indigo-200"
+                            )}
+                          >
+                            {isDone ? (
+                              <CheckCircle2 size={16} className="text-emerald-500" />
+                            ) : (
+                              <Circle size={16} className="text-gray-300 group-hover:text-indigo-400" />
+                            )}
+                            <span className={cn("text-sm font-medium", isDone ? "text-emerald-900 line-through" : "text-gray-700")}>
+                              {topic}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Practical Activities - expand this similarly */}
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <button 
+                  onClick={() => toggleSection('activities')}
+                  className="w-full p-4 flex items-center justify-between text-sm font-black text-gray-900"
+                >
+                  <span className="flex items-center gap-2"><Zap size={18} className="text-amber-500" /> Atividades Práticas</span>
+                  <ChevronDown className={cn("transition-transform", expandedSections.activities ? "rotate-180" : "")} size={18} />
+                </button>
+                <AnimatePresence>
+                  {expandedSections.activities && (
+                    <motion.div 
+                      initial={{ height: 0 }}
+                      animate={{ height: 'auto' }}
+                      exit={{ height: 0 }}
+                      className="px-4 pb-4 space-y-2"
+                    >
+                      {path.fases[activePhase].atividades.map((act: string, i: number) => {
+                        const isDone = completedItems.has(`${activePhase}-${act}`);
+                        return (
+                          <div 
+                            key={i} 
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-xl border transition-all shadow-sm",
+                              isDone ? "bg-emerald-100 border-emerald-300" : "bg-white border-emerald-100 hover:border-emerald-300 hover:bg-emerald-100"
+                            )}
+                          >
+                            <div 
+                              className="flex items-center gap-3 cursor-pointer flex-1"
+                              onClick={() => toggleItemCompletion(`${activePhase}-${act}`)}
+                            >
+                              <CheckCircle2 size={16} className={isDone ? "text-emerald-700" : "text-emerald-500"} />
+                              <span className={cn("text-sm font-medium", isDone ? "text-emerald-900 line-through" : "text-emerald-900")}>
+                                {act}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => setActiveSimulationContext(act)}
+                              className="text-emerald-600 bg-white p-1.5 rounded-lg shadow-sm hover:scale-110 transition-transform"
+                            >
+                              <ChevronRight size={16} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Resources - expand this similarly */}
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <button 
+                  onClick={() => toggleSection('resources')}
+                  className="w-full p-4 flex items-center justify-between text-sm font-black text-gray-900"
+                >
+                  <span className="flex items-center gap-2"><Video size={18} className="text-red-500" /> Recursos Recomendados</span>
+                  <ChevronDown className={cn("transition-transform", expandedSections.resources ? "rotate-180" : "")} size={18} />
+                </button>
+                <AnimatePresence>
+                  {expandedSections.resources && (
+                    <motion.div 
+                      initial={{ height: 0 }}
+                      animate={{ height: 'auto' }}
+                      exit={{ height: 0 }}
+                      className="px-4 pb-4"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {path.fases[activePhase].recursos.map((res: string, i: number) => {
+                          const isDone = completedItems.has(`${activePhase}-${res}`);
+                          return (
+                            <div 
+                              key={i} 
+                              onClick={() => toggleItemCompletion(`${activePhase}-${res}`)}
+                              className={cn(
+                                "p-4 rounded-2xl border transition-all cursor-pointer group relative",
+                                isDone ? "bg-emerald-50 border-emerald-200" : "bg-white border-gray-100 hover:bg-white hover:shadow-md"
+                              )}
+                            >
+                              {isDone && <CheckCircle2 className="absolute top-2 right-2 text-emerald-500" size={16} />}
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors",
+                                isDone ? "bg-emerald-100" : "bg-white group-hover:bg-indigo-50"
+                              )}>
+                                {res.toLowerCase().includes('vídeo') ? <Video className="text-red-500" size={20} /> : <FileText className="text-indigo-500" size={20} />}
+                              </div>
+                              <p className={cn("text-xs font-bold line-clamp-2", isDone ? "text-emerald-900 line-through" : "text-gray-900")}>
+                                {res}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <p className={cn("text-xs font-bold line-clamp-2", isDone ? "text-emerald-900 line-through" : "text-gray-900")}>
-                        {res}
-                      </p>
-                    </div>
-                  );
-                })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
