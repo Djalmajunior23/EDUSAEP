@@ -8,7 +8,7 @@ export async function mapExternalDiscipline(
 ): Promise<{ disciplineId: string | null; confidence: number; reason: string }> {
   
   const response = await generateContentWrapper({
-    model: "gemini-3-flash-preview",
+    model: "gemini-1.5-flash",
     contents: [
       {
         role: "user",
@@ -46,7 +46,7 @@ export async function mapExistingCompetencies(
   if (!questions || questions.length === 0) return [];
 
   const response = await generateContentWrapper({
-    model: "gemini-3-flash-preview",
+    model: "gemini-1.5-flash",
     contents: [
       {
         role: "user",

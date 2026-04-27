@@ -46,7 +46,7 @@ interface StudentInsightsProps {
   selectedModel?: string;
 }
 
-export function StudentInsights({ studentId, selectedModel = "gemini-3-flash-preview" }: StudentInsightsProps) {
+export function StudentInsights({ studentId, selectedModel = "gemini-1.5-flash" }: StudentInsightsProps) {
   const [profile, setProfile] = useState<any>(null);
   const [prediction, setPrediction] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);

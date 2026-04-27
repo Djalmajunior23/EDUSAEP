@@ -24,7 +24,7 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
   const [difficulty, setDifficulty] = useState<'fácil' | 'médio' | 'difícil'>('médio');
   const [questionType, setQuestionType] = useState<'multipla_escolha' | 'discursiva'>('multipla_escolha');
   const [caseStudy, setCaseStudy] = useState('');
-  const [localModel, setLocalModel] = useState(selectedModel || 'gemini-3-flash-preview');
+  const [localModel, setLocalModel] = useState(selectedModel || 'gemini-1.5-flash');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestion, setGeneratedQuestion] = useState<any | null>(null);
 
@@ -187,8 +187,8 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
               onChange={(e) => setLocalModel(e.target.value)}
               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
             >
-              <option value="gemini-3-flash-preview">Gemini 3 Flash (Rápido)</option>
-              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Avançado)</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Rápido)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado)</option>
               <option value="gemini-flash-latest">Gemini Flash Latest</option>
             </select>
           </div>

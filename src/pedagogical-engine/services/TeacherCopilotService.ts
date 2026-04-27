@@ -50,7 +50,7 @@ export class TeacherCopilotService {
    * Processa uma mensagem no formato de "Copiloto"
    * e gera uma explicação da recomendação.
    */
-  public static async processMessage(teacherId: string, message: string, history: any[], model: string = 'gemini-3-flash-preview') {
+  public static async processMessage(teacherId: string, message: string, history: any[], model: string = 'gemini-1.5-flash') {
     const teacherContext = await this.getTeacherContext(teacherId);
 
     const systemPrompt = `
@@ -102,7 +102,7 @@ export class TeacherCopilotService {
   /**
    * Gera a lista de Prioridades do Dia dinamicamente
    */
-  public static async generateDailyPriorities(teacherId: string, model: string = 'gemini-3-flash-preview'): Promise<{ title: string; desc: string; type: string }[]> {
+  public static async generateDailyPriorities(teacherId: string, model: string = 'gemini-1.5-flash'): Promise<{ title: string; desc: string; type: string }[]> {
     const context = await this.getTeacherContext(teacherId);
     
     const prompt = `
@@ -136,7 +136,7 @@ export class TeacherCopilotService {
   /**
    * Gera um Estudo de Caso (PBL) Estruturado e salva no Banco
    */
-  public static async generateAndSavePBLActivity(teacherId: string, competency: string, model: string = 'gemini-3-flash-preview'): Promise<{ text: string, pblId: string }> {
+  public static async generateAndSavePBLActivity(teacherId: string, competency: string, model: string = 'gemini-1.5-flash'): Promise<{ text: string, pblId: string }> {
     const prompt = `
       Você é um designer instrucional e especialista em Metodologias Ativas.
       Crie uma atividade de Problem-Based Learning (PBL) ou Estudo de Caso para a competência: "${competency}".

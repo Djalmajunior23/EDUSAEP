@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MonitorPlay, ChevronDown } from 'lucide-react';
 import { UserProfile } from '../../../types';
-import { TeacherDashboardService, ClassHealthMetric, CriticalCompetency, TeacherRecommendation, NextActionInfo, WeeklySummary } from '../../../pedagogical-engine/services/TeacherDashboardService';
+import { TeacherDashboardService, ClassHealthMetric, CriticalCompetency, TeacherRecommendation, NextActionInfo, WeeklySummary } from '../../../services/teacherDashboardService';
 
 // Importing the child widgets
 import { 

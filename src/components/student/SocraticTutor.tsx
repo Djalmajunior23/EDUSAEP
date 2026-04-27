@@ -32,7 +32,7 @@ export function SocraticTutor({
   questionId = 'general', 
   questionText = 'Dúvida Geral', 
   onClose, 
-  selectedModel = "gemini-3-flash-preview",
+  selectedModel = "gemini-1.5-flash",
   userRole = 'STUDENT'
 }: SocraticTutorProps) {
   const [messages, setMessages] = useState<Message[]>([]);

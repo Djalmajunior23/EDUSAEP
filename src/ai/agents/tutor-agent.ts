@@ -1,5 +1,5 @@
 import { AIRequestContext } from '../types/ai.types';
-import { generateContentWrapper } from '../../services/geminiService';
+import { generateAIContent } from '../../services/aiService';
 
 export class TutorAgent {
   public static async explain(prompt: string, context: AIRequestContext): Promise<any> {
@@ -18,7 +18,11 @@ export class TutorAgent {
     Gere a resposta em Markdown (Mantenha o tom empático e educacional).
     `;
     
-    const result = await generateContentWrapper({ prompt: aiPrompt, role: 'model', fast: true });
-    return result;
+    const result = await generateAIContent({ 
+      prompt: aiPrompt, 
+      task: 'tutor_explanation',
+      responseFormat: 'text'
+    });
+    return result.text;
   }
 }

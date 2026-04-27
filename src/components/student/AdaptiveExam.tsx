@@ -25,7 +25,7 @@ interface AdaptiveExamProps {
   userRole?: UserRole | 'professor' | 'aluno';
 }
 
-export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-3-flash-preview", userRole = 'STUDENT' }: AdaptiveExamProps) {
+export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "gemini-1.5-flash", userRole = 'STUDENT' }: AdaptiveExamProps) {
   const [currentQuestion, setCurrentQuestion] = useState<SAEPQuestion | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [proficiency, setProficiency] = useState(50); // Start at medium

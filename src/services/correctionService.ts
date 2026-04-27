@@ -1,8 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { db } from "../firebase";
 import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { generateAIContent } from "./aiService";
 
 export interface CorrectionResult {
   score: number;
@@ -49,11 +47,14 @@ export async function assistCorrection(assessmentId: string, studentId: string, 
     ]
   }`;
 
-  const result = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: prompt,
+  const result = await generateAIContent({
+    prompt,
+    task: 'assessment_correction',
+    responseFormat: 'json',
+    systemInstruction: "Atue como um avaliador técnico experiente seguindo rigorosamente a rubrica de correção fornecida."
   });
-  const jsonString = (result.text || "").replace(/```json|```/g, '').trim();
+
+  const jsonString = result.text.replace(/```json|```/g, '').trim();
   const correction: CorrectionResult = JSON.parse(jsonString);
 
   // 3. Save Correction to Firestore

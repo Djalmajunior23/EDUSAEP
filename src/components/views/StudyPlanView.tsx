@@ -11,7 +11,7 @@ import { User } from 'firebase/auth';
 import { toast } from 'sonner';
 import { pdfExportService } from '../../services/pdfExportService';
 import { generateContentWrapper, DEFAULT_CONFIG, safeParseJson, generateLearningPath } from '../../services/geminiService';
-import { Type } from '@google/genai';
+import { SchemaType as Type } from '@google/generative-ai';
 import { Question, Exam, ExamSubmission, StudyPlan, UserProfile } from '../../types';
 
 interface StudyPlanViewProps {

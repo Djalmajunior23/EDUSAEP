@@ -11,7 +11,7 @@ import { n8nEvents } from '../../services/n8nService';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
+export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemini-1.5-flash" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
@@ -444,7 +444,7 @@ export function CognitiveErrorAnalysisView({ userProfile, selectedModel = "gemin
               <BarChart3 size={20} className="text-emerald-600" /> Frequência de Erros por Categoria
             </h3>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />

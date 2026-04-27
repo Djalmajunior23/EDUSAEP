@@ -3,7 +3,19 @@ import { Sparkles, Loader2, Zap, BookOpen, FileText, LayoutDashboard, Target, Ch
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
-import { generateSmartContent, SmartContentInput } from '../../services/geminiService';
+import { generateAIContent } from '../../services/aiService';
+
+interface SmartContentInput {
+  prompt: string;
+  tipo: 'explicacao' | 'questoes' | 'plano_estudo' | 'simulado' | 'estudo_caso' | 'aula_invertida' | 'analise_desempenho';
+  perfil: 'TEACHER' | 'STUDENT';
+  disciplina: string;
+  competencias: string[];
+  nivel: 'facil' | 'medio' | 'dificil';
+  dados_desempenho?: any;
+  historico?: { simulados_realizados: number; media_geral: number };
+}
+
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -48,8 +60,25 @@ export function SmartContentGenerator({ userProfile, selectedModel }: SmartConte
     };
 
     try {
-      const content = await generateSmartContent(input, selectedModel);
-      setResult(content);
+      const response = await generateAIContent({
+        prompt: JSON.stringify(input),
+        task: 'smart_content_gen',
+        responseFormat: tipo === 'questoes' ? 'json' : 'text',
+        systemInstruction: `Você é um Gerador de Conteúdo Educacional Inteligente. 
+        Gere o conteúdo no formato solicitado (${tipo}) focado em ${disciplina || 'conhecimentos gerais'}.
+        Nível: ${nivel}. Perfil do Receptor: ${input.perfil}.`
+      });
+      
+      let finalResult = response.text;
+      if (tipo === 'questoes') {
+        try {
+          finalResult = JSON.parse(response.text);
+        } catch (e) {
+          console.warn("Retornando texto puro pois falhou o parse JSON das questões", e);
+        }
+      }
+      
+      setResult(finalResult);
       toast.success("Conteúdo gerado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar conteúdo inteligente:", error);

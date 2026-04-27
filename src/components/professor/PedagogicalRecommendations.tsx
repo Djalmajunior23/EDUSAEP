@@ -52,7 +52,7 @@ export function PedagogicalRecommendations({ userProfile }: { userProfile: any }
         recentSubmissions: submissions.slice(0, 10)
       };
 
-      const result = await generatePedagogicalAnalysis(context, 'gemini-3-flash-preview', 'TEACHER');
+      const result = await generatePedagogicalAnalysis(context, 'gemini-1.5-flash', 'TEACHER');
       setRecommendations(result);
       toast.success("Novas recomendações geradas!");
     } catch (error) {

@@ -131,7 +131,7 @@ export function TeacherAIAssistantPanel({ userProfile, selectedModel }: { userPr
       }
 
       const response = await generateContentWrapper({
-        model: selectedModel || 'gemini-3-flash-preview',
+        model: selectedModel || 'gemini-1.5-flash',
         contents: [{ role: 'user', parts: [{ text: aiPrompt }] }],
         config: {
           systemInstruction,

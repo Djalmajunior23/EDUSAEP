@@ -134,9 +134,9 @@ export function QuestionOptimizerView({ userProfile }: { userProfile: UserProfil
       let result: QuestionQualityAnalysis;
       
       if (question.tipoQuestao === 'discursiva') {
-        result = await analyzeDiscursiveQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'TEACHER');
+        result = await analyzeDiscursiveQuestionQuality(question, perf.errorDetails, "gemini-1.5-flash", userProfile?.role as any || 'TEACHER');
       } else {
-        result = await analyzeQuestionQuality(question, perf.errorDetails, "gemini-3-flash-preview", userProfile?.role as any || 'TEACHER');
+        result = await analyzeQuestionQuality(question, perf.errorDetails, "gemini-1.5-flash", userProfile?.role as any || 'TEACHER');
       }
       
       setSelectedAnalysis(result);

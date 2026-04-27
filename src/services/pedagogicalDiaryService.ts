@@ -1,8 +1,6 @@
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy } from "firebase/firestore";
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { generateAIContent } from "./aiService";
 
 export interface DiaryEntry {
   teacherId: string;
@@ -19,9 +17,11 @@ export async function createDiaryEntry(entry: Omit<DiaryEntry, 'date'>) {
   Identifique competências possivelmente afetadas e sugira uma atenção curta.
   Retorne um resumo de até 20 palavras.`;
   
-  const result = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: prompt,
+  const result = await generateAIContent({
+    prompt,
+    task: 'pedagogical_summary',
+    responseFormat: 'text',
+    systemInstruction: "Atue como um coordenador pedagógico sintetizando observações de sala de aula."
   });
   
   const summary = result.text || "";

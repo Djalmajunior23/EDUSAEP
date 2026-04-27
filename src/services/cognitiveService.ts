@@ -1,8 +1,6 @@
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { generateAIContent } from "./aiService";
 
 export type LoadStatus = 'normal' | 'overloaded' | 'struggling' | 'rushing';
 
@@ -10,9 +8,11 @@ export async function getActionableAdvice(status: LoadStatus, studentName: strin
   const prompt = `O aluno ${studentName} está com status '${status}'. 
   Sugira uma ação pedagógica curta e direta para o professor (max 15 palavras) para intervir positivamente agora.`;
   
-  const result = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: prompt,
+  const result = await generateAIContent({
+    prompt,
+    task: 'cognitive_advice',
+    responseFormat: 'text',
+    systemInstruction: "Atue como um mentor pedagógico especializado em carga cognitiva e engajamento."
   });
   return result.text || "";
 }

@@ -56,7 +56,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import { MassRescueDashboard } from "./components/professor/MassRescueDashboard";
 import { Sidebar } from "./components/shared/Sidebar";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.min.js`;
 
 type AIProvider = "gemini" | "openai" | "deepseek";
 
@@ -137,7 +137,6 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
-import { Type } from "@google/genai";
 import {
   generateDiagnostic,
   generateSuggestions,
@@ -321,7 +320,7 @@ function AppContent() {
       (localStorage.getItem("ai_provider") as AIProvider) || "gemini";
     if (provider === "openai") return "gpt-4o-mini";
     if (provider === "deepseek") return "deepseek-chat";
-    return "gemini-3-flash-preview";
+    return "gemini-1.5-flash";
   });
 
   const handleProviderChange = (p: AIProvider) => {
@@ -334,7 +333,7 @@ function AppContent() {
     } else if (p === "deepseek") {
       setSelectedModel("deepseek-chat");
     } else {
-      setSelectedModel("gemini-3-flash-preview");
+      setSelectedModel("gemini-1.5-flash");
     }
 
     window.dispatchEvent(new Event("ai_provider_changed"));

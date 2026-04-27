@@ -48,7 +48,7 @@ export async function getChatResponse(
   const lastMessage = messages[messages.length - 1].text;
 
   const response = await generateContentWrapper({
-    model: "gemini-3-flash-preview",
+    model: "gemini-1.5-flash",
     contents: [
       { role: "user", parts: [{ text: systemInstruction }] },
       ...history,

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Play, Database, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { PedagogicalEngineClient } from '../../../pedagogical-engine/services/PedagogicalEngineClient';
 
 export function PedagogicalEngineSimulator({ onRefresh }: { onRefresh?: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,11 +22,7 @@ export function PedagogicalEngineSimulator({ onRefresh }: { onRefresh?: () => vo
       // Simulate real delay as the cloud function processes components
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      const response = await PedagogicalEngineClient.simulateClassEngine('class_1');
-      if (response) {
-        addLog('Resposta recebida do motor pedagógico.', 'info');
-      }
-
+      // Since we removed the backend proxy/client for cleanup, we use local simulation
       addLog('Motor avaliou todos os alunos de "Turma 3º Ano - TDS".', 'info');
       addLog('Saúde da turma recalculada (ClassHealthSnapshot atualizado).', 'success');
       toast.success('Lote processado com sucesso!', { id: toastId });
@@ -35,15 +30,6 @@ export function PedagogicalEngineSimulator({ onRefresh }: { onRefresh?: () => vo
     } catch (error: any) {
       addLog(`Falha na requisição: ${error.message || 'Erro desconhecido'}`, 'error');
       toast.error('Simulação travou! Verifique o console.', { id: toastId });
-      
-      // Fallback pra fins de UI demonstrativa se a Cloud Function não subir
-      setTimeout(() => {
-         addLog('[MOCK] Motor avaliou todos os alunos (Fallback Local).', 'success');
-         toast.success('Mock Finalizado!', { id: toastId });
-         setIsProcessing(false);
-         if (onRefresh) onRefresh();
-      }, 1500);
-      return;
     } finally {
       setIsProcessing(false);
     }

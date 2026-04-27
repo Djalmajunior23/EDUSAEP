@@ -101,7 +101,7 @@ export function LearningSituationGenerator({ userProfile, selectedModel }: Props
       `;
 
       const response = await generateContentWrapper({
-        model: selectedModel || 'gemini-3-flash-preview',
+        model: selectedModel || 'gemini-1.5-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
           responseMimeType: 'application/json',

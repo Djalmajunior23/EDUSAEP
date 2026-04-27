@@ -28,6 +28,8 @@ import { exportExamToGoogleForms } from '../../services/googleFormsService';
 import { parseQuestionsFromText } from '../../services/geminiService';
 import { Exam } from '../../types/eduai.types';
 import * as pdfjsLib from 'pdfjs-dist';
+// Configuração do worker do PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 import mammoth from 'mammoth';
 import { ExamGenerator } from './exam/ExamGenerator';
 import { handleFirestoreError, OperationType } from '../../services/errorService';

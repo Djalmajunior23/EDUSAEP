@@ -7,7 +7,8 @@ import {
   Zap, 
   ZapOff,
   Loader2,
-  Filter
+  Filter,
+  Download
 } from 'lucide-react';
 import { 
   collection, 
@@ -215,7 +216,33 @@ export function AdminUsersView({ user }: AdminUsersViewProps) {
           <h2 className="text-3xl font-bold text-gray-900">Gestão de Usuários</h2>
           <p className="text-gray-500">Controle de acesso e administração da plataforma.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button 
+            onClick={() => {
+              const header = "email,senha,nome,funcao";
+              const rows = [
+                "aluno1@escola.com,123456,João Silva,STUDENT",
+                "professor1@escola.com,123456,Maria Santos,TEACHER",
+                "coordenador@escola.com,123456,Coordenação,COORDINATOR"
+              ];
+              const csvContent = [header, ...rows].join("\n");
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const link = document.createElement("a");
+              const url = URL.createObjectURL(blob);
+              link.setAttribute("href", url);
+              link.setAttribute("download", "template_cadastro_usuarios_eduaicore.csv");
+              link.style.visibility = 'hidden';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              toast.success("Template CSV baixado!");
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm border border-blue-200 hover:bg-blue-100 transition-all shadow-sm"
+          >
+            <Download size={18} />
+            Baixar Template CSV
+          </button>
+          
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -225,9 +252,10 @@ export function AdminUsersView({ user }: AdminUsersViewProps) {
           />
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-sm border border-emerald-100 hover:bg-emerald-100 transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
           >
-            Importar CSV
+            <UserPlus size={18} />
+            Importar Alunos em Lote
           </button>
         </div>
       </div>

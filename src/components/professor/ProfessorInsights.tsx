@@ -31,7 +31,7 @@ import { n8nEvents } from '../../services/n8nService';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 import { toast } from 'sonner';
 
-export function ProfessorInsights({ userProfile, selectedModel = "gemini-3-flash-preview" }: { userProfile: UserProfile | null, selectedModel?: string }) {
+export function ProfessorInsights({ userProfile, selectedModel = "gemini-1.5-flash" }: { userProfile: UserProfile | null, selectedModel?: string }) {
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classData, setClassData] = useState<any[]>([]);

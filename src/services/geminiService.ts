@@ -334,7 +334,7 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
   }
 }
 
-export async function generateQuestionVariation(originalQuestion: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any> {
+export async function generateQuestionVariation(originalQuestion: any, modelName: string = "gemini-1.5-flash", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any> {
   const prompt = `
 Aja como um especialista em avaliação educacional de alto nível.
 Sua tarefa é criar uma VARIAÇÃO da questão fornecida.
@@ -398,7 +398,7 @@ Seja criativo no contexto, garantindo que o candidato precise entender o conceit
   return parsed;
 }
 
-export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = "gemini-3-flash-preview", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
+export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = "gemini-1.5-flash", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
   const prompt = `
 Aja como um especialista em avaliação educacional de alto nível.
 Sua tarefa é criar ${count} VARIAÇÕES diferentes da questão fornecida.
@@ -465,7 +465,7 @@ Seja criativo nos contextos, garantindo que o candidato precise entender o conce
   return parsed;
 }
 
-export async function parseQuestionsFromText(text: string, modelName: string = "gemini-3-flash-preview", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
+export async function parseQuestionsFromText(text: string, modelName: string = "gemini-1.5-flash", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
   // Split text into chunks of ~15,000 characters to avoid output token limits
   const chunkSize = 15000;
   const chunks: string[] = [];
@@ -673,7 +673,7 @@ export interface DiagnosticResult {
   mensagem_para_o_aluno: string;
 }
 
-export async function generateInterventionPlan(classData: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+export async function generateInterventionPlan(classData: any, modelName: string = "gemini-1.5-flash"): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -714,7 +714,7 @@ export async function generateInterventionPlan(classData: any, modelName: string
   return safeParseJson(response.text, {});
 }
 
-export async function generateLearningPath(studentData: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+export async function generateLearningPath(studentData: any, modelName: string = "gemini-1.5-flash"): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -766,7 +766,7 @@ export async function generateLearningPath(studentData: any, modelName: string =
   return safeParseJson(response.text, {});
 }
 
-export async function generateRecoveryTrack(params: { studentId: string, competencyId: string, diagnosticData: any }, modelName: string = "gemini-3-flash-preview"): Promise<{ riskLevel: string, summary: string, activities: any[], interventions: string[] }> {
+export async function generateRecoveryTrack(params: { studentId: string, competencyId: string, diagnosticData: any }, modelName: string = "gemini-1.5-flash"): Promise<{ riskLevel: string, summary: string, activities: any[], interventions: string[] }> {
   const { studentId, competencyId, diagnosticData } = params;
   
   const response = await generateContentWrapper({
@@ -826,7 +826,7 @@ export interface TwinSimulationResult {
   }>;
 }
 
-export async function simulateDigitalTwin(stats: any, scenario: string, modelName: string = "gemini-3-flash-preview"): Promise<TwinSimulationResult> {
+export async function simulateDigitalTwin(stats: any, scenario: string, modelName: string = "gemini-1.5-flash"): Promise<TwinSimulationResult> {
   const prompt = `
     Aja como o "Gêmeo Digital Pedagógico" de uma turma do SAEP. 
     Sua função é SIMULAR o comportamento desta turma diante de um cenário específico e PREVER resultados e dificuldades.
@@ -876,7 +876,7 @@ export async function simulateDigitalTwin(stats: any, scenario: string, modelNam
   });
 }
 
-export async function generateDiagnostic(data: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
+export async function generateDiagnostic(data: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1041,7 +1041,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
-export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'aluno'): Promise<string[]> {
+export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'aluno'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1073,7 +1073,7 @@ export interface LearningProfileResult {
   recommendations: string;
 }
 
-export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'STUDENT'): Promise<LearningProfileResult> {
+export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'STUDENT'): Promise<LearningProfileResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1128,7 +1128,7 @@ export interface AdvancedQuestionParams {
 /**
  * Gera questões avançadas com suporte a múltiplos recursos (código, imagens, tabelas, etc.)
  */
-export async function generateAdvancedQuestion(params: AdvancedQuestionParams, modelName: string = "gemini-3-flash-preview"): Promise<any[]> {
+export async function generateAdvancedQuestion(params: AdvancedQuestionParams, modelName: string = "gemini-1.5-flash"): Promise<any[]> {
   const prompt = `
 Aja como um Arquiteto de Software Sênior e Especialista em Avaliação Educacional.
 Gere ${params.count || 1} questão(ões) do tipo "${params.type}" para a disciplina "${params.discipline}" sobre o tema "${params.topic}".
@@ -1259,7 +1259,7 @@ export interface CognitiveErrorResult {
   }>;
 }
 
-export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<CognitiveErrorResult> {
+export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<CognitiveErrorResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1324,7 +1324,7 @@ export interface QuestionAnalysisResult {
   nivelAdequacao: 'Baixo' | 'Médio' | 'Alto';
 }
 
-export async function analyzeQuestionByPerformance(questionData: any, performanceStats: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionAnalysisResult> {
+export async function analyzeQuestionByPerformance(questionData: any, performanceStats: any, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1392,7 +1392,7 @@ export interface SmartContentInput {
 /**
  * Gera conteúdo educacional inteligente baseado no input estruturado.
  */
-export async function generateSmartContent(input: SmartContentInput, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+export async function generateSmartContent(input: SmartContentInput, modelName: string = "gemini-1.5-flash"): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1431,7 +1431,7 @@ export interface RecoveryPlanResult {
   professorInterventions: string[];
 }
 
-export async function generateRecoveryPlan(studentData: any, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<RecoveryPlanResult> {
+export async function generateRecoveryPlan(studentData: any, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<RecoveryPlanResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1487,7 +1487,7 @@ export interface LessonPlanResult {
   aiInsights: string;
 }
 
-export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<LessonPlanResult> {
+export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<LessonPlanResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1544,7 +1544,7 @@ export interface PerformancePredictionResult {
   recommendations: string;
 }
 
-export async function predictPerformance(historicalData: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'ADMIN'): Promise<PerformancePredictionResult> {
+export async function predictPerformance(historicalData: any, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'ADMIN'): Promise<PerformancePredictionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1589,7 +1589,7 @@ export interface ClassOrchestrationResult {
   overallStrategy: string;
 }
 
-export async function generateClassRecoveryOrchestration(stats: any, modelName: string = "gemini-3-flash-preview"): Promise<ClassOrchestrationResult> {
+export async function generateClassRecoveryOrchestration(stats: any, modelName: string = "gemini-1.5-flash"): Promise<ClassOrchestrationResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1630,7 +1630,7 @@ export async function generateClassRecoveryOrchestration(stats: any, modelName: 
   return safeParseJson(response.text, { tracks: [], overallStrategy: "" });
 }
 
-export async function suggestCompetencies(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<string[]> {
+export async function suggestCompetencies(questions: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1679,7 +1679,7 @@ export interface SIPAResult {
   aiCommentary: string;
 }
 
-export async function generateSIPA(stats: any, intervention: string, modelName: string = "gemini-3-flash-preview"): Promise<SIPAResult> {
+export async function generateSIPA(stats: any, intervention: string, modelName: string = "gemini-1.5-flash"): Promise<SIPAResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1727,7 +1727,7 @@ export interface GuessDetectionResult {
   reason: string;
 }
 
-export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'STUDENT'): Promise<GuessDetectionResult> {
+export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'STUDENT'): Promise<GuessDetectionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1795,7 +1795,7 @@ export interface SAEPQuestion {
   atualizadoEm: any;
 }
 
-export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<SAEPQuestion> {
+export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1899,7 +1899,7 @@ export interface PedagogicalAnalysisResult {
   sugestoes_para_professor: string[];
 }
 
-export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<PedagogicalAnalysisResult> {
+export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<PedagogicalAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1949,7 +1949,7 @@ export interface BloomAnalysisResult {
   recommendations: string;
 }
 
-export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<BloomAnalysisResult> {
+export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<BloomAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1995,7 +1995,7 @@ export interface OpenQuestionGrade {
   missing_points: string[];
 }
 
-export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<OpenQuestionGrade> {
+export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<OpenQuestionGrade> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2046,7 +2046,7 @@ export interface QuestionQualityAnalysis {
   cognitiveErrorsAddressed: string[];
 }
 
-export async function analyzeDiscursiveQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
+export async function analyzeDiscursiveQuestionQuality(question: any, errors: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2109,7 +2109,7 @@ export async function analyzeDiscursiveQuestionQuality(question: any, errors: an
   });
 }
 
-export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
+export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2179,7 +2179,7 @@ export interface InterventionStrategyResult {
   n8n_trigger_payload: any;
 }
 
-export async function generateInterventionStrategy(classData: any[], studentsAtRisk: any[], modelName: string = "gemini-3-flash-preview", userRole: 'professor' | 'aluno' = 'professor'): Promise<InterventionStrategyResult> {
+export async function generateInterventionStrategy(classData: any[], studentsAtRisk: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<InterventionStrategyResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2220,7 +2220,7 @@ export async function generateInterventionStrategy(classData: any[], studentsAtR
   return safeParseJson(response.text, {});
 }
 
-export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-3-flash-preview", userRole: UserRole = 'STUDENT'): Promise<SAEPQuestion> {
+export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'STUDENT'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2334,7 +2334,7 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
 export async function generateDiscursiveQuestion(
   prompt: string,
   difficulty: string,
-  modelName: string = 'gemini-3-flash-preview',
+  modelName: string = 'gemini-1.5-flash',
   userRole: UserRole = 'TEACHER',
   competency: string = ''
 ): Promise<any> {
@@ -2438,7 +2438,7 @@ export async function generateDiscursiveQuestion(
 export async function validateAndImproveQuestion(
   question: any,
   targetCompetency: string,
-  modelName: string = 'gemini-3-flash-preview'
+  modelName: string = 'gemini-1.5-flash'
 ): Promise<any> {
   const prompt = `Como um Auditor Pedagógico Especialista, analise a seguinte questão discursiva em relação à:
   1. Clareza do enunciado.
@@ -2480,7 +2480,7 @@ export async function validateAndImproveQuestion(
   return safeParseJson(response.text, {});
 }
 
-export async function generateStudyPlan(data: any, modelName: string = "gemini-3-flash-preview"): Promise<any> {
+export async function generateStudyPlan(data: any, modelName: string = "gemini-1.5-flash"): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2562,7 +2562,7 @@ export async function generateContraryExplanation(questionText: string, incorrec
   Retorne um JSON: { "explanation": "string", "cognitiveTrapDetected": "string" }`;
 
   const response = await generateContentWrapper({
-    model: "gemini-3-flash-preview",
+    model: "gemini-1.5-flash",
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: { responseMimeType: "application/json", temperature: 0.2 }
   });
@@ -2587,7 +2587,7 @@ export async function generateAutomatedPBL(competenciesCovered: string[], contex
   }`;
 
   const response = await generateContentWrapper({
-    model: "gemini-3-flash-preview",
+    model: "gemini-1.5-flash",
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: { responseMimeType: "application/json", temperature: 0.7 }
   });
@@ -2603,7 +2603,7 @@ export async function generateCognitiveConflictScenario(topic: string) {
     RETORNE JSON: { "scenario": "texto", "apparentTruth": "texto ilusório", "alternatives": ["A","B","C","D"], "correctOptionIndex": number, "explanationIfWrong": "string" }`;
   
     const response = await generateContentWrapper({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: { responseMimeType: "application/json", temperature: 0.5 }
     });

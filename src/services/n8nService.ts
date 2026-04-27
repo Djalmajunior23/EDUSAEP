@@ -52,7 +52,7 @@ export async function triggerN8NRequest(data: any, endpoint: string = 'alerts', 
       'Content-Type': 'application/json',
     },
     body: isFormData ? data : JSON.stringify(data),
-    signal: AbortSignal.timeout(30000)
+    signal: AbortSignal.timeout(60000)
   });
 
   if (!response.ok) {

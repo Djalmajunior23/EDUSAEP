@@ -654,7 +654,7 @@ export function AlunoView({
               Evolução
             </h3>
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <LineChart data={evolutionData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
