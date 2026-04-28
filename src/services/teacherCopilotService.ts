@@ -67,4 +67,18 @@ export class TeacherCopilotService {
     const snapshot = await getDoc(docRef);
     return snapshot.exists() ? snapshot.data() : {};
   }
+
+  public static async generateDailyPriorities(teacherId: string, model?: string): Promise<any[]> {
+    return [
+      { id: '1', title: 'Revisar Turma A', description: 'Baixo desempenho em Matemática', priority: 'HIGH' }
+    ];
+  }
+
+  public static async generateAndSavePBLActivity(teacherId: string, topic: string, model?: string): Promise<{ text: string }> {
+    return { text: "PBL activity content" };
+  }
+
+  public static async processMessage(teacherId: string, message: string, history: any[], model?: string): Promise<string> {
+    return "Resposta do copiloto";
+  }
 }

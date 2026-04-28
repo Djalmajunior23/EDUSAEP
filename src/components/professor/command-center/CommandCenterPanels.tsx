@@ -7,7 +7,7 @@ import {
   Sword
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ClassHealthMetric, CriticalCompetency, TeacherRecommendation, NextActionInfo, WeeklySummary } from '../../../pedagogical-engine/services/TeacherDashboardService';
+import { ClassHealthMetric, CriticalCompetency, TeacherRecommendation, NextActionInfo, WeeklySummary } from '../../../services/teacherDashboardService';
 
 // --- WIDGET 1: Class Health Card ---
 export function ClassHealthCard({ health }: { health: ClassHealthMetric }) {

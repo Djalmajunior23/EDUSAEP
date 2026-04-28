@@ -58,9 +58,20 @@ async function startServer() {
     task: string;
     userId: string;
     userRole: string;
+    model?: string;
   }) => {
-    const { prompt, systemInstruction, responseFormat, task, userId, userRole } = params;
+    const { prompt, systemInstruction, responseFormat, task, userId, userRole, model: requestedModel } = params;
     const startTime = Date.now();
+
+    // Model mapping for legacy or inconsistent strings
+    const mapModel = (m: string | undefined) => {
+      if (!m) return m;
+      if (m.includes('gemini-3')) return 'gemini-1.5-flash';
+      if (m.includes('gpt-4o')) return 'gpt-4o-mini';
+      return m;
+    };
+
+    const finalRequestedModel = mapModel(requestedModel);
 
     try {
       const providersSnapshot = await db.collection('aiProviders')
@@ -83,7 +94,7 @@ async function startServer() {
       for (const provider of providers) {
         try {
           let resultText = "";
-          let usedModel = provider.defaultModel;
+          let usedModel = finalRequestedModel || provider.defaultModel;
 
           if (provider.providerKey === 'gemini' && gemini) {
             const model = gemini.getGenerativeModel({ model: usedModel, systemInstruction });
@@ -128,10 +139,10 @@ async function startServer() {
   // API Routes
   app.post("/api/ai/completions", async (req, res) => {
     try {
-      const { prompt, systemInstruction, responseFormat, task, userId, userRole } = req.body;
+      const { prompt, systemInstruction, responseFormat, task, userId, userRole, model } = req.body;
       if (!prompt) return res.status(400).json({ error: "Prompt is required" });
       const result = await executeAIRequest({
-        prompt, systemInstruction, responseFormat, task: task || "generic", userId: userId || "anonymous", userRole: userRole || "GUEST"
+        prompt, systemInstruction, responseFormat, task: task || "generic", userId: userId || "anonymous", userRole: userRole || "GUEST", model
       });
       res.json(result);
     } catch (error: any) {

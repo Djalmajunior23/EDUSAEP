@@ -161,10 +161,6 @@ import {
 import { ImportInconsistencyManager } from "./components/professor/ImportInconsistencyManager";
 import { pdfExportService } from "./services/pdfExportService";
 import { NotificationBell } from "./components/notifications/NotificationBell";
-import {
-  getAuth as getSecondaryAuth,
-  createUserWithEmailAndPassword as createSecondaryUser,
-} from "firebase/auth";
 import { auth, db, firebaseConfig } from "./firebase";
 import {
   User,
@@ -2565,11 +2561,11 @@ function AppContent() {
                                   }
                                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm"
                                 >
-                                  <option value="gemini-3-flash-preview">
-                                    Gemini 3 Flash (Rápido)
+                                  <option value="gemini-1.5-flash">
+                                    Gemini 1.5 Flash (Rápido)
                                   </option>
-                                  <option value="gemini-3.1-pro-preview">
-                                    Gemini 3.1 Pro (Avançado)
+                                  <option value="gemini-1.5-pro">
+                                    Gemini 1.5 Pro (Avançado)
                                   </option>
                                   <option value="gemini-flash-latest">
                                     Gemini Flash Latest

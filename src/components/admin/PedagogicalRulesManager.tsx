@@ -8,7 +8,7 @@ import {
   Zap,
   Check
 } from 'lucide-react';
-import { PedagogicalRule } from '../../services/ruleEngineService';
+import { PedagogicalRule } from '../../services/rulesEngineService';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 

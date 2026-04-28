@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Markdown from 'react-markdown';
-import { TeacherCopilotService } from '../../pedagogical-engine/services/TeacherCopilotService';
+import { TeacherCopilotService } from '../../services/teacherCopilotService';
 import { UserProfile } from '../../types';
 
 interface CopilotMessage {

@@ -37,6 +37,23 @@ const DEFAULT_RULES: InstitutionalRules = {
   weightTextQuestions: 1.0,
 };
 
+export interface PedagogicalRule {
+  id?: string;
+  name: string;
+  description: string;
+  active: boolean;
+  priority: number;
+  condition: {
+    metric: string;
+    operator: string;
+    value: number;
+  };
+  actions: {
+    type: string;
+    priority: string;
+  }[];
+}
+
 class RulesEngineService {
   private rules: InstitutionalRules = DEFAULT_RULES;
   private listeners: Set<(rules: InstitutionalRules) => void> = new Set();

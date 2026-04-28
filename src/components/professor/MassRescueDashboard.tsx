@@ -6,7 +6,7 @@ import {
   Filter, ArrowLeft
 } from 'lucide-react';
 import { UserProfile } from '../../types';
-import { MassRescueService, RescueSummary } from '../../pedagogical-engine/services/MassRescueService';
+import { MassRescueService, RescueSummary } from '../../services/massRescueService';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 

@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, BrainCircuit, Activity, BookOpen, AlertTriangle, BatteryWarning, Target, Loader2, Gauge } from 'lucide-react';
-import { CognitiveEngine, CognitiveProfile } from '../../../pedagogical-engine/services/CognitiveEngine';
+import { IntelligenceEngine } from '../../../services/advancedIntelligenceEngine';
+
+export interface CognitiveProfile {
+  studentId: string;
+  falseLearningRisk: number;
+  cognitiveLoad: number;
+  peakPerformanceTime: string;
+  fatigueLevel: 'HIGH' | 'LOW';
+  retentionRate: number;
+}
 import { toast } from 'sonner';
 
 interface Student360DrawerProps {
@@ -24,7 +33,7 @@ export function Student360Drawer({ isOpen, onClose, studentId, riskData }: Stude
   const loadProfile = async () => {
     setLoading(true);
     try {
-      const data = await CognitiveEngine.analyzeStudentCognition(studentId);
+      const data = await IntelligenceEngine.analyzeStudentCognition(studentId);
       setProfile(data);
     } catch (err) {
       console.error(err);

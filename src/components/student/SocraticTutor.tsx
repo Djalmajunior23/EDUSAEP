@@ -5,7 +5,7 @@ import { UserRole } from '../../types';
 import { db, auth } from '../../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
-import { intelligenceEngine } from '../../services/eduai/intelligenceEngine';
+import { intelligenceEngine } from '../../services/intelligenceEngine';
 
 // ... (início mantido igual, apenas substituiremos a chamada de gerar resposta)
 import Markdown from 'react-markdown';

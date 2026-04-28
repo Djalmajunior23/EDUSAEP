@@ -5,7 +5,7 @@ import { UserRole } from "../types";
 
 // The GoogleGenAI import and instance are kept ONLY if needed for complex object structures, 
 // but generateAIContent is now the primary gateway.
-import { Type } from "@google/genai";
+import { SchemaType as Type } from "@google/generative-ai";
 
 /**
  * Logs AI usage to Firestore for institutional governance and cost analysis.
@@ -204,17 +204,20 @@ Gerar sempre em JSON válido, compatível com documento Firestore.
  * incluindo a systemInstruction se presente. Utilizado para fallback e APIs externas.
  */
 function buildPromptString(params: any): string {
+  if (typeof params === 'string') return params;
+  
   let prompt = "";
   const systemInstruction = params.config?.systemInstruction;
   if (systemInstruction) {
     prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
   }
 
-  if (typeof params.contents === 'string') {
-    prompt += params.contents;
-  } else if (Array.isArray(params.contents)) {
-    prompt += params.contents.map((c: any) => {
-      // Formato Gemini API: { role: string, parts: [{ text: string }] }
+  const contents = params.contents || params.prompt || params;
+  
+  if (typeof contents === 'string') {
+    prompt += contents;
+  } else if (Array.isArray(contents)) {
+    prompt += contents.map((c: any) => {
       if (c.parts && Array.isArray(c.parts)) {
         return c.parts.map((p: any) => p.text).join('\n');
       }
@@ -227,9 +230,10 @@ function buildPromptString(params: any): string {
 
 export async function generateContentWrapper(params: any): Promise<any> {
   const prompt = buildPromptString(params);
-  const systemInstruction = params.config?.systemInstruction || "";
-  const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : 'text';
-  const task = params.task || "generic_gen";
+  const systemInstruction = (typeof params === 'object' ? params.config?.systemInstruction : "") || "";
+  const isJson = typeof params === 'object' && params.config?.responseMimeType === 'application/json';
+  const responseFormat = isJson ? 'json' : 'text';
+  const task = (typeof params === 'object' ? params.task : "generic_gen") || "generic_gen";
 
   try {
     const result = await generateAIContent({
@@ -237,10 +241,9 @@ export async function generateContentWrapper(params: any): Promise<any> {
       systemInstruction,
       responseFormat,
       task,
-      model: params.model
+      model: typeof params === 'object' ? params.model : undefined
     });
 
-    // For compatibility with previous calls that expect a result object with a .text property or a .response.text() method
     return {
       text: result.text,
       response: {
@@ -248,7 +251,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
       }
     };
   } catch (error: any) {
-    console.error("[Gemini Service Web Client] Routing to backend failed:", error);
+    console.error("[AI Wrapper] Error:", error);
     throw error;
   }
 }
@@ -1864,7 +1867,7 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
           status: { type: Type.STRING },
           revisadaPorProfessor: { type: Type.BOOLEAN },
           usoTotal: { type: Type.NUMBER },
-          ultimaUtilizacao: { type: Type.NULL },
+          ultimaUtilizacao: { type: Type.STRING },
           origem: { type: Type.STRING },
           criadoEm: { type: Type.STRING },
           atualizadoEm: { type: Type.STRING }
@@ -2305,7 +2308,7 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
           status: { type: Type.STRING },
           revisadaPorProfessor: { type: Type.BOOLEAN },
           usoTotal: { type: Type.NUMBER },
-          ultimaUtilizacao: { type: Type.NULL },
+          ultimaUtilizacao: { type: Type.STRING },
           origem: { type: Type.STRING },
           criadoEm: { type: Type.STRING },
           atualizadoEm: { type: Type.STRING }

@@ -64,6 +64,7 @@ export function SmartContentGenerator({ userProfile, selectedModel }: SmartConte
         prompt: JSON.stringify(input),
         task: 'smart_content_gen',
         responseFormat: tipo === 'questoes' ? 'json' : 'text',
+        model: selectedModel,
         systemInstruction: `Você é um Gerador de Conteúdo Educacional Inteligente. 
         Gere o conteúdo no formato solicitado (${tipo}) focado em ${disciplina || 'conhecimentos gerais'}.
         Nível: ${nivel}. Perfil do Receptor: ${input.perfil}.`
