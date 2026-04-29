@@ -6,6 +6,7 @@ export interface AICompletionParams {
   prompt: string;
   systemInstruction?: string;
   responseFormat?: "json" | "text";
+  responseSchema?: any;
   task: string;
   model?: string;
 }

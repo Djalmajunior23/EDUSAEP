@@ -1,0 +1,51 @@
+import { UserRole, Intent } from '../../types/eduJarvisTypes';
+
+export function canExecute(role: UserRole, intent: Intent): boolean {
+  const permissions: Record<string, Intent[]> = {
+    ALUNO: ["EXPLICAR_CONTEUDO", "ANALISAR_DESEMPENHO", "CORRECAO_VISAO", "GERAR_TRILHA_APRENDIZAGEM", "COMANDO_GERAL"],
+    STUDENT: ["EXPLICAR_CONTEUDO", "ANALISAR_DESEMPENHO", "CORRECAO_VISAO", "GERAR_TRILHA_APRENDIZAGEM", "COMANDO_GERAL"],
+    PROFESSOR: [
+      "GERAR_SIMULADO",
+      "GERAR_ESTUDO_CASO",
+      "GERAR_AULA_INVERTIDA",
+      "ANALISAR_DESEMPENHO",
+      "GERAR_PLANO_AULA",
+      "EXPLICAR_CONTEUDO",
+      "CORRECAO_VISAO",
+      "GERAR_BI_INSIGHTS",
+      "SUGERIR_INTERVENCAO",
+      "COMANDO_GERAL"
+    ],
+    TEACHER: [
+      "GERAR_SIMULADO",
+      "GERAR_ESTUDO_CASO",
+      "GERAR_AULA_INVERTIDA",
+      "ANALISAR_DESEMPENHO",
+      "GERAR_PLANO_AULA",
+      "EXPLICAR_CONTEUDO",
+      "CORRECAO_VISAO",
+      "GERAR_BI_INSIGHTS",
+      "SUGERIR_INTERVENCAO",
+      "COMANDO_GERAL"
+    ],
+    ADMIN: [
+      "GERAR_SIMULADO",
+      "GERAR_ESTUDO_CASO",
+      "GERAR_AULA_INVERTIDA",
+      "ANALISAR_DESEMPENHO",
+      "GERAR_PLANO_AULA",
+      "EXPLICAR_CONTEUDO",
+      "CORRECAO_VISAO",
+      "GERAR_BI_INSIGHTS",
+      "SUGERIR_INTERVENCAO",
+      "ANALISAR_RISCO_ACADEMICO",
+      "GERAR_TRILHA_APRENDIZAGEM",
+      "GERAR_RELATORIO_SEMANAL",
+      "CONSULTAR_MEMORIA",
+      "COMANDO_VOZ",
+      "COMANDO_GERAL"
+    ]
+  };
+
+  return permissions[role]?.includes(intent) || false;
+}

@@ -42,7 +42,10 @@ import { Eye, ChevronUp as ChevronUpIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 // Configuração do worker do PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url
+).toString();
 
 interface Competency {
   id: string;
@@ -223,8 +226,18 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       if (fileName.endsWith('.csv')) {
         text = await new Promise((resolve, reject) => {
           Papa.parse(file, {
-            header: true,
-            complete: (results) => resolve(JSON.stringify(results.data)),
+            header: false, // Use false to avoid skipping first row if no header exists
+            skipEmptyLines: true,
+            complete: (results) => {
+              // Convert any CSV structure to a text format the AI can understand
+              const formattedText = results.data.map((row: any, i: number) => {
+                if (Array.isArray(row)) {
+                  return `ITEM ${i+1}:\n${row.filter(v => v !== null && v !== '').join(' | ')}`;
+                }
+                return `ITEM ${i+1}:\n${Object.entries(row).map(([k, v]) => `${k}: ${v}`).join('\n')}`;
+              }).join('\n\n---\n\n');
+              resolve(formattedText);
+            },
             error: reject
           });
         });
@@ -233,10 +246,20 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         const wb = XLSX.read(data, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        text = JSON.stringify(XLSX.utils.sheet_to_json(ws));
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }); // Use header: 1 for array of arrays
+        text = rows.map((row: any, i: number) => {
+          if (Array.isArray(row)) {
+            return `ITEM ${i+1}:\n${row.filter(v => v !== null && v !== '').join(' | ')}`;
+          }
+          return `ITEM ${i+1}:\n${Object.entries(row).map(([k, v]) => `${k}: ${v}`).join('\n')}`;
+        }).join('\n\n---\n\n');
       } else if (fileName.endsWith('.pdf')) {
         const data = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(data).promise;
+        const pdf = await pdfjsLib.getDocument({
+          data,
+          useWorkerFetch: true,
+          isEvalSupported: false,
+        }).promise;
         let fullText = '';
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
@@ -245,12 +268,14 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
           setImportProgress(Math.round((i / pdf.numPages) * 100));
         }
         text = fullText;
-      } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+      } else if (fileName.endsWith('.docx')) {
         const data = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer: data });
         text = result.value;
+      } else if (fileName.endsWith('.txt')) {
+        text = await file.text();
       } else {
-        throw new Error("Formato não suportado");
+        throw new Error("Formato não suportado. Use PDF, DOCX, CSV ou Excel.");
       }
 
       await processImportedQuestions(text);
@@ -479,7 +504,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
-        accept=".csv,.xlsx,.xls,.pdf,.docx,.doc"
+        accept=".csv,.xlsx,.xls,.pdf,.docx,.txt"
         className="hidden"
       />
 
@@ -513,10 +538,14 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            className="px-4 py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50 group relative"
+            title="Formatos suportados: PDF, DOCX, CSV, Excel"
           >
             {isImporting ? <Loader2 size={20} className="animate-spin" /> : <FileUp size={20} />}
-            Importar Arquivo
+            <div className="flex flex-col items-start leading-tight">
+              <span>Importar Arquivo</span>
+              <span className="text-[10px] opacity-70 font-medium">PDF, DOCX, CSV, XLS</span>
+            </div>
           </button>
           <button 
             onClick={handleCreateClick}

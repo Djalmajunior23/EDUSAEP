@@ -3,9 +3,21 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { UserRole } from "../types";
 
-// The GoogleGenAI import and instance are kept ONLY if needed for complex object structures, 
-// but generateAIContent is now the primary gateway.
-import { SchemaType as Type } from "@google/generative-ai";
+// The GoogleGenAI import and instance are removed to ensure backend-only AI integration.
+// import { SchemaType as Type } from "@google/generative-ai";
+
+/**
+ * Local Schema Types for documentation and compatibility without heavy SDK.
+ */
+export const SchemaType = {
+  STRING: "string",
+  NUMBER: "number",
+  INTEGER: "integer",
+  BOOLEAN: "boolean",
+  ARRAY: "array",
+  OBJECT: "object",
+};
+const Type = SchemaType;
 
 /**
  * Logs AI usage to Firestore for institutional governance and cost analysis.
@@ -233,6 +245,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
   const systemInstruction = (typeof params === 'object' ? params.config?.systemInstruction : "") || "";
   const isJson = typeof params === 'object' && params.config?.responseMimeType === 'application/json';
   const responseFormat = isJson ? 'json' : 'text';
+  const responseSchema = typeof params === 'object' ? params.config?.responseSchema : undefined;
   const task = (typeof params === 'object' ? params.task : "generic_gen") || "generic_gen";
 
   try {
@@ -240,6 +253,7 @@ export async function generateContentWrapper(params: any): Promise<any> {
       prompt,
       systemInstruction,
       responseFormat,
+      responseSchema,
       task,
       model: typeof params === 'object' ? params.model : undefined
     });
@@ -472,8 +486,40 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
   // Split text into chunks of ~15,000 characters to avoid output token limits
   const chunkSize = 15000;
   const chunks: string[] = [];
-  for (let i = 0; i < text.length; i += chunkSize) {
-    chunks.push(text.substring(i, i + chunkSize));
+  
+  // Try to split by '---' if it exists (for CSV/Excel imports)
+  if (text.includes('\n\n---\n\n')) {
+    const items = text.split('\n\n---\n\n');
+    let currentChunk = '';
+    for (const item of items) {
+      if ((currentChunk.length + item.length) > chunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = item;
+      } else {
+        currentChunk = currentChunk ? `${currentChunk}\n\n---\n\n${item}` : item;
+      }
+    }
+    if (currentChunk) chunks.push(currentChunk);
+  } else {
+    // Normal text chunking (try to split by lines/paragraphs)
+    const paragraphs = text.split('\n\n');
+    let currentChunk = '';
+    for (const paragraph of paragraphs) {
+      if ((currentChunk.length + paragraph.length) > chunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = paragraph;
+      } else {
+        currentChunk = currentChunk ? `${currentChunk}\n\n${paragraph}` : paragraph;
+      }
+    }
+    if (currentChunk) chunks.push(currentChunk);
+    
+    // Fallback if still too large chunks (extremely rare with split)
+    if (chunks.length === 0 && text.length > 0) {
+      for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.substring(i, i + chunkSize));
+      }
+    }
   }
 
   const allQuestions: any[] = [];
@@ -488,24 +534,18 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
             {
               text: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
               O texto pode vir de um documento (PDF, DOCX, CSV ou Excel) e pode conter ruídos ou formatação irregular.
-              Este é um fragmento de um documento que pode conter centenas de questões.
-              
-              Para cada questão identificada, extraia:
-              1. O enunciado completo.
-              2. Exatamente 4 alternativas (opções).
-              3. O índice da alternativa correta (0 para A, 1 para B, etc.).
+              2. Entre 4 a 5 alternativas (opções).
+              3. O índice da alternativa correta (letra correspondente).
               4. A competência ou assunto da questão (se não houver, use 'Geral').
               5. O nível de dificuldade ('fácil', 'médio' ou 'difícil').
-              6. Uma explicação detalhada da resposta correta (se disponível no texto).
+              6. Uma explicação detalhada da resposta correta (comentarioGabarito).
+              7. Justificativas para cada alternativa (explicando por que estão certas ou erradas).
 
               Retorne APENAS um array JSON de objetos com a seguinte estrutura:
               [
                 {
-                  "questionUid": "COMPETENCIA-TEMA-DIFICULDADE-HASH",
-                  "competenciaId": "ID",
+                  "questionUid": "ID",
                   "competenciaNome": "Nome",
-                  "temaId": "ID",
-                  "temaNome": "Nome",
                   "dificuldade": "fácil" | "médio" | "difícil",
                   "bloom": "lembrar" | "compreender" | "aplicar" | "analisar" | "avaliar" | "criar",
                   "perfilGeracao": "${userRole}",
@@ -515,20 +555,13 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
                     { "id": "A", "texto": "..." },
                     { "id": "B", "texto": "..." },
                     { "id": "C", "texto": "..." },
-                    { "id": "D", "texto": "..." },
-                    { "id": "E", "texto": "..." }
+                    { "id": "D", "texto": "..." }
                   ],
                   "respostaCorreta": "A" | "B" | "C" | "D" | "E",
                   "comentarioGabarito": "Explicação...",
-                  "justificativasAlternativas": { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." },
-                  "contextoHash": "HASH",
+                  "justificativasAlternativas": { "A": "...", "B": "...", "C": "...", "D": "..." },
                   "tags": ["tag1", "tag2"],
-                  "status": "rascunho",
-                  "revisadaPorProfessor": false,
-                  "usoTotal": 0,
-                  "origem": "importacao",
-                  "criadoEm": "SERVER_TIMESTAMP",
-                  "atualizadoEm": "SERVER_TIMESTAMP"
+                  "status": "rascunho"
                 }
               ]
 
@@ -548,27 +581,22 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
           type: Type.OBJECT,
           properties: {
             questionUid: { type: Type.STRING },
-            competenciaId: { type: Type.STRING },
             competenciaNome: { type: Type.STRING },
-            temaId: { type: Type.STRING },
-            temaNome: { type: Type.STRING },
-            dificuldade: { type: Type.STRING },
-            bloom: { type: Type.STRING },
-            perfilGeracao: { type: Type.STRING },
-            tipoQuestao: { type: Type.STRING },
+            dificuldade: { type: Type.STRING, enum: ["fácil", "médio", "difícil"] },
+            bloom: { type: Type.STRING, enum: ["lembrar", "compreender", "aplicar", "analisar", "avaliar", "criar"] },
             enunciado: { type: Type.STRING },
             alternativas: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  id: { type: Type.STRING },
+                  id: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
                   texto: { type: Type.STRING }
                 },
                 required: ["id", "texto"]
               }
             },
-            respostaCorreta: { type: Type.STRING },
+            respostaCorreta: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
             comentarioGabarito: { type: Type.STRING },
             justificativasAlternativas: {
               type: Type.OBJECT,
@@ -579,27 +607,14 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
                 D: { type: Type.STRING },
                 E: { type: Type.STRING }
               },
-              required: ["A", "B", "C", "D", "E"]
+              required: ["A", "B", "C", "D"]
             },
-            contextoHash: { type: Type.STRING },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-            status: { type: Type.STRING },
-            revisadaPorProfessor: { type: Type.BOOLEAN },
-            usoTotal: { type: Type.NUMBER },
-            origem: { type: Type.STRING },
-            criadoEm: { type: Type.STRING },
-            atualizadoEm: { type: Type.STRING }
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: [
-            "questionUid", "competenciaId", "competenciaNome", "temaId", "temaNome", 
-            "dificuldade", "bloom", "perfilGeracao", "tipoQuestao", "enunciado", 
-            "alternativas", "respostaCorreta", "comentarioGabarito", 
-            "justificativasAlternativas", "contextoHash", "tags", "status", 
-            "revisadaPorProfessor", "usoTotal", "origem", "criadoEm", "atualizadoEm"
-          ]
+          required: ["enunciado", "alternativas", "respostaCorreta", "competenciaNome", "dificuldade", "bloom", "justificativasAlternativas"]
         }
       }
-      }
+    }
     });
 
     const result = safeParseJson(response.text, []);

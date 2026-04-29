@@ -56,7 +56,11 @@ import * as pdfjsLib from "pdfjs-dist";
 import { MassRescueDashboard } from "./components/professor/MassRescueDashboard";
 import { Sidebar } from "./components/shared/Sidebar";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.min.js`;
+// Configuração do worker do PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url
+).toString();
 
 type AIProvider = "gemini" | "openai" | "deepseek";
 
@@ -116,6 +120,7 @@ import {
   BarChart2,
   Layout,
   Activity,
+  Bot,
   Map as MapIcon,
   Library,
   Shield,
@@ -161,6 +166,7 @@ import {
 import { ImportInconsistencyManager } from "./components/professor/ImportInconsistencyManager";
 import { pdfExportService } from "./services/pdfExportService";
 import { NotificationBell } from "./components/notifications/NotificationBell";
+import { EduJarvisPanel } from "./components/eduJarvis/EduJarvisPanel";
 import { auth, db, firebaseConfig } from "./firebase";
 import {
   User,
@@ -298,6 +304,7 @@ function AppContent() {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isJarvisOpen, setIsJarvisOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [verificationSent, setVerificationSent] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -2564,9 +2571,6 @@ function AppContent() {
                                   <option value="gemini-1.5-flash">
                                     Gemini 1.5 Flash (Rápido)
                                   </option>
-                                  <option value="gemini-1.5-pro">
-                                    Gemini 1.5 Pro (Avançado)
-                                  </option>
                                   <option value="gemini-flash-latest">
                                     Gemini Flash Latest
                                   </option>
@@ -4035,6 +4039,24 @@ function AppContent() {
             </div>
           </div>
         </footer>
+
+        {user && userProfile && (
+          <>
+            <button
+              onClick={() => setIsJarvisOpen(!isJarvisOpen)}
+              className="fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 hover:scale-105 transition-all z-40 flex items-center justify-center animate-bounce-slow"
+              title="EduJarvis"
+            >
+              <Bot size={28} />
+            </button>
+            <EduJarvisPanel
+              isOpen={isJarvisOpen}
+              onClose={() => setIsJarvisOpen(false)}
+              userRole={userProfile.role}
+              contextData={{ path: location.pathname }}
+            />
+          </>
+        )}
       </div>
     </div>
   );

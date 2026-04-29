@@ -188,7 +188,6 @@ export function DiscursiveQuestionGenerator({ user, userProfile, selectedModel }
               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
             >
               <option value="gemini-1.5-flash">Gemini 1.5 Flash (Rápido)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado)</option>
               <option value="gemini-flash-latest">Gemini Flash Latest</option>
             </select>
           </div>

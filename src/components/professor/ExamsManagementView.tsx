@@ -29,7 +29,10 @@ import { parseQuestionsFromText } from '../../services/geminiService';
 import { Exam } from '../../types/eduai.types';
 import * as pdfjsLib from 'pdfjs-dist';
 // Configuração do worker do PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url
+).toString();
 import mammoth from 'mammoth';
 import { ExamGenerator } from './exam/ExamGenerator';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
@@ -124,12 +127,16 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
           text += content.items.map((item: any) => item.str).join(' ');
           setImportProgress(10 + Math.floor((i / pdf.numPages) * 30));
         }
-      } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      } else if (file.name.toLowerCase().endsWith('.docx')) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value;
         setImportProgress(40);
+      } else if (file.name.toLowerCase().endsWith('.txt')) {
+        text = await file.text();
+        setImportProgress(40);
       } else {
+        // Fallback for CSV and others
         text = await file.text();
         setImportProgress(40);
       }
@@ -362,7 +369,7 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
             type="file" 
             id="exam-import" 
             className="hidden" 
-            accept=".pdf,.docx,.csv,.xlsx"
+            accept=".pdf,.docx,.csv,.xlsx,.txt"
             onChange={handleImportFile}
           />
           <label 

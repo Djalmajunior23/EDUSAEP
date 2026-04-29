@@ -14,7 +14,11 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Configuração do worker do PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url
+).toString();
 
 export function GoogleFormsExportView({ user, userProfile }: { user: any, userProfile: any }) {
   const [exams, setExams] = useState<any[]>([]);

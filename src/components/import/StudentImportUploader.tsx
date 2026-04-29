@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, Users } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { importService } from '../../services/importService';
@@ -21,6 +22,7 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
+  const [importError, setImportError] = useState<{ message: string; details?: string; type: 'parsing' | 'importing' } | null>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
 
@@ -44,28 +46,66 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
     setFile(selectedFile);
     setIsProcessing(true);
     setImportResult(null);
+    setImportError(null);
 
     try {
       const data = await importService.parseFile(selectedFile);
       
-      // Basic validation and mapping
-      const mappedData = data.map((row: any) => ({
-        nome: row.nome || row.Nome || row.name || row.Name || '',
-        email: row.email || row.Email || row.e_mail || '',
-        matricula: row.matricula || row.Matricula || row.id || '',
-        turma: row.turma || row.Turma || row.class || '',
-        _raw: row
-      })).filter(row => row.nome || row.email); // Filter out completely empty rows
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('O arquivo parece estar vazio ou não contém dados válidos.');
+      }
+
+      // Robust validation and mapping
+      const mappedData = data.map((row: any, index: number) => {
+        // Normalize keys for case-insensitive matching
+        const normalizedRow: any = {};
+        Object.keys(row).forEach(key => {
+          normalizedRow[key.toLowerCase().trim()] = row[key];
+        });
+
+        const rowData = {
+          nome: normalizedRow.nome || normalizedRow.name || normalizedRow['nome completo'] || normalizedRow['full name'] || '',
+          email: normalizedRow.email || normalizedRow['e-mail'] || normalizedRow['email address'] || '',
+          matricula: normalizedRow.matricula || normalizedRow.id || normalizedRow.registration || normalizedRow['matrícula'] || '',
+          turma: normalizedRow.turma || normalizedRow.class || normalizedRow.grade || normalizedRow.classroom || '',
+          _raw: row,
+          _line: index + 1,
+          validationErrors: [] as string[]
+        };
+
+        // Basic validation
+        if (!rowData.nome) rowData.validationErrors.push('Nome ausente');
+        if (!rowData.email) {
+          rowData.validationErrors.push('Email ausente');
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rowData.email as string)) {
+          rowData.validationErrors.push('Email inválido');
+        }
+
+        return rowData;
+      }).filter(row => Object.values(row._raw).some(v => v !== null && v !== '')); // Filter out completely empty rows
 
       setPreviewData(mappedData);
       
+      const rowsWithErrors = mappedData.filter(r => r.validationErrors.length > 0);
+      
       if (mappedData.length === 0) {
-        toast.error('Nenhum dado válido encontrado no arquivo. Verifique as colunas (nome, email).');
+        setImportError({
+          type: 'parsing',
+          message: 'Arquivo sem dados válidos',
+          details: 'O arquivo foi lido, mas não encontramos nenhuma linha com dados. Verifique se o arquivo não está vazio.'
+        });
+      } else if (rowsWithErrors.length > 0) {
+        toast.warning(`${rowsWithErrors.length} linhas possuem avisos ou erros.`);
       } else {
-        toast.success(`${mappedData.length} alunos identificados.`);
+        toast.success(`${mappedData.length} alunos identificados com sucesso.`);
       }
     } catch (error: any) {
       console.error(error);
+      setImportError({
+        type: 'parsing',
+        message: 'Falha ao processar o arquivo',
+        details: error.message || 'Ocorreu um erro inesperado ao ler a planilha. Verifique se o arquivo não está corrompido ou se o formato é suportado.'
+      });
       toast.error(`Erro ao ler arquivo: ${error.message}`);
       setFile(null);
     } finally {
@@ -88,6 +128,7 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
     if (previewData.length === 0) return;
     
     setIsImporting(true);
+    setImportError(null);
     try {
       // Add selected class to rows if provided
       const dataToImport = previewData.map(row => ({
@@ -97,9 +138,19 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
 
       const result = await importService.processStudentImport(dataToImport, userProfile.uid);
       setImportResult(result);
-      toast.success('Importação concluída!');
+      
+      if (result.errorCount > 0) {
+        toast.warning(`Importação concluída com ${result.errorCount} erros.`);
+      } else {
+        toast.success('Importação concluída com sucesso!');
+      }
     } catch (error: any) {
       console.error(error);
+      setImportError({
+        type: 'importing',
+        message: 'Erro durante o salvamento dos dados',
+        details: error.message || 'Não foi possível completar a importação no banco de dados.'
+      });
       toast.error(`Erro na importação: ${error.message}`);
     } finally {
       setIsImporting(false);
@@ -110,6 +161,7 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
     setFile(null);
     setPreviewData([]);
     setImportResult(null);
+    setImportError(null);
     setSelectedClass('');
   };
 
@@ -117,11 +169,20 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 size={32} />
+          <div className={cn(
+            "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4",
+            importResult.successCount > 0 ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"
+          )}>
+            {importResult.successCount > 0 ? <CheckCircle2 size={32} /> : <AlertCircle size={32} />}
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Importação Concluída</h2>
-          <p className="text-gray-500 mt-2">O arquivo foi processado com sucesso.</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {importResult.successCount > 0 ? 'Importação Concluída' : 'Falha na Importação'}
+          </h2>
+          <p className="text-gray-500 mt-2">
+            {importResult.successCount > 0 
+              ? 'O arquivo foi processado. Veja o resumo abaixo.' 
+              : 'Não foi possível importar nenhum registro válido.'}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
@@ -140,10 +201,32 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
             <h3 className="text-sm font-bold text-red-600 flex items-center gap-2 mb-3">
               <AlertCircle size={16} /> Erros Encontrados ({importResult.errorCount})
             </h3>
-            <div className="max-h-40 overflow-y-auto bg-red-50 p-4 rounded-lg border border-red-100 text-sm text-red-700 space-y-2">
+            <div className="max-h-60 overflow-y-auto bg-red-50 p-4 rounded-xl border border-red-100 text-sm text-red-700 space-y-2 mb-4">
               {importResult.errors.map((err: any, i: number) => (
-                <div key={i}>Linha {err.row}: {err.message}</div>
+                <div key={i} className="flex gap-2">
+                  <span className="font-bold whitespace-nowrap">Linha {err.row}:</span>
+                  <span>{err.message}</span>
+                </div>
               ))}
+            </div>
+            
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mb-4">
+              <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-2">Próximos Passos Sugeridos:</h4>
+              <ul className="text-xs text-blue-700 space-y-1 list-disc ml-4">
+                <li>Corrija as linhas indicadas acima no seu arquivo original.</li>
+                <li>Certifique-se de que não existam e-mails duplicados.</li>
+                <li>Remova caracteres especiais de nomes caso necessário.</li>
+                <li>Tente realizar a importação novamente após os ajustes.</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
+              <h4 className="text-xs font-bold text-orange-800 uppercase tracking-wider mb-2">Por que esses erros acontecem?</h4>
+              <ul className="text-xs text-orange-700 space-y-1 list-disc ml-4">
+                <li><strong>Email Duplicado:</strong> Já existe um aluno cadastrado com este e-mail no sistema.</li>
+                <li><strong>Dados Ausentes:</strong> Campos obrigatórios como 'nome' ou 'email' estão vazios na planilha.</li>
+                <li><strong>Formato Inválido:</strong> O arquivo pode conter caracteres especiais ou formatação que impede a leitura correta.</li>
+              </ul>
             </div>
           </div>
         )}
@@ -167,6 +250,41 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
             <p className="text-sm text-gray-500">Faça upload de uma planilha (CSV, XLSX) para cadastrar alunos em lote.</p>
           </div>
         </div>
+
+        {importError && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }} 
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl"
+          >
+            <div className="flex gap-3">
+              <div className="p-2 bg-red-100 text-red-600 rounded-full h-fit">
+                <AlertCircle size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-red-900">{importError.message}</h3>
+                <p className="text-sm text-red-700 mt-1">{importError.details}</p>
+                
+                <div className="mt-4 pt-4 border-t border-red-100">
+                  <p className="text-xs font-bold text-red-900 uppercase tracking-wider mb-2">Sugestões para correção:</p>
+                  <ul className="text-xs text-red-700 space-y-1 list-disc ml-4">
+                    <li>Verifique se o arquivo é um .CSV ou .XLSX válido.</li>
+                    <li>Certifique-se de que as colunas <strong>nome</strong> e <strong>email</strong> existem.</li>
+                    <li>Remova linhas vazias no início ou no fim da planilha.</li>
+                    <li>Tente exportar novamente o arquivo de sua fonte original.</li>
+                  </ul>
+                </div>
+
+                <button 
+                  onClick={reset}
+                  className="mt-4 px-4 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                >
+                  Tentar com outro arquivo
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {!file ? (
           <div 
@@ -234,10 +352,21 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {previewData.slice(0, 5).map((row, idx) => (
-                          <tr key={idx} className={!row.nome || !row.email ? 'bg-red-50' : ''}>
-                            <td className="p-3">{row.nome || <span className="text-red-500 text-xs">Faltando</span>}</td>
-                            <td className="p-3">{row.email || <span className="text-red-500 text-xs">Faltando</span>}</td>
+                        {previewData.slice(0, 10).map((row, idx) => (
+                          <tr key={idx} className={row.validationErrors.length > 0 ? 'bg-red-50' : ''}>
+                            <td className="p-3">
+                              <div className="font-medium text-gray-900">{row.nome || <span className="text-red-500 italic">Ausente</span>}</div>
+                              {row.validationErrors.map((err, i) => (
+                                <div key={i} className="text-[10px] text-red-600 flex items-center gap-1">
+                                  <AlertCircle size={10} /> {err}
+                                </div>
+                              ))}
+                            </td>
+                            <td className="p-3">
+                              <span className={!row.email || row.validationErrors.includes('Email inválido') ? 'text-red-600' : 'text-gray-600'}>
+                                {row.email || <span className="italic">Ausente</span>}
+                              </span>
+                            </td>
                             <td className="p-3 text-gray-500">{row.matricula || '-'}</td>
                             <td className="p-3 text-gray-500">{row.turma || '-'}</td>
                           </tr>
@@ -245,8 +374,8 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
                       </tbody>
                     </table>
                   </div>
-                  {previewData.length > 5 && (
-                    <p className="text-center text-xs text-gray-500 mt-2">Mostrando apenas os 5 primeiros registros.</p>
+                  {previewData.length > 10 && (
+                    <p className="text-center text-xs text-gray-500 mt-2">Mostrando 10 de {previewData.length} registros.</p>
                   )}
                 </div>
 

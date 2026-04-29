@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import multer from "multer";
 import https from "https";
 import admin from "firebase-admin";
+import { processCommand as processEduJarvisCommand } from "./src/server/eduJarvis/processCommand";
 
 import fs from "fs";
 
@@ -55,18 +56,19 @@ async function startServer() {
     prompt: string;
     systemInstruction?: string;
     responseFormat?: "json" | "text";
+    responseSchema?: any;
     task: string;
     userId: string;
     userRole: string;
     model?: string;
   }) => {
-    const { prompt, systemInstruction, responseFormat, task, userId, userRole, model: requestedModel } = params;
+    const { prompt, systemInstruction, responseFormat, responseSchema, task, userId, userRole, model: requestedModel } = params;
     const startTime = Date.now();
 
     // Model mapping for legacy or inconsistent strings
     const mapModel = (m: string | undefined) => {
-      if (!m) return m;
-      if (m.includes('gemini-3')) return 'gemini-1.5-flash';
+      // Force all Gemini requests to use gemini-1.5-flash for stability
+      if (!m || m.includes('gemini')) return 'gemini-1.5-flash';
       if (m.includes('gpt-4o')) return 'gpt-4o-mini';
       return m;
     };
@@ -97,8 +99,22 @@ async function startServer() {
           let usedModel = finalRequestedModel || provider.defaultModel;
 
           if (provider.providerKey === 'gemini' && gemini) {
-            const model = gemini.getGenerativeModel({ model: usedModel, systemInstruction });
-            const result = await model.generateContent(prompt);
+            const modelConfig: any = { model: usedModel };
+            if (systemInstruction) modelConfig.systemInstruction = systemInstruction;
+            
+            const generationConfig: any = {};
+            if (responseFormat === 'json') {
+              generationConfig.responseMimeType = 'application/json';
+              if (responseSchema) {
+                generationConfig.responseSchema = responseSchema;
+              }
+            }
+
+            const model = gemini.getGenerativeModel(modelConfig);
+            const result = await model.generateContent({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig
+            });
             resultText = result.response.text();
           } 
           else if ((provider.providerKey === 'openai' || provider.providerKey === 'groq' || provider.providerKey === 'deepseek')) {
@@ -137,12 +153,22 @@ async function startServer() {
   };
 
   // API Routes
+  app.post("/api/edu-jarvis/process", async (req, res) => {
+    try {
+      const result = await processEduJarvisCommand(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[EduJarvis API Error]:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/ai/completions", async (req, res) => {
     try {
-      const { prompt, systemInstruction, responseFormat, task, userId, userRole, model } = req.body;
+      const { prompt, systemInstruction, responseFormat, responseSchema, task, userId, userRole, model } = req.body;
       if (!prompt) return res.status(400).json({ error: "Prompt is required" });
       const result = await executeAIRequest({
-        prompt, systemInstruction, responseFormat, task: task || "generic", userId: userId || "anonymous", userRole: userRole || "GUEST", model
+        prompt, systemInstruction, responseFormat, responseSchema, task: task || "generic", userId: userId || "anonymous", userRole: userRole || "GUEST", model
       });
       res.json(result);
     } catch (error: any) {
