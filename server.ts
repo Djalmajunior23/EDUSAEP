@@ -9,6 +9,7 @@ import https from "https";
 import admin from "firebase-admin";
 import { getFirestore } from 'firebase-admin/firestore';
 import { processCommand as processEduJarvisCommand } from "./src/server/eduJarvis/processCommand";
+import { EduJarvisCore } from "./src/server/eduJarvis/eduJarvisCore";
 
 import fs from "fs";
 
@@ -267,10 +268,6 @@ async function startServer() {
     }
     next();
   };
-
-import { EduJarvisCore } from "./src/server/eduJarvis/eduJarvisCore";
-
-  // ... (inside startsServer or where routes are defined)
 
   // API Routes
   app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {

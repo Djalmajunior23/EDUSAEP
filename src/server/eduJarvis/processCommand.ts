@@ -30,16 +30,22 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
   }
 
   // 2. Proteção de Segurança de Camada de IA (ML Security)
-  const isSafe = await securityAgent(userId, userRole, command, intent);
+  const isSafe = await securityAgent(userId, userRole, command || "", intent);
   if (!isSafe) {
-    return { response: "⚠️ COMANDO BLOQUEADO: Detectamos um comportamento de risco. Sua conta foi sinalizada para auditoria administrativa." };
+    return { 
+      success: false,
+      response: "⚠️ COMANDO BLOQUEADO: Detectamos um comportamento de risco. Sua conta foi sinalizada para auditoria administrativa.",
+      metadata: { createdAt: new Date().toISOString() }
+    };
   }
 
   // 3. Validar Permissão e Auditoria
-  if (!canExecute(userRole, intent)) {
+  if (!canExecute(userRole, intent as any)) {
     await logAudit(userId, userRole, intent, 'bloqueado', 'medio');
     return {
-      response: "Desculpe, seu perfil não tem permissão para esta ação específica. O EduJarvis registrou sua solicitação para análise da coordenação."
+      success: false,
+      response: "Desculpe, seu perfil não tem permissão para esta ação específica. O EduJarvis registrou sua solicitação para análise da coordenação.",
+      metadata: { createdAt: new Date().toISOString() }
     };
   }
 
@@ -52,59 +58,141 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
 
   let result: EduJarvisResponse;
 
+  const responseMetadata = {
+    createdAt: new Date().toISOString(),
+    costMode: request.costMode || "normal" as const
+  };
+
   try {
     // 4. Roteamento de Agentes
-    switch (intent) {
+    switch (intent as any) {
       case "CONSULTAR_MEMORIA":
         const summary = await memoryAgent.getMemorySummary(userId);
-        result = { response: summary, actionType: 'CONSULTAR_MEMORIA' };
+        result = { 
+          success: true,
+          response: summary, 
+          action: 'CONSULTAR_MEMORIA',
+          metadata: responseMetadata
+        };
         break;
       case "CORRECAO_VISAO":
         if (!image) {
-          result = { response: "Para correção via visão, por favor envie uma imagem da prova ou exercício." };
+          result = { 
+            success: false,
+            response: "Para correção via visão, por favor envie uma imagem da prova ou exercício.",
+            metadata: responseMetadata
+          };
         } else {
-          result = await visionAgent(command, userId, image, enhancedContext);
+          const visionResult = await visionAgent(command || "", userId, image, enhancedContext);
+          result = {
+            success: true,
+            ...visionResult,
+            metadata: responseMetadata
+          };
         }
         break;
       case "GERAR_BI_INSIGHTS":
-        result = await biAgent(command, userId, enhancedContext);
+        const biResult = await biAgent(request);
+        result = {
+          success: true,
+          response: biResult.resumoExecutivo || "Insights gerados.",
+          data: biResult,
+          action: intent,
+          metadata: responseMetadata
+        };
         break;
       case "GERAR_SIMULADO":
-        result = await assessmentAgent(command, userId, enhancedContext);
+        const assessmentResult = await assessmentAgent(command || "", userId, enhancedContext);
+        result = {
+          success: true,
+          ...assessmentResult,
+          metadata: responseMetadata
+        };
         break;
       case "ANALISAR_DESEMPENHO":
-        result = await performanceAgent(command, userId, enhancedContext);
+        const perfResult = await performanceAgent(command || "", userId, enhancedContext);
+        result = {
+          success: true,
+          ...perfResult,
+          metadata: responseMetadata
+        };
         break;
       case "GERAR_TRILHA_APRENDIZAGEM":
-        result = await learningPathAgent(command, userId, enhancedContext);
+        const lpResult = await learningPathAgent(command || "", userId, enhancedContext);
+        result = {
+          success: true,
+          ...lpResult,
+          metadata: responseMetadata
+        };
         break;
       case "SUGERIR_INTERVENCAO":
-        result = await interventionAgent(command, userId, enhancedContext);
+        const intResult = await interventionAgent(command || "", userId, enhancedContext);
+        result = {
+          success: true,
+          ...intResult,
+          metadata: responseMetadata
+        };
         break;
       case "IMPORTAR_QUESTOES":
-        const questionsImported = await importAgent(command, enhancedContext);
-        result = { response: `EduJarvis processou ${questionsImported.length} questões com sucesso.`, data: questionsImported, actionType: 'IMPORTAR_QUESTOES' };
+        const questionsImported = await importAgent(command || "", enhancedContext);
+        result = { 
+          success: true,
+          response: `EduJarvis processou ${questionsImported.length} questões com sucesso.`, 
+          data: questionsImported, 
+          action: 'IMPORTAR_QUESTOES',
+          metadata: responseMetadata
+        };
         break;
       case "ANALISAR_RISCO_ACADEMICO":
-        result = await predictionAgent(command, userId, enhancedContext);
+        const predResult = await predictionAgent(command || "", userId, enhancedContext);
+        result = {
+          success: true,
+          ...predResult,
+          metadata: responseMetadata
+        };
         break;
       case "GERAR_ESTUDO_CASO":
-        result = await teacherCopilotAgent(command, userId, 'GERAR_ESTUDO_CASO', enhancedContext);
+        const caseResult = await teacherCopilotAgent(command || "", userId, 'GERAR_ESTUDO_CASO', enhancedContext);
+        result = {
+          success: true,
+          ...caseResult,
+          metadata: responseMetadata
+        };
         break;
       case "GERAR_AULA_INVERTIDA":
-        result = await teacherCopilotAgent(command, userId, 'GERAR_AULA_INVERTIDA', enhancedContext);
+        const flipResult = await teacherCopilotAgent(command || "", userId, 'GERAR_AULA_INVERTIDA', enhancedContext);
+        result = {
+          success: true,
+          ...flipResult,
+          metadata: responseMetadata
+        };
         break;
       case "GERAR_PLANO_AULA":
-        result = await teacherCopilotAgent(command, userId, 'GERAR_PLANO_AULA', enhancedContext);
+        const planResult = await teacherCopilotAgent(command || "", userId, 'GERAR_PLANO_AULA', enhancedContext);
+        result = {
+          success: true,
+          ...planResult,
+          metadata: responseMetadata
+        };
         break;
       case "OTIMIZAR_QUESTAO":
-        result = await questionOptimizerAgent(command, userId, enhancedContext);
+        const optResult = await questionOptimizerAgent(command || "", userId, enhancedContext);
+        result = {
+          success: true,
+          ...optResult,
+          metadata: responseMetadata
+        };
         break;
       case "EXPLICAR_CONTEUDO":
       case "COMANDO_GERAL":
       default:
-        const aiRes = await pedagogicalAgent(command, enhancedContext);
-        result = { response: aiRes.text, actionType: 'COMANDO_GERAL' };
+        const aiRes = await pedagogicalAgent(command || "", enhancedContext);
+        result = { 
+          success: true,
+          response: aiRes.text, 
+          action: 'COMANDO_GERAL',
+          metadata: responseMetadata
+        };
         break;
     }
 
@@ -147,7 +235,9 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
     });
 
     return {
-      response: "Ocorreu um erro ao processar seu comando. Por favor, tente novamente em alguns instantes."
+      success: false,
+      response: "Ocorreu um erro ao processar seu comando. Por favor, tente novamente em alguns instantes.",
+      metadata: { createdAt: new Date().toISOString() }
     };
   }
 }

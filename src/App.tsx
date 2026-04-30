@@ -2783,7 +2783,7 @@ function AppContent() {
                       userProfile={userProfile}
                       allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
                     >
-                      <PedagogicalIntelligenceHub />
+                      <EduJarvisUltraDashboard />
                     </ProtectedRoute>
                   }
                 />
@@ -2794,63 +2794,7 @@ function AppContent() {
                       userProfile={userProfile}
                       allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
                     >
-                      <AdvancedDashboard
-                        userProfile={userProfile}
-                        selectedModel={selectedModel}
-                        stats={{
-                          totalStudents: 42,
-                          totalExams: 156,
-                          averageScore: 0.68,
-                          successRate: 0.74,
-                          evolutionRate: 0.12,
-                          criticalCompetencies: [
-                            "Banco de Dados",
-                            "Lógica de Programação",
-                          ],
-                          riskClusters: [
-                            {
-                              name: "Risco Elevado",
-                              count: 5,
-                              description: "Alunos com baixo engajamento",
-                            },
-                            {
-                              name: "Em Atenção",
-                              count: 12,
-                              description: "Desempenho abaixo da média",
-                            },
-                            {
-                              name: "Avançados",
-                              count: 25,
-                              description: "Alunos com alta performance",
-                            },
-                          ],
-                        }}
-                        disciplinePerformance={[
-                          { name: "Lógica", score: 75 },
-                          { name: "Banco de Dados", score: 45 },
-                          { name: "Redes", score: 62 },
-                          { name: "Sistemas", score: 88 },
-                          { name: "Segurança", score: 54 },
-                        ]}
-                        studentEvolution={[
-                          { date: "Jan", score: 45 },
-                          { date: "Fev", score: 52 },
-                          { date: "Mar", score: 48 },
-                          { date: "Abr", score: 61 },
-                          { date: "Mai", score: 68 },
-                        ]}
-                        competencyDistribution={[
-                          { name: "Técnica", value: 40 },
-                          { name: "Analítica", value: 30 },
-                          { name: "Sócio-emocional", value: 20 },
-                          { name: "Gestão", value: 10 },
-                        ]}
-                        classComparison={[
-                          { name: "Turma A", score: 72 },
-                          { name: "Turma B", score: 65 },
-                          { name: "Turma C", score: 78 },
-                        ]}
-                      />
+                      <EduJarvisUltraDashboard />
                     </ProtectedRoute>
                   }
                 />

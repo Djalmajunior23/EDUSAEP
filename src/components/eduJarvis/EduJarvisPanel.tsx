@@ -112,8 +112,8 @@ export function EduJarvisPanel({ userRole, contextData, isOpen, onClose }: Props
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      if (response.actionType && response.generatedId) {
-        toast.success(`${response.actionType} gerado com sucesso! ID: ${response.generatedId}`);
+      if (response.action && response.data?.generatedId) {
+        toast.success(`${response.action} gerado com sucesso! ID: ${response.data.generatedId}`);
       }
     } catch (error) {
       console.error(error);
