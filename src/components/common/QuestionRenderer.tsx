@@ -254,41 +254,49 @@ export function QuestionRenderer({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3">
-          {question.alternativas?.map((alt) => {
-            const isCorrect = alt.id === question.respostaCorreta;
-            const isSelected = selectedAnswer === alt.id;
-            
-            return (
-              <button
-                key={alt.id}
-                disabled={showCorrectAnswer}
-                onClick={() => onSelect?.(alt.id)}
-                className={cn(
-                  "p-4 rounded-2xl border text-left transition-all flex items-start gap-4",
-                  isSelected 
-                    ? "bg-emerald-600 border-emerald-600 text-white shadow-lg scale-[1.01]" 
-                    : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-emerald-200 dark:hover:border-emerald-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 shadow-sm",
-                  showCorrectAnswer && isCorrect && !isSelected && "border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/30 ring-2 ring-emerald-400",
-                  showCorrectAnswer && isSelected && !isCorrect && "bg-red-500 border-red-500 text-white"
-                )}
-              >
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0",
-                  isSelected ? "bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                )}>
-                  {alt.id}
-                </div>
-                <div className="pt-1 flex-1 leading-relaxed text-left">
-                  {alt.texto}
-                  {showCorrectAnswer && isCorrect && (
-                    <div className="mt-2 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 size={12} /> Gabarito Correto
-                    </div>
+          {Array.isArray(question.alternativas) && question.alternativas.length > 0 ? (
+            question.alternativas.map((alt, idx) => {
+              const altId = typeof alt === 'object' ? alt.id : String.fromCharCode(65 + idx);
+              const altText = typeof alt === 'object' ? alt.texto : alt;
+              const isCorrect = altId === question.respostaCorreta;
+              const isSelected = selectedAnswer === altId;
+              
+              return (
+                <button
+                  key={altId || idx}
+                  disabled={showCorrectAnswer}
+                  onClick={() => onSelect?.(altId)}
+                  className={cn(
+                    "p-4 rounded-2xl border text-left transition-all flex items-start gap-4",
+                    isSelected 
+                      ? "bg-emerald-600 border-emerald-600 text-white shadow-lg scale-[1.01]" 
+                      : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-emerald-200 dark:hover:border-emerald-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 shadow-sm",
+                    showCorrectAnswer && isCorrect && !isSelected && "border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/30 ring-2 ring-emerald-400",
+                    showCorrectAnswer && isSelected && !isCorrect && "bg-red-500 border-red-500 text-white"
                   )}
-                </div>
-              </button>
-            );
-          })}
+                >
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0",
+                    isSelected ? "bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  )}>
+                    {altId}
+                  </div>
+                  <div className="pt-1 flex-1 leading-relaxed text-left">
+                    {altText || "Alternativa vazia"}
+                    {showCorrectAnswer && isCorrect && (
+                      <div className="mt-2 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 size={12} /> Gabarito Correto
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 text-center text-gray-500 text-sm">
+              Nenhuma alternativa cadastrada para esta questão.
+            </div>
+          )}
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import { importAgent } from './agents/importAgent';
 import { EduJarvisRequest, EduJarvisResponse, Intent } from '../../types/eduJarvisTypes';
 import { detectIntent } from './agentRouter';
 import { canExecute } from './permissionService';
@@ -15,6 +16,7 @@ import { biAgent } from './agents/biAgent';
 import { automationAgent } from './agents/automationAgent';
 import { securityAgent } from './security/securityAgent';
 import { logAudit } from './security/auditLogger';
+import { questionOptimizerAgent } from './agents/questionOptimizerAgent';
 
 export async function processCommand(request: EduJarvisRequest): Promise<EduJarvisResponse> {
   const { userId, userRole, command, context, image } = request;
@@ -45,7 +47,8 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
 
   // 3. Recuperar Memória Pedagógica
   const memory = await memoryAgent.getMemory(userId);
-  const enhancedContext = { ...context, memory };
+  const memorySummary = await memoryAgent.getMemorySummary(userId);
+  const enhancedContext = { ...context, memory, memorySummary };
 
   let result: EduJarvisResponse;
 
@@ -78,6 +81,10 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
       case "SUGERIR_INTERVENCAO":
         result = await interventionAgent(command, userId, enhancedContext);
         break;
+      case "IMPORTAR_QUESTOES":
+        const questionsImported = await importAgent(command, enhancedContext);
+        result = { response: `EduJarvis processou ${questionsImported.length} questões com sucesso.`, data: questionsImported, actionType: 'IMPORTAR_QUESTOES' };
+        break;
       case "ANALISAR_RISCO_ACADEMICO":
         result = await predictionAgent(command, userId, enhancedContext);
         break;
@@ -89,6 +96,9 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         break;
       case "GERAR_PLANO_AULA":
         result = await teacherCopilotAgent(command, userId, 'GERAR_PLANO_AULA', enhancedContext);
+        break;
+      case "OTIMIZAR_QUESTAO":
+        result = await questionOptimizerAgent(command, userId, enhancedContext);
         break;
       case "EXPLICAR_CONTEUDO":
       case "COMANDO_GERAL":
@@ -109,13 +119,7 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
     }
 
     // 6. Atualizar Memória (Interação Recente)
-    await memoryAgent.updateGeneric(userId, {
-      usoTotal: admin.firestore.FieldValue.increment(1) as any,
-      historicoInteracoes: admin.firestore.FieldValue.arrayUnion({
-        intent,
-        timestamp: new Date().toISOString()
-      })
-    });
+    await memoryAgent.recordInteraction(userId, intent, command, result.response || '');
 
     // 7. Registrar Logs de Operação
     await db.collection('jarvis_logs').add({

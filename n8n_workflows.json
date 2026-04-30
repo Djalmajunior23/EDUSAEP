@@ -15,7 +15,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "Gerar {{ $json.quantidade }} questões de múltipla escolha para a disciplina {{ $json.disciplina }} e competência {{ $json.competencia }} no nível {{ $json.nivel }}. Retornar em JSON estruturado com enunciado, alternativas, respostaCorreta e comentário pedagógico.",
           "options": {}
         },
@@ -55,7 +55,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "Analisar o desempenho do aluno {{ $json.nomeAluno }} na disciplina {{ $json.disciplina }}. Dados: {{ JSON.stringify($json.dados_desempenho) }}. Identificar pontos fortes, fracos e sugerir ações pedagógicas.",
           "options": {}
         },
@@ -94,7 +94,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "Com base na análise de desempenho {{ JSON.stringify($json.analise) }}, gere um plano de estudo personalizado para o aluno. Inclua sequência sugerida, atividades e prioridades.",
           "options": {}
         },
@@ -174,7 +174,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "=Você é um tutor pedagógico da plataforma JuniorsStudent. O aluno {{ $json.studentId }} concluiu o simulado {{ $json.examId }} com desempenho de {{ $json.score }} pontos (Proficiência: {{ $json.proficiency }}%).\n\nGere um feedback pedagógico inicial que seja:\n1. Motivacional (reconheça o esforço).\n2. Analítico (aponte áreas de melhoria com base na nota).\n3. Prático (sugira o próximo passo na trilha de aprendizagem).\n\nRetorne apenas o texto do feedback.",
           "options": {}
         },
@@ -279,7 +279,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "Gere um roteiro de recuperação para o aluno {{ $json.studentId }} com base no plano: {{ JSON.stringify($json.plan) }}.",
           "options": {}
         },
@@ -418,7 +418,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "=Gere 10 questões de múltipla escolha para a disciplina {{ $json.disciplina }}, competência {{ $json.competencia }} e nível de dificuldade {{ $json.dificuldade }}.\n\nCada questão deve seguir este formato JSON estritamente:\n{\n  \"id_unico\": \"(gere um UUID ou string aleatória única)\",\n  \"enunciado\": \"...\",\n  \"alternativas\": [\n    {\"id\": \"A\", \"texto\": \"...\"},\n    {\"id\": \"B\", \"texto\": \"...\"},\n    {\"id\": \"C\", \"texto\": \"...\"},\n    {\"id\": \"D\", \"texto\": \"...\"},\n    {\"id\": \"E\", \"texto\": \"...\"}\n  ],\n  \"respostaCorreta\": \"A\",\n  \"comentarioGabarito\": \"...\",\n  \"bloom\": \"...\",\n  \"disciplina\": \"{{ $json.disciplina }}\",\n  \"competency\": \"{{ $json.competencia }}\",\n  \"difficulty\": \"{{ $json.dificuldade }}\",\n  \"status\": \"rascunho\",\n  \"createdAt\": \"{{ new Date().toISOString() }}\"\n}\n\nRetorne APENAS um array JSON contendo as 10 questões.",
           "options": {}
         },
@@ -502,7 +502,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-pro",
+          "model": "gemini-1.5-flash",
           "prompt": "=Analise os dados de desempenho da semana: {{ JSON.stringify($json) }}. Gere um resumo executivo para os professores.",
           "options": {}
         },

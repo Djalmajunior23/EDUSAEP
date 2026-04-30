@@ -14,6 +14,7 @@ export function canExecute(role: UserRole, intent: Intent): boolean {
       "CORRECAO_VISAO",
       "GERAR_BI_INSIGHTS",
       "SUGERIR_INTERVENCAO",
+      "OTIMIZAR_QUESTAO",
       "COMANDO_GERAL"
     ],
     TEACHER: [
@@ -26,6 +27,7 @@ export function canExecute(role: UserRole, intent: Intent): boolean {
       "CORRECAO_VISAO",
       "GERAR_BI_INSIGHTS",
       "SUGERIR_INTERVENCAO",
+      "OTIMIZAR_QUESTAO",
       "COMANDO_GERAL"
     ],
     ADMIN: [
@@ -38,6 +40,7 @@ export function canExecute(role: UserRole, intent: Intent): boolean {
       "CORRECAO_VISAO",
       "GERAR_BI_INSIGHTS",
       "SUGERIR_INTERVENCAO",
+      "OTIMIZAR_QUESTAO",
       "ANALISAR_RISCO_ACADEMICO",
       "GERAR_TRILHA_APRENDIZAGEM",
       "GERAR_RELATORIO_SEMANAL",

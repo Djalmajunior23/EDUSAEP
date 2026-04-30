@@ -250,7 +250,7 @@
       },
       {
         "parameters": {
-          "model": "gemini-3.1-pro",
+          "model": "gemini-1.5-pro",
           "prompt": "=Você é um sistema de Inteligência Artificial Analítica da plataforma EduAI Core.\n\nAnalise os seguintes logs do sistema dessa semana e gere um relatório de 3 parágrafos focando em:\n1. Nível de engajamento.\n2. Quantidade de alunos que caíram na régua de risco.\n3. Pontos de sucesso nas intervenções.\n\nJSON de Dados: \n{{ JSON.stringify($json.documents) }}\n"
         },
         "id": "c138af64-160a-4298-b7ab-8f9dafc126b8",

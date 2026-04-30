@@ -79,7 +79,7 @@ export const generateStudentRecommendation = async (userId: string, studentName:
         disciplina: 'Geral',
         competencias: criticalCompetencies.length > 0 ? criticalCompetencies : ['Aprofundamento Geral'],
         nivel: criticalCompetencies.length > 0 ? 'medio' : 'dificil',
-        prompt: `Com base nas dificuldades do aluno, sugira exatamente 3 atividades práticas curtas ou materiais de estudo focados em superar as dificuldades nessas áreas: ${criticalCompetencies.join(', ')}. Se houver histórico de erros cognitivos como falta de atenção ou interpretação, foque nisso. Retorne UM JSON com um array 'atividades' com objetos contendo: 'titulo' (string), 'descricao' (string detalhada), 'tipo' (um dos seguintes textos literais: 'video', 'exercicio', 'leitura', ou 'pratica') e 'tempo' (string, ex: '15 min').`
+        prompt: `Com base nas dificuldades do aluno, sugira exatamente 3 atividades práticas curtas ou materiais de estudo focados em superar as dificuldades nessas áreas: ${(criticalCompetencies || []).join(', ')}. Se houver histórico de erros cognitivos como falta de atenção ou interpretação, foque nisso. Retorne UM JSON com um array 'atividades' com objetos contendo: 'titulo' (string), 'descricao' (string detalhada), 'tipo' (um dos seguintes textos literais: 'video', 'exercicio', 'leitura', ou 'pratica') e 'tempo' (string, ex: '15 min').`
       });
 
       if (aiResponse && aiResponse.atividades) {
@@ -111,7 +111,7 @@ export const generateStudentRecommendation = async (userId: string, studentName:
 
     if (criticalCompetencies.length > 0) {
       prioridade = criticalCompetencies.length > 2 ? 'Alta' : 'Média';
-      diagnostico = `Identificamos uma oportunidade de melhoria significativa em ${criticalCompetencies.join(', ')}. O padrão de respostas mostra que focar na base teórica dessas áreas trará resultados rápidos.`;
+      diagnostico = `Identificamos uma oportunidade de melhoria significativa em ${(criticalCompetencies || []).join(', ')}. O padrão de respostas mostra que focar na base teórica dessas áreas trará resultados rápidos.`;
       planoEstudo = `Sugerimos uma imersão direcionada nos tópicos críticos identificados, combinando micro-leituras com exercícios práticos de fixação.`;
       
       criticalCompetencies.slice(0,2).forEach(comp => {

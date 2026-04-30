@@ -7,31 +7,47 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import multer from "multer";
 import https from "https";
 import admin from "firebase-admin";
+import { getFirestore } from 'firebase-admin/firestore';
 import { processCommand as processEduJarvisCommand } from "./src/server/eduJarvis/processCommand";
 
 import fs from "fs";
 
 dotenv.config();
 
-// Globally allow self-signed certificates for n8n/external integrations
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Initialize Firebase Admin with Application Default Credentials
 const config = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
+const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || config.projectId;
+const databaseId = process.env.FIRESTORE_DATABASE_ID || config.firestoreDatabaseId;
+
 if (!admin.apps.length) {
+  console.log("[Firestore Debug] Initializing admin SDK", {
+    projectId,
+    databaseId,
+    hasCredentials: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+  });
+  
   admin.initializeApp({
     credential: admin.credential.applicationDefault(),
-    projectId: config.projectId
+    projectId: projectId
   });
 }
-const db = admin.firestore(admin.app());
 
-// Create a custom agent that ignores self-signed certificate errors
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false,
-});
+const db = databaseId && databaseId !== '(default)' 
+  ? getFirestore(databaseId) 
+  : getFirestore();
+
+// Override admin.firestore so backend agents get the correct database implicitly
+const originalFirestore = admin.firestore;
+(admin as any).firestore = function() {
+  return db;
+};
+Object.assign((admin as any).firestore, originalFirestore);
+
+// Note: For newer firebase-admin versions, the above might need adjustment. 
+// Standard way for admin.firestore(app).databaseId depends on version.
+// Using admin.firestore() is safest for default.
 
 async function startServer() {
   const app = express();
@@ -66,16 +82,57 @@ async function startServer() {
     const startTime = Date.now();
 
     // Model mapping for legacy or inconsistent strings
-    const mapModel = (m: string | undefined) => {
-      // Force all Gemini requests to use gemini-1.5-flash for stability
-      if (!m || m.includes('gemini')) return 'gemini-1.5-flash';
-      if (m.includes('gpt-4o')) return 'gpt-4o-mini';
-      return m;
+    const mapGeminiModel = (m: string | undefined): string => {
+      const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+      console.log(`[AI Request] Using model: ${m || PRIMARY_MODEL}`);
+      if (!m) return PRIMARY_MODEL;
+      
+      const lowerM = m.toLowerCase();
+      const cleanM = lowerM.replace('models/', '');
+      
+      const deprecatedModels = [
+        "gemini-pro",
+        "gemini-1.0-pro",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash-latest"
+      ];
+
+      if (deprecatedModels.some(dm => cleanM.includes(dm))) {
+        console.warn("[AI Request] Deprecated model detected. Migrating to current model.", {
+          from: cleanM,
+          to: PRIMARY_MODEL
+        });
+        return PRIMARY_MODEL;
+      }
+      
+      if (cleanM.includes('gpt-4o')) return 'gpt-4o-mini';
+      return cleanM;
     };
 
-    const finalRequestedModel = mapModel(requestedModel);
+    const normalizeAIError = (error: any): string => {
+      const message = error?.message || String(error);
+      if (message.includes('5 NOT_FOUND') || message.includes('404')) {
+        return 'Modelo ou recurso de IA não encontrado. Use modelos atuais como gemini-2.0-flash.';
+      }
+      if (message.includes('429') || message.includes('QUOTA_EXCEEDED')) {
+        return 'Limite de uso da IA atingido.';
+      }
+      if (message.toLowerCase().includes('api key')) {
+        return 'Chave de API inválida ou ausente.';
+      }
+      return 'Falha ao gerar conteúdo com IA.';
+    };
+
+    const finalRequestedModel = mapGeminiModel(requestedModel);
 
     try {
+      const enableAI = process.env.ENABLE_AI !== 'false';
+      if (!enableAI) {
+        console.warn('[AI Service] AI is disabled');
+        return { text: "", provider: 'none', model: 'none', fallback: true, error: 'IA desativada' };
+      }
+
       const providersSnapshot = await db.collection('aiProviders')
         .where('enabled', '==', true)
         .orderBy('priority', 'asc')
@@ -87,35 +144,78 @@ async function startServer() {
 
       if (providers.length === 0) {
         providers = [
-          { providerKey: 'gemini', defaultModel: 'gemini-1.5-flash', priority: 1 },
+          { providerKey: 'gemini', defaultModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash', priority: 1 },
           { providerKey: 'openai', defaultModel: 'gpt-4o-mini', priority: 2 }
         ];
       }
 
       let lastError = null;
       for (const provider of providers) {
+        let resultText = "";
+        let usedModel = finalRequestedModel || provider.defaultModel;
         try {
-          let resultText = "";
-          let usedModel = finalRequestedModel || provider.defaultModel;
-
+          console.log(`[AI Request] Attempting with provider: ${provider.providerKey}, model: ${usedModel}`);
+          
           if (provider.providerKey === 'gemini' && gemini) {
-            const modelConfig: any = { model: usedModel };
-            if (systemInstruction) modelConfig.systemInstruction = systemInstruction;
+            // Modern variations list
+            const modelVariations = [
+              usedModel, 
+              `models/${usedModel}`, 
+              'gemini-2.0-flash',
+              'models/gemini-2.0-flash',
+              'gemini-2.0-flash-lite',
+              'models/gemini-2.0-flash-lite'
+            ];
+            let geminiError = null;
             
-            const generationConfig: any = {};
-            if (responseFormat === 'json') {
-              generationConfig.responseMimeType = 'application/json';
-              if (responseSchema) {
-                generationConfig.responseSchema = responseSchema;
+            for (const variant of modelVariations) {
+              if (!variant) continue;
+              try {
+                console.log(`[Gemini] Testing variant: ${variant}`);
+                
+                try {
+                  const modelConfig: any = { 
+                    model: variant,
+                    ...(systemInstruction ? { systemInstruction } : {})
+                  };
+                  
+                  const generationConfig: any = {
+                    responseMimeType: responseFormat === 'json' ? 'application/json' : 'text/plain',
+                    ...(responseSchema ? { responseSchema } : {})
+                  };
+
+                  const modelObj = gemini.getGenerativeModel(modelConfig);
+                  const result = await modelObj.generateContent({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig
+                  });
+                  resultText = result.response.text();
+                  if (resultText) {
+                    usedModel = variant;
+                    break;
+                  }
+                } catch (innerErr: any) {
+                  const errStr = innerErr.message || "";
+                  if (errStr.includes('NOT_FOUND') || errStr.includes('systemInstruction')) {
+                    console.log(`[Gemini] Fallback for ${variant}: no system instruction`);
+                    const modelObj = gemini.getGenerativeModel({ model: variant });
+                    const combinedPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
+                    const result = await modelObj.generateContent(combinedPrompt);
+                    resultText = result.response.text();
+                    if (resultText) {
+                      usedModel = variant;
+                      break;
+                    }
+                  } else {
+                    throw innerErr;
+                  }
+                }
+              } catch (vErr: any) {
+                console.warn(`[Gemini Variant Error] ${variant}:`, vErr.message);
+                geminiError = vErr;
               }
             }
-
-            const model = gemini.getGenerativeModel(modelConfig);
-            const result = await model.generateContent({
-              contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              generationConfig
-            });
-            resultText = result.response.text();
+            if (!resultText && geminiError) throw geminiError;
           } 
           else if ((provider.providerKey === 'openai' || provider.providerKey === 'groq' || provider.providerKey === 'deepseek')) {
             let client = (provider.providerKey === 'openai' ? openai : (provider.providerKey === 'groq' ? groq : deepseek));
@@ -139,6 +239,7 @@ async function startServer() {
             return { text: resultText, provider: provider.providerKey, model: usedModel };
           }
         } catch (err: any) {
+          console.error(`[AI Provider Error] ${provider.providerKey} (${usedModel}):`, err.message || err);
           lastError = err;
         }
       }
@@ -152,8 +253,23 @@ async function startServer() {
     }
   };
 
+  // Security Middleware for Prompt Validation
+  const promptInjectionGuard = (req: any, res: any, next: any) => {
+    const prompt = req.body.prompt || req.body.command || "";
+    const suspiciousPatterns = [/ignore all previous instructions/i, /developer mode/i, /system prompt/i, /bypassing/i, /forget your instructions/i];
+    if (suspiciousPatterns.some(pattern => pattern.test(prompt))) {
+      console.warn(`[Security Alert] Prompt injection attempt detected from user ${req.body.userId || 'anonymous'}`);
+      return res.status(403).json({ error: "Rejeitado: Padrão suspeito detectado (Prompt Injection Guard)." });
+    }
+    // Block excessively long prompts
+    if (prompt.length > 30000) {
+      return res.status(413).json({ error: "Rejeitado: Prompt excede o limite máximo permitido." });
+    }
+    next();
+  };
+
   // API Routes
-  app.post("/api/edu-jarvis/process", async (req, res) => {
+  app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {
     try {
       const result = await processEduJarvisCommand(req.body);
       res.json(result);
@@ -163,7 +279,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/ai/completions", async (req, res) => {
+  app.post("/api/ai/completions", promptInjectionGuard, async (req, res) => {
     try {
       const { prompt, systemInstruction, responseFormat, responseSchema, task, userId, userRole, model } = req.body;
       if (!prompt) return res.status(400).json({ error: "Prompt is required" });
@@ -208,9 +324,7 @@ async function startServer() {
       const response = await fetch(n8nUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body),
-        // @ts-ignore
-        agent: httpsAgent
+        body: JSON.stringify(req.body)
       });
       res.json(await response.json().catch(() => ({ status: "ok" })));
     } catch (error: any) {
@@ -225,9 +339,7 @@ async function startServer() {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        // @ts-ignore
-        agent: httpsAgent
+        body: JSON.stringify(data)
       });
       res.json({ ok: response.ok, status: response.status });
     } catch (error: any) {
@@ -250,9 +362,7 @@ async function startServer() {
       const response = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body),
-        // @ts-ignore
-        agent: httpsAgent
+        body: JSON.stringify(req.body)
       });
       res.json(await response.json().catch(() => ({ status: "ok" })));
     } catch (error: any) {

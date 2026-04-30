@@ -22,6 +22,7 @@ export interface EduJarvisResponse {
   actionType?: Intent;
   generatedId?: string;
   payload?: any;
+  data?: any;
 }
 
 export type Intent =
@@ -39,4 +40,6 @@ export type Intent =
   | "COMANDO_VOZ"
   | "CORRECAO_VISAO"
   | "GERAR_BI_INSIGHTS"
+  | "IMPORTAR_QUESTOES"
+  | "OTIMIZAR_QUESTAO"
   | "COMANDO_GERAL";

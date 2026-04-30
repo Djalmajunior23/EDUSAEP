@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Zap, Database, X, Info, BrainCircuit } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { baseInputSchema, sanitizeInput } from '../../utils/validation';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { generateSAEPQuestion, generateDiscursiveQuestion } from '../../services/geminiService';
@@ -40,14 +41,23 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
   };
 
   const handleGenerate = async () => {
-    if (!competency.trim()) {
-      toast.error("Informe a competência para gerar a questão.");
+    // Validate competency
+    const competencyResult = baseInputSchema.safeParse(competency);
+    if (!competencyResult.success) {
+      toast.error("Informe uma competência válida.");
       return;
     }
+    const validatedCompetency = competencyResult.data;
 
-    if (questionType === 'discursiva' && !caseStudy.trim()) {
-      toast.error("Informe o estudo de caso para gerar a questão discursiva.");
-      return;
+    // Validate Case Study
+    let validatedCaseStudy = "";
+    if (questionType === 'discursiva') {
+        const caseStudyResult = baseInputSchema.safeParse(caseStudy);
+        if (!caseStudyResult.success) {
+            toast.error("Informe um estudo de caso válido.");
+            return;
+        }
+        validatedCaseStudy = caseStudyResult.data;
     }
 
     setIsGenerating(true);
@@ -55,9 +65,9 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
     try {
       let question;
       if (questionType === 'multipla_escolha') {
-        question = await generateSAEPQuestion(competency, difficulty, localModel, userProfile?.role as any || 'TEACHER');
+        question = await generateSAEPQuestion(validatedCompetency, difficulty, localModel, userProfile?.role as any || 'TEACHER');
       } else {
-        const promptParams = `Baseado neste estudo de caso exclusivo:\n"${caseStudy}"\n\nCrie uma questão discursiva avaliando a competência. Extrapole os pontos fundamentais do caso para formar o enunciado da questão.`;
+        const promptParams = `Baseado neste estudo de caso exclusivo:\n"${validatedCaseStudy}"\n\nCrie uma questão discursiva avaliando a competência. Extrapole os pontos fundamentais do caso para formar o enunciado da questão.`;
         question = await generateDiscursiveQuestion(promptParams, difficulty, localModel, userProfile?.role as any || 'TEACHER', competency);
       }
       setGeneratedQuestion(question);
@@ -188,7 +198,7 @@ export function SAEPItemGenerator({ user, userProfile, selectedModel }: SAEPItem
               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all dark:text-white"
             >
               <option value="gemini-1.5-flash">Gemini 1.5 Flash (Rápido)</option>
-              <option value="gemini-flash-latest">Gemini Flash Latest</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado)</option>
             </select>
           </div>
 

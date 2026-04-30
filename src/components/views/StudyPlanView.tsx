@@ -61,9 +61,9 @@ export function StudyPlanView({ user, userProfile, selectedModel }: StudyPlanVie
     try {
       const prompt = `Como um tutor educacional especialista no SAEP, gere um novo conjunto de 3 Tópicos Prioritários para estudo, mais específicos e detalhados.
       
-      FRAQUEZAS GERAIS (Competências): ${studyPlan.weaknesses.join(', ')}
-      CONHECIMENTOS ESPECÍFICOS FRÁGEIS: ${studyPlan.detailedWeaknesses?.join(', ') || 'Não detalhados'}
-      TÓPICOS ANTERIORES SUGERIDOS: ${studyPlan.priorityTopics.map(t => `${t.topic} (${t.reason})`).join('; ')}
+      FRAQUEZAS GERAIS (Competências): ${(studyPlan.weaknesses || []).join(', ')}
+      CONHECIMENTOS ESPECÍFICOS FRÁGEIS: ${(studyPlan.detailedWeaknesses || []).join(', ') || 'Não detalhados'}
+      TÓPICOS ANTERIORES SUGERIDOS: ${(studyPlan.priorityTopics || []).map(t => `${t.topic} (${t.reason})`).join('; ')}
       
       OBJETIVO:
       Aprofundar nas fraquezas e sugerir tópicos mais granulares, técnicos e específicos que os anteriores. 

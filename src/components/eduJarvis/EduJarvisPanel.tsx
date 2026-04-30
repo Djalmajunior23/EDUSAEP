@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Send, Bot, PieChart, MessageSquare, Terminal, Image as ImageIcon, X } from 'lucide-react';
-import { eduJarvisService } from '../../services/eduJarvisService';
+import { sendJarvisCommand } from '../../services/eduJarvisService';
 import { EduJarvisMessageType, UserRole } from '../../types/eduJarvisTypes';
 import { EduJarvisHeader } from './EduJarvisHeader';
 import { EduJarvisChat } from './EduJarvisChat';
@@ -12,6 +12,7 @@ import { auth } from '../../firebase';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { baseInputSchema } from '../../utils/validation';
 
 interface Props {
   userRole: UserRole;
@@ -65,11 +66,21 @@ export function EduJarvisPanel({ userRole, contextData, isOpen, onClose }: Props
   };
 
   const handleSend = async (text: string) => {
-    if (!text.trim() && !selectedImage || isProcessing) return;
+    // Validate and sanitize input using Zod
+    const validationResult = baseInputSchema.safeParse(text);
+    
+    if (!validationResult.success && !selectedImage) {
+      toast.error('Por favor, insira uma mensagem válida.');
+      return;
+    }
+
+    const sanitizedText = validationResult.success ? validationResult.data : text;
+
+    if (isProcessing) return;
 
     const userMessage: EduJarvisMessageType = {
       id: Date.now().toString(),
-      content: text || "Análise de imagem",
+      content: sanitizedText || "Análise de imagem",
       role: 'user',
       createdAt: new Date().toISOString()
     };
@@ -82,9 +93,9 @@ export function EduJarvisPanel({ userRole, contextData, isOpen, onClose }: Props
     setIsCommandPaletteOpen(false);
 
     try {
-      const response = await eduJarvisService.sendEduJarvisCommand({
+      const response = await sendJarvisCommand({
         userRole,
-        command: text,
+        command: sanitizedText,
         image: imageToSend || undefined,
         context: {
           ...contextData,

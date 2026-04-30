@@ -21,6 +21,17 @@ export const aiEngine = {
       
     const interactions = logs.docs.map(d => d.data());
     
+    // Coletar avaliações / diagnósticos recentes do aluno (Engagement & Mastery)
+    let academicPerformance = [];
+    try {
+      const resultsRef = await db.collection('resultados')
+        .where('studentId', '==', userId)
+        .orderBy('submittedAt', 'desc')
+        .limit(10)
+        .get();
+      academicPerformance = resultsRef.docs.map(d => d.data());
+    } catch(e) {}
+
     // Simulação de Pipeline de Dados: Normalização e Agregação
     const activityCount = interactions.length;
     const commonIntents = interactions.reduce((acc: any, curr: any) => {
@@ -32,6 +43,7 @@ export const aiEngine = {
       userId,
       activityCount,
       commonIntents,
+      academicPerformance,
       lastInteractions: interactions.slice(0, 5),
       timestamp: new Date().toISOString()
     };
@@ -45,21 +57,48 @@ export const aiEngine = {
     
     const systemPrompt = `
 Você é o motor de inferência preditiva do EduJarvis AI Engine.
-Sua tarefa é analisar sequências de desempenho e comportamento (Deep Learning Analysis).
-Identifique:
-1. Probabilidade de Evasão (Churn).
-2. Risco de Reprovação por Disciplina.
-3. Velocidade de Aprendizagem (Learning Velocity).
-Aja como uma rede neural recursiva (RNN/LSTM) identificando padrões temporais.
+Você atua na predição de desempenho acadêmico, avaliando engajamento, tendências de aprendizado e mitigação de evasão.
+
+Sua tarefa é analisar os dados de desempenho (academicPerformance) e engajamento (activityCount, interações).
+Você DEVE RETORNAR ESTRITAMENTE UM JSON com a seguinte estrutura:
+
+{
+  "predictedScore": 0-100, // Score preditivo
+  "trend": "UP" | "DOWN" | "STABLE", // Tendência temporal
+  "keyFactors": ["Fator 1", "Fator 2"], // Motivos qualitativos do desempenho
+  "recommendations": ["Rec 1", "Rec 2"], // Recomendações pedagógicas para reverter / acelerar
+  "engagementMetrics": {
+    "studyTimeMinutes": 120, // Estimativa de tempo baseado nas atividades
+    "platformAccessFrequency": "HIGH" | "MEDIUM" | "LOW",
+    "completionRate": 85 // Porcentagem preditiva
+  },
+  "riskLevel": "CRITICAL" | "WARNING" | "SAFE",
+  "evasionRiskScore": 0-100, // Porcentagem que indica risco de evasão
+  "adaptivePaths": [
+    {
+      "pathId": "id-unico",
+      "title": "Título da Trilha",
+      "reason": "Por que esta trilha ajudará este aluno"
+    }
+  ]
+}
 `;
 
     const userPrompt = `
-Dataset Histórico: ${JSON.stringify(dataset)}
-Contexto Atual: ${JSON.stringify(currentContext)}
-Determine o Risco e sugira Intervenção.
+Dataset Histórico do Aluno: ${JSON.stringify(dataset)}
+Contexto Atual da Turma/Escola: ${JSON.stringify(currentContext)}
+
+Faça a predição.
 `;
 
-    const aiResponse = await callAI({ systemPrompt, userPrompt });
-    return aiResponse.text;
+    const aiResponse = await callAI({ systemPrompt, userPrompt, responseFormat: 'json' });
+    let parsedData = {};
+    try {
+       parsedData = JSON.parse(aiResponse.text);
+    } catch(err) {
+       console.error("Falha ao parsear predição:", err);
+       parsedData = { erro: "Falha na análise preditiva da IA" };
+    }
+    return parsedData;
   }
 };

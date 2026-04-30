@@ -50,6 +50,9 @@ import { pdfExportService } from "../../services/pdfExportService";
 import { n8nEvents } from "../../services/n8nService";
 import { useAuth } from "../../contexts/AuthContext";
 
+import { ErrorBoundary } from '../common/ErrorBoundary';
+import { safeArray, safeString, safeDate } from '../../utils/safeData';
+
 interface AlunoViewProps {
   result: DiagnosticResult | null;
   onUpdateResult: (newResult: DiagnosticResult) => void;
@@ -102,7 +105,7 @@ export function AlunoView({
 
   const studentHistory = useMemo(() => {
     if (!result || !history) return [];
-    return history
+    return safeArray<any>(history)
       .filter((h) => h.result?.aluno === result.aluno)
       .sort((a, b) => {
         const dateA = a.createdAt?.seconds || 0;
@@ -113,9 +116,9 @@ export function AlunoView({
 
   const uniqueCompetencies = useMemo(() => {
     const comps = new Set<string>();
-    studentHistory.forEach((h) => {
+    safeArray<any>(studentHistory).forEach((h) => {
       if (h.result?.diagnostico_por_competencia) {
-        h.result.diagnostico_por_competencia.forEach((c: any) =>
+        safeArray<any>(h.result.diagnostico_por_competencia).forEach((c: any) =>
           comps.add(c.competencia),
         );
       }
@@ -124,13 +127,13 @@ export function AlunoView({
   }, [studentHistory]);
 
   const evolutionData = useMemo(() => {
-    return studentHistory.map((h, i) => {
+    return safeArray<any>(studentHistory).map((h, i) => {
       const date = h.createdAt
-        ? new Date(h.createdAt.seconds * 1000).toLocaleDateString()
+        ? safeDate(h.createdAt)
         : `Simulado ${i + 1}`;
       const dataPoint: any = { name: date };
       if (h.result?.diagnostico_por_competencia) {
-        h.result.diagnostico_por_competencia.forEach((c: any) => {
+        safeArray<any>(h.result.diagnostico_por_competencia).forEach((c: any) => {
           dataPoint[c.competencia] = Math.round(c.acuracia_ponderada * 100);
         });
       }
@@ -484,11 +487,12 @@ export function AlunoView({
     );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
-    >
+    <ErrorBoundary componentName="AlunoView">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-8"
+      >
       <div className="flex items-center justify-between">
         <button
           onClick={() =>
@@ -1065,5 +1069,6 @@ export function AlunoView({
         </div>
       </div>
     </motion.div>
+    </ErrorBoundary>
   );
 }

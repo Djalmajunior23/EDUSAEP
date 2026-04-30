@@ -6,6 +6,21 @@ export interface PerformancePrediction {
   trend: 'UP' | 'DOWN' | 'STABLE';
   keyFactors: string[];
   recommendations: string[];
+  // 1. Métricas mais profundas
+  engagementMetrics?: {
+    studyTimeMinutes: number;
+    platformAccessFrequency: 'HIGH' | 'MEDIUM' | 'LOW';
+    completionRate: number;
+  };
+  // 2. Alertas preditivos
+  riskLevel?: 'CRITICAL' | 'WARNING' | 'SAFE';
+  evasionRiskScore?: number;
+  // 3. Recomendação de trilhas
+  adaptivePaths?: {
+    pathId: string;
+    title: string;
+    reason: string;
+  }[];
 }
 
 export class PredictionService {

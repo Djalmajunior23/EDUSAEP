@@ -11,6 +11,9 @@ import { DropoutRiskCard } from '../shared/DropoutRiskCard';
 import { StudentLearningPath } from '../shared/StudentLearningPath';
 import { StudentProgressCard } from '../student/StudentProgressCard';
 
+import { ErrorBoundary } from '../common/ErrorBoundary';
+import { safeArray, safeString, safeDate } from '../../utils/safeData';
+
 interface StudentDashboardViewProps {
   user: User | null;
   userProfile: UserProfile | null;
@@ -150,7 +153,8 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
   const criticalComps = latestDecision?.competencies?.filter((c: any) => c.level === 'CRITICAL') || [];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+    <ErrorBoundary componentName="StudentDashboard">
+      <div className="max-w-5xl mx-auto space-y-8 pb-12">
       
       {/* Rescue Alert Section */}
       <AnimatePresence>
@@ -206,7 +210,7 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
             <span className="text-4xl font-black">{userProfile?.level || 1}</span>
           </div>
           <div className="flex-1">
-            <h2 className="text-3xl font-bold">Olá, {user?.displayName?.split(' ')[0] || 'Estudante'}!</h2>
+            <h2 className="text-3xl font-bold">Olá, {safeString(user?.displayName?.split(' ')[0], 'Estudante')}!</h2>
             <p className="text-emerald-50 mt-1 font-medium">{userProfile?.xp || 0} XP Acumulados no seu aprendizado</p>
             <div className="mt-4 w-full md:w-64 h-2.5 bg-black/20 rounded-full overflow-hidden shadow-inner">
               <div 
@@ -250,16 +254,16 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
                       {latestDecision.recommendation}
                     </p>
                     
-                    {criticalComps.length > 0 && (
+                    {safeArray<any>(criticalComps).length > 0 && (
                       <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-5">
                         <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2 mb-3">
                           <AlertTriangle size={16} /> Foco Prioritário
                         </h4>
                         <ul className="space-y-2">
-                          {criticalComps.map((comp: any) => (
-                            <li key={comp.id} className="text-sm text-rose-700 flex items-center gap-2">
+                          {safeArray<any>(criticalComps).map((comp: any) => (
+                            <li key={comp.id || comp.name} className="text-sm text-rose-700 flex items-center gap-2">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              {comp.name}
+                              {safeString(comp.name)}
                             </li>
                           ))}
                         </ul>
@@ -295,7 +299,7 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <AnimatePresence>
-              {diagnostics.length === 0 ? (
+              {safeArray<any>(diagnostics).length === 0 ? (
                 <div className="col-span-full border border-dashed border-gray-300 rounded-3xl p-12 text-center">
                   <div className="bg-gray-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <BookOpen className="text-gray-400" size={32} />
@@ -304,12 +308,12 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
                   <p className="text-gray-500 mt-1 max-w-sm mx-auto">Faça seu primeiro simulado SAEP para entender seu nível e receber sugestões.</p>
                 </div>
               ) : (
-                diagnostics.slice(0, 4).map((diag, idx) => (
+                safeArray<any>(diagnostics).slice(0, 4).map((diag: any, idx) => (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    key={diag.id} 
+                    key={diag.id || idx} 
                     onClick={() => navigate(`/aluno/${diag.id}`)}
                     className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group flex flex-col"
                   >
@@ -317,7 +321,7 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 group-hover:scale-110 transition-all">
                         <Target size={24} />
                       </div>
-                      <h4 className="font-bold text-lg text-gray-900 line-clamp-1">{diag.examTitle || 'Simulado Geral'}</h4>
+                      <h4 className="font-bold text-lg text-gray-900 line-clamp-1">{safeString(diag.examTitle, 'Simulado Geral')}</h4>
                       <div className="text-sm text-gray-500 mt-2 space-y-1">
                         <p>Total de Questões: <span className="font-semibold text-gray-700">{diag.totalQuestions || 0}</span></p>
                         <p>Acertos: <span className="font-semibold text-gray-700">{diag.correctAnswers || 0}</span></p>
@@ -357,6 +361,7 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
         </div>
         
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

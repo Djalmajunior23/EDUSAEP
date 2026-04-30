@@ -16,8 +16,9 @@ export async function predictionAgent(command: string, userId: string, context?:
   });
 
   return {
-    response: predictionAnalysis,
+    response: "A análise de risco acadêmico e predição foi concluída.",
     actionType: 'ANALISAR_RISCO_ACADEMICO' as any,
-    generatedId: docRef.id
+    generatedId: docRef.id,
+    data: predictionAnalysis
   };
 }

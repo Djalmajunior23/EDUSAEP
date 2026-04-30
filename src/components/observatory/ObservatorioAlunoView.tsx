@@ -6,6 +6,7 @@ import { MapaCompetencias } from './MapaCompetencias';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as LineTooltip, ResponsiveContainer } from 'recharts';
 import { Target, AlertTriangle, TrendingUp, TrendingDown, Minus, BookOpen, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { toast } from 'sonner';
 
 export function ObservatorioAlunoView() {
   const { userProfile, user } = useAuth();
@@ -119,9 +120,9 @@ export function ObservatorioAlunoView() {
                   comp.name,
                   data
                 );
-                alert("Trilha de recuperação gerada com sucesso!");
+                toast.success("Trilha de recuperação gerada com sucesso!");
               } catch (error) {
-                alert("Erro ao gerar trilha de recuperação.");
+                toast.error("Erro ao gerar trilha de recuperação.");
               } finally {
                 setIsGenerating(false);
               }

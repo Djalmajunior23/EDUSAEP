@@ -85,13 +85,17 @@ export interface Question {
   temaId: string;
   temaNome: string;
   habilidade?: string;
-  dificuldade: 'fácil' | 'médio' | 'difícil';
-  bloom: 'lembrar' | 'compreender' | 'aplicar' | 'analisar' | 'avaliar' | 'criar';
+  disciplina?: string;
+  competencias?: string[];
+  conhecimentos?: string[];
+  habilidades?: string[];
+  dificuldade: 'fácil' | 'médio' | 'difícil' | string;
+  bloom: 'lembrar' | 'compreender' | 'aplicar' | 'analisar' | 'avaliar' | 'criar' | string;
   perfilGeracao: string;
-  tipoQuestao: 'multipla_escolha' | 'discursiva' | 'verdadeiro_falso' | 'lacuna' | 'ordenacao' | 'associacao';
+  tipoQuestao: 'multipla_escolha' | 'discursiva' | 'verdadeiro_falso' | 'lacuna' | 'ordenacao' | 'associacao' | string;
   enunciado: string;
   assets?: QuestionAsset[]; // Integrated assets (code, images, etc.)
-  alternativas?: Array<{ id: string; texto: string; feedback?: string }>;
+  alternativas?: Array<{ id: string; texto: string; feedback?: string } | any>;
   respostaCorreta?: string; // ID for multiple choice
   respostaEsperada?: string; // Sample answer for discursive
   rubricaAvaliacao?: string; // Guidelines for manual scoring
@@ -102,7 +106,8 @@ export interface Question {
   justificativasAlternativas?: Record<string, string>;
   contextoHash: string;
   tags: string[];
-  status: 'rascunho' | 'publicado';
+  status: 'rascunho' | 'publicado' | string;
+  statusIA?: string;
   revisadaPorProfessor: boolean;
   usoTotal: number;
   taxaAcerto?: number;

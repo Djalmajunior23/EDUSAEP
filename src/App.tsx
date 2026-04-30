@@ -142,6 +142,7 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
+import { AI_CONFIG } from "./ai-config";
 import {
   generateDiagnostic,
   generateSuggestions,
@@ -323,7 +324,7 @@ function AppContent() {
       (localStorage.getItem("ai_provider") as AIProvider) || "gemini";
     if (provider === "openai") return "gpt-4o-mini";
     if (provider === "deepseek") return "deepseek-chat";
-    return "gemini-1.5-flash";
+    return "fast";
   });
 
   const handleProviderChange = (p: AIProvider) => {
@@ -336,7 +337,7 @@ function AppContent() {
     } else if (p === "deepseek") {
       setSelectedModel("deepseek-chat");
     } else {
-      setSelectedModel("gemini-1.5-flash");
+      setSelectedModel("fast");
     }
 
     window.dispatchEvent(new Event("ai_provider_changed"));
@@ -1350,7 +1351,7 @@ function AppContent() {
       "Média (%)": (comp.acuracia_ponderada * 100).toFixed(1),
       Acertos: comp.acertos,
       "Total Questões": comp.total_questoes,
-      "Conhecimentos Fracos": comp.conhecimentos_fracos.join("; "),
+      "Conhecimentos Fracos": (comp.conhecimentos_fracos || []).join("; "),
       Recomendações: comp.recomendacoes,
     }));
 
@@ -2571,8 +2572,8 @@ function AppContent() {
                                   <option value="gemini-1.5-flash">
                                     Gemini 1.5 Flash (Rápido)
                                   </option>
-                                  <option value="gemini-flash-latest">
-                                    Gemini Flash Latest
+                                  <option value="gemini-1.5-pro">
+                                    Gemini 1.5 Pro (Complexo)
                                   </option>
                                 </select>
                               </div>
@@ -3266,7 +3267,7 @@ function AppContent() {
                                   Alertas de Dados / Segurança
                                 </p>
                                 <p className="text-xs text-amber-700">
-                                  {result.summary.alertas_dados.join(", ")}
+                                  {(result.summary.alertas_dados || []).join(", ")}
                                 </p>
                               </div>
                             </div>

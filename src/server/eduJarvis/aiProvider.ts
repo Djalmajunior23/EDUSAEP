@@ -23,7 +23,7 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Force gemini-1.5-flash for reliability and to avoid 5 NOT_FOUND errors
+  // Using gemini-1.5-flash for reliability and to avoid 5 NOT_FOUND errors
   const modelName = "gemini-1.5-flash";
   
   const model = genAI.getGenerativeModel({ 

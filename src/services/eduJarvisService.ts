@@ -1,88 +1,82 @@
 import { auth } from '../firebase';
-import { EduJarvisRequest, EduJarvisResponse, UserRole, Intent } from '../types/eduJarvisTypes';
+import { EduJarvisRequest, EduJarvisResponse, Intent, UserRole } from '../types/eduJarvisTypes';
 
 /**
- * EduJarvisService: Central de Inteligência Pedagógica (Frontend)
- * 
- * Este serviço é o PONTO ÚNICO de entrada para todas as funcionalidades de IA
- * relacionadas ao ecossistema EduJarvis. 
- * 
- * DIRETRIZES DE SEGURANÇA E GOVERNANÇA:
- * 1. Nenhuma chave de API (Gemini, OpenAI, etc.) deve existir aqui.
- * 2. Nenhuma lógica de processamento de IA (prompt engineering pesado) deve existir aqui.
- * 3. Todas as chamadas são delegadas para o Backend (Cloud Functions/Server) via /api/edu-jarvis/process.
- * 4. O backend é responsável pela orquestração, segurança de camada de IA e auditoria.
+ * EduJarvis Service - Frontend Proxy for AI Operations.
+ * Ensures the backend is the only point of contact with AI providers.
  */
-export const eduJarvisService = {
+export class EduJarvis {
   /**
-   * Envia um comando genérico ou orquestrado para o EduJarvis.
+   * Sends a structured command to the EduJarvis backend.
    */
-  async sendEduJarvisCommand(
-    request: Partial<EduJarvisRequest>
-  ): Promise<EduJarvisResponse> {
+  public static async execute(command: string, options: {
+    context?: any;
+    image?: string;
+    role?: UserRole;
+  } = {}): Promise<EduJarvisResponse> {
+    const user = (auth as any).currentUser;
+    if (!user) throw new Error("Ação não permitida: Usuário não autenticado");
+
+    const payload: EduJarvisRequest = {
+      command,
+      userId: user.uid,
+      userRole: options.role || (localStorage.getItem('user_role') as UserRole) || 'TEACHER',
+      context: options.context,
+      image: options.image
+    };
+
     try {
-      const userId = request.userId || auth.currentUser?.uid;
-      
-      if (!userId && !request.userId) {
-        throw new Error('Usuário não autenticado para utilizar o EduJarvis');
-      }
-
-      const userRole = request.userRole || (localStorage.getItem('user_role') as UserRole) || 'STUDENT';
-
-      const fullRequest: EduJarvisRequest = {
-        userId: userId || 'anonymous',
-        userRole,
-        command: request.command || '',
-        context: {
-          ...request.context,
-          lastAccessedAt: new Date().toISOString(),
-          clientVersion: '1.2.0-ULTRA'
-        },
-        image: request.image
-      };
-
       const response = await fetch('/api/edu-jarvis/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await auth.currentUser?.getIdToken() || ''}`
         },
-        body: JSON.stringify(fullRequest)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Falha na comunicação com o Cérebro EduJarvis');
+        const err = await response.json().catch(() => ({ error: 'Erro de comunicação backend' }));
+        throw new Error(err.error || `Erro ${response.status} ao processar comando EduJarvis`);
       }
 
-      const result: EduJarvisResponse = await response.json();
-      return result;
-      
-    } catch (e: any) {
-      console.error('[EduJarvisService] Error:', e);
-      return {
-        response: `[Falha Técnica] O EduJarvis não conseguiu processar sua solicitação agora. Motivo: ${e.message}. Verifique sua conexão e tente novamente.`
-      };
+      return await response.json();
+    } catch (error: any) {
+      console.error("[EduJarvis Service] Execution Error:", error);
+      throw error;
     }
-  },
-
-  /**
-   * Método especializado para análise de imagem (OCR + Pedagogia)
-   */
-  async analyzeVision(image: string, comment?: string): Promise<EduJarvisResponse> {
-    return this.sendEduJarvisCommand({
-      command: comment || 'Analise esta imagem sob uma ótica pedagógica.',
-      image
-    });
-  },
-
-  /**
-   * Atalho para gerar diagnósticos rápidos
-   */
-  async generateDiagnostic(context: any): Promise<EduJarvisResponse> {
-    return this.sendEduJarvisCommand({
-      command: '/gerar-diagnostico',
-      context: { ...context, forceIntent: 'ANALISAR_DESEMPENHO' as Intent }
-    });
   }
-};
+
+  /**
+   * Helper for pedagogical content generation.
+   */
+  public static async pedagogicalCommand(prompt: string, context?: any): Promise<string> {
+    const res = await this.execute(prompt, { context });
+    return res.response || "";
+  }
+
+  /**
+   * Specialist for question import enrichment.
+   */
+  public static async importQuestions(rawText: string, context?: any): Promise<any[]> {
+    const res = await this.execute(`/importar ${rawText}`, { context });
+    if (res.data && Array.isArray(res.data)) {
+      return res.data;
+    }
+    return [];
+  }
+
+  /**
+   * Analyze student or class performance.
+   */
+  public static async analyzePerformance(id: string, type: 'STUDENT' | 'CLASS', data: any): Promise<EduJarvisResponse> {
+    const command = type === 'STUDENT' ? `/analisar-aluno ${id}` : `/analisar-turma ${id}`;
+    return await this.execute(command, { context: data });
+  }
+}
+
+// Backward compatibility or easier access
+export const sendJarvisCommand = (req: any) => EduJarvis.execute(req.command, { 
+  context: req.context, 
+  image: req.image,
+  role: req.userRole
+});

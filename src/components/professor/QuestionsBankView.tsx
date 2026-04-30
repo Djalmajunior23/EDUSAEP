@@ -28,14 +28,25 @@ import {
 import { db } from '../../firebase';
 import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { parseQuestionsFromText, generateMultipleQuestionVariations, analyzeQuestionByPerformance, QuestionAnalysisResult } from '../../services/geminiService';
+import { 
+  parseQuestionsFromText, 
+  generateMultipleQuestionVariations, 
+  analyzeQuestionByPerformance, 
+  QuestionAnalysisResult,
+  analyzeQuestionQuality
+} from '../../services/geminiService';
+import { normalizeImportError } from '../../utils/normalizeImportError';
+import { simpleRegexParser } from '../../utils/simpleRegexParser';
+import { AI_CONFIG } from '../../ai-config';
+import { sendJarvisCommand } from '../../services/eduJarvisService';
 import { exportQuestionsToGoogleForms } from '../../services/googleFormsService';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
-import { Question } from '../../types';
+import { Question } from '../../types/questionTypes';
+import { safeArray, safeJoin, safeString, safeDate } from '../../utils/safeData';
 import { AdvancedQuestionGenerator } from './AdvancedQuestionGenerator';
 import { QuestionRenderer } from '../common/QuestionRenderer';
 import { Eye, ChevronUp as ChevronUpIcon } from 'lucide-react';
@@ -50,6 +61,31 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 interface Competency {
   id: string;
   name: string;
+}
+
+// --- UTILITÁRIOS DE SEGURANÇA (CORREÇÃO DEFINITIVA) ---
+function normalizeQuestion(q: any): Question {
+  return {
+    ...q,
+    id: q?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7)),
+    enunciado: q?.enunciado || q?.pergunta || q?.questao || "Enunciado não informado",
+    disciplina: q?.disciplina || "Não informado",
+    competenciaNome: q?.competenciaNome || q?.competencia || "Não informado",
+    competencias: Array.isArray(q?.competencias) ? q.competencias : [],
+    conhecimentos: Array.isArray(q?.conhecimentos) ? q.conhecimentos : [],
+    habilidades: Array.isArray(q?.habilidades) ? q.habilidades : [],
+    tags: Array.isArray(q?.tags) ? q.tags : [],
+    alternativas: Array.isArray(q?.alternativas) ? q.alternativas : [],
+    respostaCorreta: q?.respostaCorreta || q?.gabarito || q?.resposta || "Não informado",
+    gabaritoComentado: q?.gabaritoComentado || "",
+    bloom: q?.bloom || q?.nivelBloom || "Não informado",
+    dificuldade: q?.dificuldade || "Não informado",
+    statusIA: q?.statusIA || "pendente_revisao_ia",
+    usoTotal: q?.usoTotal || 0,
+    assets: Array.isArray(q?.assets) ? q.assets : [],
+    createdAt: q?.createdAt || null,
+    updatedAt: q?.updatedAt || null,
+  };
 }
 
 export function QuestionsBankView({ user, userProfile, selectedModel }: { user: any, userProfile: any, selectedModel: string }) {
@@ -230,11 +266,11 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
             skipEmptyLines: true,
             complete: (results) => {
               // Convert any CSV structure to a text format the AI can understand
-              const formattedText = results.data.map((row: any, i: number) => {
+              const formattedText = safeArray(results.data).map((row: any, i: number) => {
                 if (Array.isArray(row)) {
-                  return `ITEM ${i+1}:\n${row.filter(v => v !== null && v !== '').join(' | ')}`;
+                  return `ITEM ${i+1}:\n${safeJoin(row, ' | ')}`;
                 }
-                return `ITEM ${i+1}:\n${Object.entries(row).map(([k, v]) => `${k}: ${v}`).join('\n')}`;
+                return `ITEM ${i+1}:\n${safeArray(Object.entries(row)).map(([k, v]) => `${k}: ${v}`).join('\n')}`;
               }).join('\n\n---\n\n');
               resolve(formattedText);
             },
@@ -247,11 +283,11 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }); // Use header: 1 for array of arrays
-        text = rows.map((row: any, i: number) => {
+        text = safeArray(rows).map((row: any, i: number) => {
           if (Array.isArray(row)) {
-            return `ITEM ${i+1}:\n${row.filter(v => v !== null && v !== '').join(' | ')}`;
+            return `ITEM ${i+1}:\n${safeJoin(row, ' | ')}`;
           }
-          return `ITEM ${i+1}:\n${Object.entries(row).map(([k, v]) => `${k}: ${v}`).join('\n')}`;
+          return `ITEM ${i+1}:\n${safeArray(Object.entries(row)).map(([k, v]) => `${k}: ${v}`).join('\n')}`;
         }).join('\n\n---\n\n');
       } else if (fileName.endsWith('.pdf')) {
         const data = await file.arrayBuffer();
@@ -264,7 +300,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
-          fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+          fullText += safeJoin(safeArray(textContent.items).map((item: any) => item.str), ' ') + '\n';
           setImportProgress(Math.round((i / pdf.numPages) * 100));
         }
         text = fullText;
@@ -295,56 +331,144 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       return;
     }
     setImportProgress(0);
+    
     try {
-      toast.info("A IA está processando o conteúdo... aguarde.");
-      const parsedQuestions = await parseQuestionsFromText(text, selectedModel, 'TEACHER');
+      console.log("[Import] Iniciando importação");
       
-      if (!parsedQuestions || parsedQuestions.length === 0) {
-        toast.error("Nenhuma questão foi identificada pela IA.");
+      // 1. Extração manual (Parser Fallback)
+      console.log("[Parser] Iniciando extração manual");
+      const extractedQuestions = simpleRegexParser(text);
+      
+      if (!extractedQuestions || extractedQuestions.length === 0) {
+        toast.error("Não foi possível identificar nenhuma questão no arquivo via parser manual.");
         return;
       }
 
-      const uniqueCompetencies = Array.from(new Set(parsedQuestions.map(q => q.competenciaNome)));
-      const existingCompetencies = disciplines.map(d => d.name || d.nome);
-      const missing = uniqueCompetencies.filter(c => c && !existingCompetencies.includes(c));
+      // 2. Preparar questões base
+      const questionsBase = extractedQuestions.map((q, index) => ({
+        ...q,
+        enunciado: q.enunciado || "Questão sem enunciado (Importada)",
+        alternativas: Array.isArray(q.alternativas) ? q.alternativas : [],
+        respostaCorreta: q.respostaCorreta || "A",
+        statusIA: "pendente_revisao_ia",
+        origem: "importacao",
+        revisadaPorProfessor: false,
+        status: 'rascunho',
+        numeroImportacao: index + 1
+      }));
 
-      if (missing.length > 0) {
-        setMissingCompetencies(missing);
-        setTempQuestions(parsedQuestions);
-        setShowMappingModal(true);
+      // 3. Salvar no Firestore antes da IA (Garante que os dados não se percam)
+      console.log("[Import] Questões extraídas, salvando no banco...");
+      const savedIds = await saveImportedQuestions(questionsBase);
+      console.log("[Import] Questões salvas antes da IA:", savedIds.length);
+
+      // 4. Tentar IA opcionalmente para enriquecimento com EduJarvis
+      const enableAI = AI_CONFIG.enableAI;
+      if (enableAI) {
+        try {
+          toast.info("O EduJarvis está analisando e enriquecendo as questões...");
+          console.log("[EduJarvis] Solicitando processamento inteligente");
+          
+          const jarvisRes = await sendJarvisCommand({
+            command: `/importar o seguinte conteúdo de questões:\n${text}`,
+            context: {
+              savedIds: savedIds,
+              disciplines: disciplines.map(d => d.name || d.nome)
+            }
+          });
+          
+          if (jarvisRes.data && Array.isArray(jarvisRes.data)) {
+            console.log("[Import] EduJarvis retornou dados enriquecidos, atualizando banco...");
+            await updateQuestionsWithAI(savedIds, jarvisRes.data);
+            toast.success("EduJarvis processou e enriqueciu as questões com sucesso!");
+          } else {
+            console.warn("[Import] EduJarvis não retornou dados estruturados:", jarvisRes);
+          }
+        } catch (aiError) {
+          console.warn("[Import] EduJarvis falhou no enriquecimento. As questões foram mantidas com dados básicos.", aiError);
+          toast.warning(`EduJarvis encontrou dificuldades: ${aiError instanceof Error ? aiError.message : 'Erro na IA'}. As questões foram salvas, mas precisam de revisão manual.`);
+        }
       } else {
-        await saveImportedQuestions(parsedQuestions);
+        console.info("[Import] IA desativada por configuração. Mantendo dados do parser manual.");
+        toast.info("Importação concluída sem IA.");
       }
+
     } catch (error) {
-      console.error("[Import] Erro no processamento com IA:", error);
-      toast.error("Erro ao analisar questões com IA.");
+      console.error("[Import] Erro crítico no processamento:", error);
+      toast.error("Erro fatal na importação de questões.");
     }
   };
 
+  const updateQuestionsWithAI = async (docIds: string[], enrichedList: any[]) => {
+    try {
+      const batch = writeBatch(db);
+      
+      // Tenta cruzar por índice (já que a ordem no text tende a ser a mesma)
+      docIds.forEach((id, index) => {
+        if (enrichedList[index]) {
+          const enriched = enrichedList[index];
+          const docRef = doc(db, 'questions', id);
+          batch.update(docRef, {
+            ...enriched,
+            statusIA: 'processado',
+            updatedAt: serverTimestamp()
+          });
+        }
+      });
+      
+      await batch.commit();
+      fetchQuestions();
+    } catch (error) {
+      console.error("[Import] Erro ao atualizar questões com IA:", error);
+    }
+  };
 
   const saveImportedQuestions = async (questionsToSave: any[]) => {
     try {
       const batch = writeBatch(db);
       const questionsCol = collection(db, 'questions');
+      const savedIds: string[] = [];
+      const userId = user?.uid;
+
+      if (!userId) {
+        toast.error("Erro: Usuário não identificado para salvar questões.");
+        throw new Error("Missing User ID");
+      }
       
       questionsToSave.forEach(q => {
         const newDocRef = doc(questionsCol);
-        batch.set(newDocRef, {
-          ...q,
-          createdBy: user.uid,
+        savedIds.push(newDocRef.id);
+        
+        // Limpeza de campos para evitar erros no Firestore
+        const cleanQuestion = {
+          enunciado: q.enunciado || "Questão sem enunciado",
+          alternativas: Array.isArray(q.alternativas) ? q.alternativas : [],
+          respostaCorreta: q.respostaCorreta || "A",
+          dificuldade: q.dificuldade || "médio",
+          bloom: q.bloom || "compreender",
+          competenciaNome: q.competenciaNome || "Pendente",
+          temaNome: q.temaNome || "Geral",
+          status: q.status || 'rascunho',
+          statusIA: q.statusIA || 'pendente_revisao_ia',
+          origem: q.origem || 'importacao',
+          revisadaPorProfessor: !!q.revisadaPorProfessor,
+          createdBy: userId,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          usoTotal: 0,
-          status: 'rascunho'
-        });
+          usoTotal: 0
+        };
+
+        batch.set(newDocRef, cleanQuestion);
       });
 
       await batch.commit();
-      toast.success(`${questionsToSave.length} questões importadas com sucesso!`);
+      console.log(`[Firestore] ${savedIds.length} questões salvas com sucesso.`);
       fetchQuestions();
+      return savedIds;
     } catch (error) {
       console.error("Error saving questions:", error);
       toast.error("Erro ao salvar questões no banco.");
+      throw error;
     }
   };
 
@@ -392,7 +516,9 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
         orderBy('usoTotal', 'desc')
       );
       const snap = await getDocs(q);
-      setQuestions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
+      const rawData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Normalização dos dados (CORREÇÃO 4)
+      setQuestions(rawData.map(normalizeQuestion));
     } catch (error) {
       console.error("Error fetching questions:", error);
       toast.error("Erro ao carregar banco de questões.");
@@ -474,14 +600,30 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     }
   };
 
-  const filteredQuestions = questions.filter(q => {
-    const matchesSearch = q.enunciado.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         q.competenciaNome.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDifficulty = filterDifficulty === 'all' || q.dificuldade === filterDifficulty;
-    const matchesCompetency = filterCompetency === 'all' || q.competenciaNome === filterCompetency;
-    const matchesAi = !filterAiOnly || q.isAiGenerated;
-    return matchesSearch && matchesDifficulty && matchesCompetency && matchesAi;
-  });
+  const filteredQuestions = useMemo(() => {
+    return questions.filter(q => {
+      const searchContent = [
+        q.enunciado,
+        q.disciplina,
+        q.competenciaNome,
+        q.temaNome,
+        q.respostaCorreta,
+        q.bloom,
+        q.dificuldade,
+        safeJoin(q.tags),
+        safeJoin(q.competencias),
+        safeJoin(q.conhecimentos),
+        safeJoin(q.habilidades)
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      const matchesSearch = searchContent.includes(searchTerm.toLowerCase());
+      const matchesDifficulty = filterDifficulty === 'all' || q.dificuldade === filterDifficulty;
+      const matchesCompetency = filterCompetency === 'all' || q.competenciaNome === filterCompetency;
+      const matchesAi = !filterAiOnly || q.isAiGenerated;
+      
+      return matchesSearch && matchesDifficulty && matchesCompetency && matchesAi;
+    });
+  }, [questions, searchTerm, filterDifficulty, filterCompetency, filterAiOnly]);
 
   const filteredCompetencies = useMemo(() => {
     // Combine names from existing questions AND fetched disciplines/competencies
@@ -675,6 +817,13 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
 
       {/* Questions List */}
       <div className="space-y-4">
+        {!questions && (
+          <div className="flex flex-col items-center justify-center p-20 space-y-4 bg-white rounded-3xl border border-gray-100">
+            <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+            <p className="text-gray-500 font-medium">Carregando banco de inteligência...</p>
+          </div>
+        )}
+        
         {selectedQuestionIds.length > 0 && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
@@ -877,7 +1026,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
 
                 <div className="flex items-center gap-6 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                   <span className="flex items-center gap-1.5"><History size={14} /> Usada {question.usoTotal} vezes</span>
-                  <span className="flex items-center gap-1.5"><Tag size={14} /> {question.tags.join(', ')}</span>
+                  <span className="flex items-center gap-1.5"><Tag size={14} /> {safeJoin(question.tags)}</span>
                   <button 
                     onClick={() => setExpandedQuestionId(expandedQuestionId === question.id ? null : question.id || null)}
                     className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 transition-colors"
@@ -1156,27 +1305,42 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-bold text-gray-700">Alternativas</label>
-                  {editedQuestion.alternativas?.map((alt, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <span className="font-bold text-gray-500">{alt.id})</span>
-                      <input 
-                        type="text" 
-                        value={alt.texto}
-                        onChange={e => {
-                          const newAlts = [...editedQuestion.alternativas!];
-                          newAlts[idx] = { ...newAlts[idx], texto: e.target.value };
-                          setEditedQuestion({...editedQuestion, alternativas: newAlts});
-                        }}
-                        className="flex-1 p-2 border border-gray-200 rounded-lg text-sm"
-                      />
-                      <button 
-                        onClick={() => setEditedQuestion({...editedQuestion, respostaCorreta: alt.id})}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg ${editedQuestion.respostaCorreta === alt.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
-                      >
-                        Correta?
-                      </button>
+                  {safeArray(editedQuestion.alternativas).length > 0 ? (
+                    safeArray(editedQuestion.alternativas).map((alt: any, idx: number) => {
+                      const altId = typeof alt === 'object' ? alt.id : String.fromCharCode(65 + idx);
+                      const altTexto = typeof alt === 'object' ? alt.texto : alt;
+                      
+                      return (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <span className="font-bold text-gray-500">{altId})</span>
+                          <input 
+                            type="text" 
+                            value={altTexto || ''}
+                            onChange={e => {
+                              const newAlts = [...(editedQuestion.alternativas || [])];
+                              if (typeof alt === 'object') {
+                                newAlts[idx] = { ...alt, texto: e.target.value };
+                              } else {
+                                newAlts[idx] = e.target.value;
+                              }
+                              setEditedQuestion({...editedQuestion, alternativas: newAlts});
+                            }}
+                            className="flex-1 p-2 border border-gray-200 rounded-lg text-sm"
+                          />
+                          <button 
+                            onClick={() => setEditedQuestion({...editedQuestion, respostaCorreta: altId})}
+                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${editedQuestion.respostaCorreta === altId ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+                          >
+                            {editedQuestion.respostaCorreta === altId ? 'Correta!' : 'Marcar Correta'}
+                          </button>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-700 text-xs italic">
+                      Nenhuma alternativa definida. Adicione alternativas para questões de múltipla escolha.
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
               <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">

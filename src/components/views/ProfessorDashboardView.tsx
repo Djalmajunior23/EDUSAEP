@@ -16,6 +16,9 @@ import { PedagogicalDecisionsWidget } from '../professor/PedagogicalDecisionsWid
 import { PedagogicalSummaryCard } from '../professor/PedagogicalSummaryCard';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 
+import { ErrorBoundary } from '../common/ErrorBoundary';
+import { safeArray, safeString, safeDate } from '../../utils/safeData';
+
 interface ProfessorDashboardViewProps {
   user: User | null;
   userProfile: UserProfile | null;
@@ -39,15 +42,15 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
     const fetchStats = async () => {
       try {
         const studentsQuery = query(collection(db, 'users'), where('role', '==', 'STUDENT'));
-        const studentsSnap = await getDocs(studentsQuery);
-        
-        // Use avaliacoes for exam count
         const examsQuery = query(collection(db, 'avaliacoes'), where('createdBy', '==', user.uid));
-        const examsSnap = await getDocs(examsQuery);
-        
-        // Use resultados for average score and submissions
         const resultsQuery = query(collection(db, 'resultados'), orderBy('submittedAt', 'desc'), limit(100));
-        const resultsSnap = await getDocs(resultsQuery);
+
+        const [studentsSnap, examsSnap, resultsSnap] = await Promise.all([
+          getDocs(studentsQuery),
+          getDocs(examsQuery),
+          getDocs(resultsQuery)
+        ]);
+        
         const results = resultsSnap.docs.map(doc => doc.data());
         
         const totalSubmissions = results.length;
@@ -73,11 +76,12 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
   }, [user]);
   
   return (
-    <div className="space-y-10 py-8">
+    <ErrorBoundary componentName="ProfessorDashboard">
+      <div className="space-y-10 py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Painel do Professor</h1>
-          <p className="text-gray-500 dark:text-gray-400">Bem-vindo, {userProfile?.displayName || 'Professor'}. Gerencie suas turmas e simulados.</p>
+          <p className="text-gray-500 dark:text-gray-400">Bem-vindo, {safeString(userProfile?.displayName, 'Professor')}. Gerencie suas turmas e simulados.</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -284,22 +288,22 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
                     <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
                     <p className="text-sm text-gray-500">Carregando atividade...</p>
                   </div>
-                ) : stats.recentActivity.length === 0 ? (
+                ) : safeArray<any>(stats.recentActivity).length === 0 ? (
                   <div className="p-8 text-center text-gray-500 italic text-sm">
                     Nenhuma atividade recente encontrada.
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {stats.recentActivity.map((item) => (
+                    {safeArray<any>(stats.recentActivity).map((item: any) => (
                       <button
                         key={item.id}
                         onClick={() => navigate(`/aluno/${item.studentId}`)}
                         className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left flex items-center justify-between group"
                       >
                         <div>
-                          <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{item.studentName || 'Aluno'}</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">{safeString(item.studentName, 'Aluno')}</p>
                           <p className="text-[10px] text-gray-500">
-                            {item.submittedAt?.seconds ? new Date(item.submittedAt.seconds * 1000).toLocaleDateString() : 'Recente'} - {item.examTitle || 'Atividade'}
+                            {safeDate(item.submittedAt)} - {safeString(item.examTitle, 'Atividade')}
                           </p>
                         </div>
                         <div className="text-right">
@@ -335,6 +339,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

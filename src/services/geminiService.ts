@@ -1,10 +1,12 @@
-import { generateAIContent } from "./aiService";
+import { EduJarvis } from "./eduJarvisService";
+import { AI_CONFIG } from "../ai-config";
+import { toast } from "sonner";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { UserRole } from "../types";
-
-// The GoogleGenAI import and instance are removed to ensure backend-only AI integration.
-// import { SchemaType as Type } from "@google/generative-ai";
+import { normalizeImportError } from "../utils/normalizeImportError";
+import { simpleRegexParser } from "../utils/simpleRegexParser";
+import { safeArray, safeJoin } from "../utils/safeData";
 
 /**
  * Local Schema Types for documentation and compatibility without heavy SDK.
@@ -20,200 +22,7 @@ export const SchemaType = {
 const Type = SchemaType;
 
 /**
- * Logs AI usage to Firestore for institutional governance and cost analysis.
- */
-async function logAIUsage(provider: string, model: string, success: boolean, error?: string) {
-  try {
-    const userId = auth.currentUser?.uid || 'anonymous';
-    const email = auth.currentUser?.email || 'anonymous';
-    
-    await addDoc(collection(db, 'ai_usage_logs'), {
-      userId,
-      email,
-      provider,
-      model,
-      timestamp: serverTimestamp(),
-      success,
-      error: error || null,
-      costEstimate: 0, 
-    });
-  } catch (err) {
-    console.warn("[AI Logging] Failed to log usage:", err);
-  }
-}
-
-export type AIProvider = 'gemini' | 'openai' | 'groq' | 'deepseek' | 'cohere' | 'together';
-
-export function getAIProvider(): AIProvider {
-  return (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
-}
-
-export function setAIProvider(provider: AIProvider) {
-  localStorage.setItem('ai_provider', provider);
-  window.dispatchEvent(new Event('ai_provider_changed'));
-}
-
-export function getSystemInstruction(profile: UserRole | 'professor' | 'aluno', module: string): string {
-  const isProfessor = profile === 'TEACHER' || profile === 'ADMIN' || profile === 'COORDINATOR' || profile === 'professor';
-  const isBancoQuestoes = module === 'banco_questoes';
-  const isSimulados = module === 'simulados';
-  const isExportForms = module === 'exportacao_google_forms';
-  const isSmartContent = module === 'smart_content';
-
-  let instructions = `
-## 🎯 PAPEL DO MODELO
-Você atuará como um **Especialista em Educação Profissional, Avaliação por Competências, BI Educacional e Inteligência Artificial aplicada ao ensino técnico**, com domínio do padrão SAEP (SENAI) e da Taxonomia de Bloom.
-Seu objetivo é analisar dados, gerar conteúdos educacionais inteligentes, personalizados e estruturados, e propor recomendações inteligentes para aprendizagem a partir de comandos recebidos.
-Você está integrado à plataforma educacional chamada **JuniorsStudent**.
-
----
-
-## ⚙️ OBJETIVO EM SMART CONTENT:
-- **estudo_caso**: Gerar um cenário técnico real (PBL) com contexto, problema e questões discursivas baseadas em uma situação-problema.
-- **aula_invertida**: Gerar um roteiro de estudo prévio, materiais de consulta e uma atividade prática desafiadora para aplicação em sala.
-- **simulado**: 40 questões robustas.
-- **questoes**: Questões isoladas com feedback.
-- **explicacao**: Explicações didáticas profundas.
-
----
-`;
-
-  instructions += `
-## 🚫 REGRAS DE OURO (SISTEMA)
-- **NUNCA** gere textos repetitivos ou em loop (ex: repetir o mesmo prefixo centenas de vezes).
-- **CONCISÃO TÉCNICA**: Seja profundo pedagogicamente mas evite descrições excessivamente longas que possam truncar a resposta JSON.
-- **NÚMEROS**: "tempoEstimado" deve ser um número inteiro razoável (ex: 120-600), nunca uma sequência infinita de zeros.
-- **JSON VÁLIDO**: Feche todas as aspas, chaves e colchetes. Nunca retorne texto fora do bloco JSON.
-- **REFERÊNCIAS**: Use IDs consistentes e curtos.
-
----
-
-## 👤 PERFIL DO USUÁRIO
-perfil: ${profile}
-Sua resposta deve se adaptar automaticamente ao perfil do usuário (Professores esperam profundidade técnica e insights de BI; Alunos esperam clareza didática e caminhos de aprendizagem).
-
----
-
-## ⚙️ OBJETIVO
-Gerar conteúdo educacional de alta qualidade e análises de desempenho, com foco em:
-- questões pedagógicas bem elaboradas no padrão SAEP
-- planos de estudo personalizados baseados em dados de desempenho
-- explicações técnicas claras e contextualizadas
-- simulados inteligentes com balanceamento de competências
-- análise de BI educacional para professores
-- recomendações de estudo baseadas em lacunas de competência
-
----
-
-## 📥 FORMATO DE ENTRADA (JSON)
-Você receberá um JSON com os seguintes campos:
-{
-  "tipo": "questoes | simulado | plano_estudo | explicacao | analise_desempenho | estudo_caso | aula_invertida",
-  "perfil": "${profile}",
-  "disciplina": "nome da disciplina",
-  "competencias": ["lista de competências"],
-  "nivel": "facil | medio | dificil",
-  "dados_desempenho": [
-    {
-      "competencia": "nome",
-      "acertos": number,
-      "erros": number
-    }
-  ],
-  "historico": {
-    "simulados_realizados": number,
-    "media_geral": number
-  },
-  "prompt": "instrução adicional"
-}
-
----
-
-## 🚫 REGRAS POR PERFIL
-
-${isProfessor && (isBancoQuestoes || isSmartContent) ? `
-### 👨‍🏫 REGRA CRÍTICA (PROFESSOR)
-- PRIORIDADE: QUALIDADE PEDAGÓGICA MÁXIMA.
-- NÃO simplificar enunciados excessivamente.
-- NÃO reduzir contexto da questão.
-- NÃO comprometer clareza para economizar tokens.
-- Manter assertividade técnica.
-- Produzir conteúdo apropriado para uso profissional e avaliativo.
-` : isProfessor ? `
-### 👨‍🏫 REGRA GERAL (PROFESSOR)
-- Ser assertivo, técnico e objetivo.
-- Foco em decisão, análise e qualidade pedagógica.
-` : `
-### 👨‍🎓 REGRA GERAL (ALUNO)
-- Usar linguagem mais didática e clara.
-- Explicar quando necessário.
-- Ser mais econômico em profundidade do que no perfil professor.
-`}
-
----
-
-## 🧩 ESTRUTURA OBRIGATÓRIA DA QUESTÃO (PADRÃO FIRESTORE)
-Cada questão deve conter obrigatoriamente os seguintes campos:
-
-- questionUid: ID único (COMPETENCIA-TEMA-DIFICULDADE-HASH). Ex: BD-JOIN-MEDIO-A81F29C4.
-- competenciaId / competenciaNome
-- temaId / temaNome
-- dificuldade (fácil, médio, difícil)
-- bloom (lembrar, compreender, aplicar, analisar, avaliar, criar)
-- perfilGeracao: ${profile}
-- tipoQuestao: multipla_escolha
-- enunciado
-- alternativas: Array de 5 objetos { "id": "A", "texto": "..." }
-- respostaCorreta: Letra (A, B, C, D ou E)
-- comentarioGabarito: Explicação técnica clara.
-- justificativasAlternativas: Objeto { "A": "...", "B": "...", "C": "...", "D": "...", "E": "..." }
-- contextoHash: Hash derivado do enunciado + alternativas + bloom + competência + tema.
-- tags: Array de palavras-chave.
-- status: "rascunho" (padrão)
-- revisadaPorProfessor: false
-- usoTotal: 0
-- ultimaUtilizacao: null
-- origem: "ia"
-- criadoEm: "SERVER_TIMESTAMP"
-- atualizadoEm: "SERVER_TIMESTAMP"
-- aiExplicabilidade: Objeto contendo { justificativaDificuldade, justificativaBloom, analiseDistratores, intencaoPedagogica }
-
----
-
-## 📊 TAXONOMIA DE BLOOM
-Classificar automaticamente: lembrar, compreender, aplicar, analisar, avaliar, criar.
-
----
-
-## 🛡️ CONTROLE DE DUPLICAÇÃO
-- NÃO repetir enunciados, exemplos ou estruturas.
-- Variar contexto, cenário e abordagem.
-
----
-
-${isSimulados ? `
-## 🎲 SORTEIO INTELIGENTE (SIMULADOS)
-- 40 questões: 30% fáceis, 40% médias, 30% difíceis.
-- Equilíbrio entre competências e níveis de Bloom.
-` : ""}
-
-${isExportForms ? `
-## 📄 EXPORTAÇÃO GOOGLE FORMS
-Gerar estrutura simplificada: pergunta, opcaoA, opcaoB, opcaoC, opcaoD, opcaoE, respostaCorreta. Sem texto extra.
-` : ""}
-
----
-
-## 📤 SAÍDA OBRIGATÓRIA
-Gerar sempre em JSON válido, compatível com documento Firestore.
-`;
-
-  return instructions;
-}
-
-/**
- * Converte o formato de contents da API do Gemini para uma string simples,
- * incluindo a systemInstruction se presente. Utilizado para fallback e APIs externas.
+ * Converte o formato de contents da API do Gemini para uma string simples.
  */
 function buildPromptString(params: any): string {
   if (typeof params === 'string') return params;
@@ -221,7 +30,7 @@ function buildPromptString(params: any): string {
   let prompt = "";
   const systemInstruction = params.config?.systemInstruction;
   if (systemInstruction) {
-    prompt += `[SYSTEM INSTRUCTION]\n${systemInstruction}\n\n`;
+    prompt += `[INSTRUÇÃO DO SISTEMA]\n${systemInstruction}\n\n`;
   }
 
   const contents = params.contents || params.prompt || params;
@@ -240,35 +49,46 @@ function buildPromptString(params: any): string {
   return prompt;
 }
 
-export async function generateContentWrapper(params: any): Promise<any> {
-  const prompt = buildPromptString(params);
-  const systemInstruction = (typeof params === 'object' ? params.config?.systemInstruction : "") || "";
-  const isJson = typeof params === 'object' && params.config?.responseMimeType === 'application/json';
-  const responseFormat = isJson ? 'json' : 'text';
-  const responseSchema = typeof params === 'object' ? params.config?.responseSchema : undefined;
-  const task = (typeof params === 'object' ? params.task : "generic_gen") || "generic_gen";
-
-  try {
-    const result = await generateAIContent({
-      prompt,
-      systemInstruction,
-      responseFormat,
-      responseSchema,
-      task,
-      model: typeof params === 'object' ? params.model : undefined
-    });
-
-    return {
-      text: result.text,
-      response: {
-        text: () => result.text
-      }
-    };
-  } catch (error: any) {
-    console.error("[AI Wrapper] Error:", error);
-    throw error;
-  }
+/**
+ * Retorna as instruções de sistema para cada módulo.
+ */
+export function getSystemInstruction(profile: UserRole | 'professor' | 'aluno', module: string): string {
+  const isProfessor = profile === 'TEACHER' || profile === 'ADMIN' || profile === 'COORDINATOR' || profile === 'professor';
+  return `Atue como um especialista em pedagogia e inteligência educacional. Perfil: ${profile}. Módulo: ${module}.`;
 }
+
+export async function generateContentWrapper(params: any): Promise<any> {
+    const prompt = buildPromptString(params);
+    const systemInstruction = params.config?.systemInstruction;
+    const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : 'text';
+    const model = params.model;
+    
+    try {
+      const response = await fetch('/api/ai/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          systemInstruction,
+          responseFormat,
+          model,
+          task: 'generate_content',
+          userId: auth.currentUser?.uid || 'anonymous',
+          userRole: localStorage.getItem('user_role') || 'TEACHER'
+        })
+      });
+      
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Erro ${response.status} da IA`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("[AI Generation proxy error]:", error);
+      throw error;
+    }
+  }
 
 
 export const DEFAULT_CONFIG = {
@@ -351,7 +171,7 @@ export function safeParseJson(text: string | undefined, fallback: any = {}): any
   }
 }
 
-export async function generateQuestionVariation(originalQuestion: any, modelName: string = "gemini-1.5-flash", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any> {
+export async function generateQuestionVariation(originalQuestion: any, modelName: string = 'fast', userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any> {
   const prompt = `
 Aja como um especialista em avaliação educacional de alto nível.
 Sua tarefa é criar uma VARIAÇÃO da questão fornecida.
@@ -366,7 +186,7 @@ REGRAS ESTABELECIDAS:
 QUESTÃO ORIGINAL:
 Enunciado: ${originalQuestion.enunciado}
 Competência Opcional: ${originalQuestion.competenciaNome || ''}
-Alternativas: ${originalQuestion.alternativas?.map((a: any) => `${a.id}) ${a.texto}`).join(' | ')}
+Alternativas: ${safeJoin(safeArray(originalQuestion.alternativas).map((a: any) => `${a.id}) ${a.texto}`), ' | ')}
 Resposta Correta: ${originalQuestion.respostaCorreta}
 Dificuldade: ${originalQuestion.dificuldade}
 
@@ -415,7 +235,7 @@ Seja criativo no contexto, garantindo que o candidato precise entender o conceit
   return parsed;
 }
 
-export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = "gemini-1.5-flash", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
+export async function generateMultipleQuestionVariations(originalQuestion: any, count: number = 5, modelName: string = 'fast', userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
   const prompt = `
 Aja como um especialista em avaliação educacional de alto nível.
 Sua tarefa é criar ${count} VARIAÇÕES diferentes da questão fornecida.
@@ -430,7 +250,7 @@ REGRAS ESTABELECIDAS:
 QUESTÃO ORIGINAL:
 Enunciado: ${originalQuestion.enunciado}
 Competência Opcional: ${originalQuestion.competenciaNome || ''}
-Alternativas: ${originalQuestion.alternativas?.map((a: any) => `${a.id}) ${a.texto}`).join(' | ')}
+Alternativas: ${safeJoin(safeArray(originalQuestion.alternativas).map((a: any) => `${a.id}) ${a.texto}`), ' | ')}
 Resposta Correta: ${originalQuestion.respostaCorreta}
 Dificuldade: ${originalQuestion.dificuldade}
 
@@ -482,7 +302,7 @@ Seja criativo nos contextos, garantindo que o candidato precise entender o conce
   return parsed;
 }
 
-export async function parseQuestionsFromText(text: string, modelName: string = "gemini-1.5-flash", userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
+export async function parseQuestionsFromText(text: string, modelName: string = 'fast', userRole: UserRole | 'professor' | 'aluno' = 'TEACHER'): Promise<any[]> {
   // Split text into chunks of ~15,000 characters to avoid output token limits
   const chunkSize = 15000;
   const chunks: string[] = [];
@@ -525,105 +345,71 @@ export async function parseQuestionsFromText(text: string, modelName: string = "
   const allQuestions: any[] = [];
   
   for (const chunk of chunks) {
-    const response = await generateContentWrapper({
-      model: modelName,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
-              O texto pode vir de um documento (PDF, DOCX, CSV ou Excel) e pode conter ruídos ou formatação irregular.
-              2. Entre 4 a 5 alternativas (opções).
-              3. O índice da alternativa correta (letra correspondente).
-              4. A competência ou assunto da questão (se não houver, use 'Geral').
-              5. O nível de dificuldade ('fácil', 'médio' ou 'difícil').
-              6. Uma explicação detalhada da resposta correta (comentarioGabarito).
-              7. Justificativas para cada alternativa (explicando por que estão certas ou erradas).
-
-              Retorne APENAS um array JSON de objetos com a seguinte estrutura:
-              [
-                {
-                  "questionUid": "ID",
-                  "competenciaNome": "Nome",
-                  "dificuldade": "fácil" | "médio" | "difícil",
-                  "bloom": "lembrar" | "compreender" | "aplicar" | "analisar" | "avaliar" | "criar",
-                  "perfilGeracao": "${userRole}",
-                  "tipoQuestao": "multipla_escolha",
-                  "enunciado": "Enunciado...",
-                  "alternativas": [
-                    { "id": "A", "texto": "..." },
-                    { "id": "B", "texto": "..." },
-                    { "id": "C", "texto": "..." },
-                    { "id": "D", "texto": "..." }
-                  ],
-                  "respostaCorreta": "A" | "B" | "C" | "D" | "E",
-                  "comentarioGabarito": "Explicação...",
-                  "justificativasAlternativas": { "A": "...", "B": "...", "C": "...", "D": "..." },
-                  "tags": ["tag1", "tag2"],
-                  "status": "rascunho"
-                }
-              ]
-
-              Texto para análise:
-              ${chunk}`
-            }
-          ]
-        }
-      ],
-      config: {
-        systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
-        responseMimeType: "application/json",
-        ...DEFAULT_CONFIG,
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            questionUid: { type: Type.STRING },
-            competenciaNome: { type: Type.STRING },
-            dificuldade: { type: Type.STRING, enum: ["fácil", "médio", "difícil"] },
-            bloom: { type: Type.STRING, enum: ["lembrar", "compreender", "aplicar", "analisar", "avaliar", "criar"] },
-            enunciado: { type: Type.STRING },
-            alternativas: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
-                  texto: { type: Type.STRING }
-                },
-                required: ["id", "texto"]
+    try {
+      const response = await generateContentWrapper({
+        model: modelName,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `Analise o texto abaixo e extraia todas as questões de múltipla escolha.
+                O texto pode vir de um documento (PDF, DOCX, CSV ou Excel) e pode conter ruídos ou formatação irregular.
+                2. Entre 4 a 5 alternativas (opções).
+                3. O índice da alternativa correta (letra correspondente).
+                4. A competência ou assunto da questão (se não houver, use 'Geral').
+                5. O nível de dificuldade ('fácil', 'médio' ou 'difícil').
+                6. Uma explicação detalhada da resposta correta (comentarioGabarito).
+                7. Justificativas para cada alternativa (explicando por que estão certas ou erradas).
+  
+                Retorne APENAS um array JSON de objetos com a seguinte estrutura:
+                [
+                  {
+                    "questionUid": "ID",
+                    "competenciaNome": "Nome",
+                    "dificuldade": "fácil" | "médio" | "difícil",
+                    "bloom": "lembrar" | "compreender" | "aplicar" | "analisar" | "avaliar" | "criar",
+                    "perfilGeracao": "${userRole}",
+                    "tipoQuestao": "multipla_escolha",
+                    "enunciado": "Enunciado...",
+                    "alternativas": [
+                      { "id": "A", "texto": "..." },
+                      { "id": "B", "texto": "..." },
+                      { "id": "C", "texto": "..." },
+                      { "id": "D", "texto": "..." }
+                    ],
+                    "respostaCorreta": "A" | "B" | "C" | "D" | "E",
+                    "comentarioGabarito": "Explicação...",
+                    "justificativasAlternativas": { "A": "...", "B": "...", "C": "...", "D": "..." },
+                    "tags": ["tag1", "tag2"],
+                    "status": "rascunho"
+                  }
+                ]
+  
+                Texto para análise:
+                ${chunk}`
               }
-            },
-            respostaCorreta: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
-            comentarioGabarito: { type: Type.STRING },
-            justificativasAlternativas: {
-              type: Type.OBJECT,
-              properties: {
-                A: { type: Type.STRING },
-                B: { type: Type.STRING },
-                C: { type: Type.STRING },
-                D: { type: Type.STRING },
-                E: { type: Type.STRING }
-              },
-              required: ["A", "B", "C", "D"]
-            },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["enunciado", "alternativas", "respostaCorreta", "competenciaNome", "dificuldade", "bloom", "justificativasAlternativas"]
+            ]
+          }
+        ],
+        config: {
+          systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
+          responseMimeType: "application/json",
+          ...DEFAULT_CONFIG
         }
+      });
+  
+      const result = safeParseJson(response.text, []);
+      if (Array.isArray(result) && result.length > 0) {
+        allQuestions.push(...result);
+      } else {
+        console.warn("[Import] Resposta da IA vazia ou inválida, usando fallback manual.");
+        allQuestions.push(...simpleRegexParser(chunk));
       }
-    }
-    });
-
-    const result = safeParseJson(response.text, []);
-    if (Array.isArray(result)) {
-      allQuestions.push(...result);
-    } else if (result && typeof result === 'object' && result.enunciado) {
-      allQuestions.push(result);
-    } else {
-      console.warn(`[AI] Expected array but got:`, result);
+    } catch (error) {
+      console.error("[Import] Erro no bloco de importação IA:", error);
+      toast.warning("A IA falhou em processar este bloco. Usando extração manual.");
+      allQuestions.push(...simpleRegexParser(chunk));
     }
   }
   
@@ -691,7 +477,7 @@ export interface DiagnosticResult {
   mensagem_para_o_aluno: string;
 }
 
-export async function generateInterventionPlan(classData: any, modelName: string = "gemini-1.5-flash"): Promise<any> {
+export async function generateInterventionPlan(classData: any, modelName: string = 'fast'): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -732,7 +518,7 @@ export async function generateInterventionPlan(classData: any, modelName: string
   return safeParseJson(response.text, {});
 }
 
-export async function generateLearningPath(studentData: any, modelName: string = "gemini-1.5-flash"): Promise<any> {
+export async function generateLearningPath(studentData: any, modelName: string = 'fast'): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -784,7 +570,7 @@ export async function generateLearningPath(studentData: any, modelName: string =
   return safeParseJson(response.text, {});
 }
 
-export async function generateRecoveryTrack(params: { studentId: string, competencyId: string, diagnosticData: any }, modelName: string = "gemini-1.5-flash"): Promise<{ riskLevel: string, summary: string, activities: any[], interventions: string[] }> {
+export async function generateRecoveryTrack(params: { studentId: string, competencyId: string, diagnosticData: any }, modelName: string = 'fast'): Promise<{ riskLevel: string, summary: string, activities: any[], interventions: string[] }> {
   const { studentId, competencyId, diagnosticData } = params;
   
   const response = await generateContentWrapper({
@@ -844,7 +630,7 @@ export interface TwinSimulationResult {
   }>;
 }
 
-export async function simulateDigitalTwin(stats: any, scenario: string, modelName: string = "gemini-1.5-flash"): Promise<TwinSimulationResult> {
+export async function simulateDigitalTwin(stats: any, scenario: string, modelName: string = 'fast'): Promise<TwinSimulationResult> {
   const prompt = `
     Aja como o "Gêmeo Digital Pedagógico" de uma turma do SAEP. 
     Sua função é SIMULAR o comportamento desta turma diante de um cenário específico e PREVER resultados e dificuldades.
@@ -894,7 +680,7 @@ export async function simulateDigitalTwin(stats: any, scenario: string, modelNam
   });
 }
 
-export async function generateDiagnostic(data: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
+export async function generateDiagnostic(data: any[], modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<DiagnosticResult[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1059,7 +845,7 @@ RETORNE UM ARRAY JSON DE OBJETOS, ONDE CADA OBJETO SEGUE O FORMATO:
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
-export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'aluno'): Promise<string[]> {
+export async function generateSuggestions(conhecimentos: string[], recomendacoes: string, modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'aluno'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1067,7 +853,7 @@ export async function generateSuggestions(conhecimentos: string[], recomendacoes
         role: "user",
         parts: [
           {
-            text: `Com base nos conhecimentos fracos: ${conhecimentos.join(", ")} e nas recomendações: ${recomendacoes}, gere uma lista de 3 a 5 sugestões de estudo detalhadas, claras e acionáveis para um aluno.
+            text: `Com base nos conhecimentos fracos: ${(conhecimentos || []).join(", ")} e nas recomendações: ${recomendacoes}, gere uma lista de 3 a 5 sugestões de estudo detalhadas, claras e acionáveis para um aluno.
             
             RETORNE APENAS UM ARRAY JSON DE STRINGS.`
           }
@@ -1091,7 +877,7 @@ export interface LearningProfileResult {
   recommendations: string;
 }
 
-export async function classifyLearningProfile(behavioralData: any, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'STUDENT'): Promise<LearningProfileResult> {
+export async function classifyLearningProfile(behavioralData: any, modelName: string = 'fast', userRole: UserRole = 'STUDENT'): Promise<LearningProfileResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1146,7 +932,7 @@ export interface AdvancedQuestionParams {
 /**
  * Gera questões avançadas com suporte a múltiplos recursos (código, imagens, tabelas, etc.)
  */
-export async function generateAdvancedQuestion(params: AdvancedQuestionParams, modelName: string = "gemini-1.5-flash"): Promise<any[]> {
+export async function generateAdvancedQuestion(params: AdvancedQuestionParams, modelName: string = 'fast'): Promise<any[]> {
   const prompt = `
 Aja como um Arquiteto de Software Sênior e Especialista em Avaliação Educacional.
 Gere ${params.count || 1} questão(ões) do tipo "${params.type}" para a disciplina "${params.discipline}" sobre o tema "${params.topic}".
@@ -1277,7 +1063,7 @@ export interface CognitiveErrorResult {
   }>;
 }
 
-export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<CognitiveErrorResult> {
+export async function analyzeCognitiveErrors(submissionData: any, questions: any[], modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<CognitiveErrorResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1342,7 +1128,7 @@ export interface QuestionAnalysisResult {
   nivelAdequacao: 'Baixo' | 'Médio' | 'Alto';
 }
 
-export async function analyzeQuestionByPerformance(questionData: any, performanceStats: any, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionAnalysisResult> {
+export async function analyzeQuestionByPerformance(questionData: any, performanceStats: any, modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<QuestionAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1410,7 +1196,7 @@ export interface SmartContentInput {
 /**
  * Gera conteúdo educacional inteligente baseado no input estruturado.
  */
-export async function generateSmartContent(input: SmartContentInput, modelName: string = "gemini-1.5-flash"): Promise<any> {
+export async function generateSmartContent(input: SmartContentInput, modelName: string = 'fast'): Promise<any> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1449,7 +1235,7 @@ export interface RecoveryPlanResult {
   professorInterventions: string[];
 }
 
-export async function generateRecoveryPlan(studentData: any, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<RecoveryPlanResult> {
+export async function generateRecoveryPlan(studentData: any, modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<RecoveryPlanResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1505,7 +1291,7 @@ export interface LessonPlanResult {
   aiInsights: string;
 }
 
-export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<LessonPlanResult> {
+export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[] = [], modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<LessonPlanResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1562,7 +1348,7 @@ export interface PerformancePredictionResult {
   recommendations: string;
 }
 
-export async function predictPerformance(historicalData: any, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'ADMIN'): Promise<PerformancePredictionResult> {
+export async function predictPerformance(historicalData: any, modelName: string = 'fast', userRole: UserRole = 'ADMIN'): Promise<PerformancePredictionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1607,7 +1393,7 @@ export interface ClassOrchestrationResult {
   overallStrategy: string;
 }
 
-export async function generateClassRecoveryOrchestration(stats: any, modelName: string = "gemini-1.5-flash"): Promise<ClassOrchestrationResult> {
+export async function generateClassRecoveryOrchestration(stats: any, modelName: string = 'fast'): Promise<ClassOrchestrationResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1648,7 +1434,7 @@ export async function generateClassRecoveryOrchestration(stats: any, modelName: 
   return safeParseJson(response.text, { tracks: [], overallStrategy: "" });
 }
 
-export async function suggestCompetencies(questions: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<string[]> {
+export async function suggestCompetencies(questions: any[], modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<string[]> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1697,7 +1483,7 @@ export interface SIPAResult {
   aiCommentary: string;
 }
 
-export async function generateSIPA(stats: any, intervention: string, modelName: string = "gemini-1.5-flash"): Promise<SIPAResult> {
+export async function generateSIPA(stats: any, intervention: string, modelName: string = 'fast'): Promise<SIPAResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1745,7 +1531,7 @@ export interface GuessDetectionResult {
   reason: string;
 }
 
-export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'STUDENT'): Promise<GuessDetectionResult> {
+export async function detectGuessing(responseTime: number, difficulty: string, isCorrect: boolean, modelName: string = 'fast', userRole: UserRole = 'STUDENT'): Promise<GuessDetectionResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1813,7 +1599,7 @@ export interface SAEPQuestion {
   atualizadoEm: any;
 }
 
-export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<SAEPQuestion> {
+export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1917,7 +1703,7 @@ export interface PedagogicalAnalysisResult {
   sugestoes_para_professor: string[];
 }
 
-export async function generatePedagogicalAnalysis(data: any, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<PedagogicalAnalysisResult> {
+export async function generatePedagogicalAnalysis(data: any, modelName: string = 'fast', userRole: UserRole = 'TEACHER'): Promise<PedagogicalAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -1967,7 +1753,7 @@ export interface BloomAnalysisResult {
   recommendations: string;
 }
 
-export async function analyzeBloomTaxonomy(questions: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<BloomAnalysisResult> {
+export async function analyzeBloomTaxonomy(questions: any[], modelName: string = 'fast', userRole: UserRole = 'TEACHER'): Promise<BloomAnalysisResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2013,7 +1799,7 @@ export interface OpenQuestionGrade {
   missing_points: string[];
 }
 
-export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<OpenQuestionGrade> {
+export async function gradeOpenQuestion(question: string, answer: string, rubric: string, modelName: string = 'fast', userRole: UserRole = 'TEACHER'): Promise<OpenQuestionGrade> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2064,128 +1850,64 @@ export interface QuestionQualityAnalysis {
   cognitiveErrorsAddressed: string[];
 }
 
-export async function analyzeDiscursiveQuestionQuality(question: any, errors: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
-  const response = await generateContentWrapper({
-    model: modelName,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Como um Especialista em Avaliação Educacional e Design de Itens Discursivos (especialista em questões abertas e rubricas), analise esta QUESTÃO DISCURSIVA que apresenta baixo desempenho ou dificuldade em discriminar alunos que dominam o conteúdo.
+export async function analyzeDiscursiveQuestionQuality(question: any, errors: any[], modelName: string = 'fast', userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
+  try {
+    const res = await EduJarvis.execute(`Analise a questão '${question.id}' com base em seu desempenho e sugira uma reformulação para melhorar a clareza e o poder de discriminação. Considere os erros mais comuns dos alunos.`, {
+      context: {
+        question,
+        errors,
+        isDiscursive: true
+      },
+      role: userRole
+    });
 
-            DADOS DA QUESTÃO:
-            ${JSON.stringify({
-              enunciado: question.enunciado,
-              respostaEsperada: question.respostaEsperada,
-              criteriosAvaliacao: question.criteriosAvaliacao,
-              competencia: question.competenciaNome,
-              nivel: question.dificuldade
-            })}
-            
-            DADOS DE ERROS/DIFICULDADES IDENTIFICADOS:
-            ${JSON.stringify(errors.map(e => ({ category: e.category, explanation: e.explanation })))}
-            
-            Sua missão é REFORMULAR a questão para aumentar o seu PODER DE DISCRIMINAÇÃO.
-            Discriminação significa que a questão deve ser clara o suficiente para que o aluno que domina o conteúdo consiga responder corretamente, enquanto o aluno que não domina não encontre brechas ou ambiguidades que permitam chutes plausíveis ou respostas parciais vagas.
-
-            ÁREAS DE FOCO:
-            1. CLAREZA DO COMANDO: O verbo de ação (Taxonomia de Bloom) está claro? O aluno sabe exatamente o que deve entregar?
-            2. PADRÃO DE RESPOSTA (RESPOSTA ESPERADA): A resposta esperada é técnica, precisa e cobre todos os pontos do enunciado?
-            3. RUBRICA (CRITÉRIOS): Os critérios de avaliação permitem uma correção justa e objetiva? Eles discriminam níveis de domínio (ex: erro de conceito vs erro de processo)?
-            
-            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
-            {
-              "questionId": "${question.id || question.questionUid}",
-              "originalEnunciado": string,
-              "suggestedEnunciado": string,
-              "originalRespostaEsperada": string,
-              "suggestedRespostaEsperada": string,
-              "originalCriterios": Array<any>,
-              "suggestedCriterios": Array<{criterio, pontuacao, descricao}>,
-              "analysis": string (Análise pedagógica da falha de discriminação na questão original),
-              "improvements": string[] (Lista de melhorias implementadas),
-              "cognitiveErrorsAddressed": string[]
-            }`
-          }
-        ]
-      }
-    ],
-    config: {
-      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
-      responseMimeType: "application/json",
-      ...DEFAULT_CONFIG,
+    if (res.data) {
+      return res.data as QuestionQualityAnalysis;
     }
-  });
-
-  return safeParseJson(response.text, {
-    questionId: question.id || question.questionUid,
-    originalEnunciado: question.enunciado,
-    analysis: "Não foi possível gerar análise para questão discursiva.",
-    improvements: [],
-    cognitiveErrorsAddressed: []
-  });
+    throw new Error("Resposta da IA inválida");
+  } catch (error) {
+    console.warn("EduJarvis API analysis fallback to mock due to error", error);
+    return {
+      questionId: question.id || question.questionUid,
+      originalEnunciado: question.enunciado,
+      originalCriterios: question.criteriosAvaliacao || [],
+      suggestedCriterios: question.criteriosAvaliacao || [],
+      originalAlternativas: [],
+      suggestedAlternativas: [],
+      analysis: "Não foi possível gerar análise. " + (error as any).message,
+      improvements: [],
+      cognitiveErrorsAddressed: []
+    } as any;
+  }
 }
 
-export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
-  const response = await generateContentWrapper({
-    model: modelName,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Como um Especialista em Avaliação Educacional e Design de Itens (padrão SAEP), analise esta questão de múltipla escolha que apresenta alto índice de erros cognitivos pelos alunos.
-            
-            DADOS DA QUESTÃO:
-            ${JSON.stringify({
-              enunciado: question.enunciado,
-              alternativas: question.alternativas,
-              respostaCorreta: question.respostaCorreta,
-              comentarioGabarito: question.comentarioGabarito
-            })}
-            
-            DADOS DE ERROS COGNITIVOS IDENTIFICADOS NAS SUBMISSÕES:
-            ${JSON.stringify(errors.map(e => ({ category: e.category, explanation: e.explanation })))}
-            
-            Sua tarefa:
-            1. Identificar se o enunciado possui ambiguidades, falta de clareza ou excesso de carga cognitiva (interpretação de texto vs conhecimento técnico).
-            2. Avaliar se os distratores capturam equívocos comuns de raciocínio.
-            3. Sugerir uma reformulação do enunciado focada na clareza e objetividade.
-            4. Sugerir alternativas que diferenciem melhor alunos que possuem o conceito daqueles que estão cometendo erros de processo.
-            5. Explicar como essas mudanças abordam especificamente os erros cognitivos (Falta de Conceito, Interpretação, Processo, etc).
-            
-            RETORNE UM JSON COM A SEGUINTE ESTRUTURA:
-            {
-              "questionId": "${question.id || question.questionUid}",
-              "originalEnunciado": string,
-              "suggestedEnunciado": string (opcional, apenas se houver melhoria),
-              "originalAlternativas": Array<{id, texto}>,
-              "suggestedAlternativas": Array<{id, texto}>,
-              "analysis": string (Análise pedagógica da questão original),
-              "improvements": string[] (Lista de melhorias sugeridas),
-              "cognitiveErrorsAddressed": string[] (Quais categorias de erro esta reformulação visa reduzir)
-            }`
-          }
-        ]
-      }
-    ],
-    config: {
-      systemInstruction: getSystemInstruction(userRole, 'banco_questoes'),
-      responseMimeType: "application/json",
-      ...DEFAULT_CONFIG,
-    }
-  });
+export async function analyzeQuestionQuality(question: any, errors: any[], modelName: string = 'fast', userRole: UserRole = 'TEACHER'): Promise<QuestionQualityAnalysis> {
+  try {
+    const res = await EduJarvis.execute(`Analise a questão '${question.id}' com base em seu desempenho e sugira uma reformulação para melhorar a clareza e o poder de discriminação. Considere os erros mais comuns dos alunos.`, {
+      context: {
+        question,
+        errors,
+        isDiscursive: false
+      },
+      role: userRole
+    });
 
-  return safeParseJson(response.text, {
-    questionId: question.id || question.questionUid,
-    originalEnunciado: question.enunciado,
-    originalAlternativas: question.alternativas || [],
-    suggestedAlternativas: question.alternativas || [],
-    analysis: "Não foi possível gerar análise.",
-    improvements: [],
-    cognitiveErrorsAddressed: []
-  });
+    if (res.data) {
+      return res.data as QuestionQualityAnalysis;
+    }
+    throw new Error("Resposta da IA inválida");
+  } catch (error) {
+    console.warn("EduJarvis API analysis fallback to mock due to error", error);
+    return {
+      questionId: question.id || question.questionUid,
+      originalEnunciado: question.enunciado,
+      originalAlternativas: question.alternativas || [],
+      suggestedAlternativas: question.alternativas || [],
+      analysis: "Não foi possível gerar análise. " + (error as any).message,
+      improvements: [],
+      cognitiveErrorsAddressed: []
+    } as any;
+  }
 }
 
 export interface InterventionStrategyResult {
@@ -2197,7 +1919,7 @@ export interface InterventionStrategyResult {
   n8n_trigger_payload: any;
 }
 
-export async function generateInterventionStrategy(classData: any[], studentsAtRisk: any[], modelName: string = "gemini-1.5-flash", userRole: 'professor' | 'aluno' = 'professor'): Promise<InterventionStrategyResult> {
+export async function generateInterventionStrategy(classData: any[], studentsAtRisk: any[], modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<InterventionStrategyResult> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2238,7 +1960,7 @@ export async function generateInterventionStrategy(classData: any[], studentsAtR
   return safeParseJson(response.text, {});
 }
 
-export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = "gemini-1.5-flash", userRole: UserRole = 'STUDENT'): Promise<SAEPQuestion> {
+export async function getNextAdaptiveQuestion(proficiency: number, competency: string, history: any[], modelName: string = 'fast', userRole: UserRole = 'STUDENT'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
     contents: [
@@ -2352,7 +2074,7 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
 export async function generateDiscursiveQuestion(
   prompt: string,
   difficulty: string,
-  modelName: string = 'gemini-1.5-flash',
+  modelName: string = 'fast',
   userRole: UserRole = 'TEACHER',
   competency: string = ''
 ): Promise<any> {
@@ -2590,7 +2312,7 @@ export async function generateContraryExplanation(questionText: string, incorrec
 
 // Módulo 18: ABP Automatizada (Aprendizagem Baseada em Projetos)
 export async function generateAutomatedPBL(competenciesCovered: string[], context: string) {
-  const prompt = `Aja como Desenvolvedor Curricular Avançado. Crie um Projeto de Aprendizagem (ABP / PBL) de aplicação no mundo real para ensino médio/fundamental usando estas competências: ${competenciesCovered.join(', ')} e o contexto: ${context}
+  const prompt = `Aja como Desenvolvedor Curricular Avançado. Crie um Projeto de Aprendizagem (ABP / PBL) de aplicação no mundo real para ensino médio/fundamental usando estas competências: ${(competenciesCovered || []).join(', ')} e o contexto: ${context}
   
   RETORNE JSON:
   {

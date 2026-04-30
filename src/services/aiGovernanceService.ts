@@ -51,11 +51,12 @@ export class AIGovernanceService {
    */
   static calculateCost(model: string, inputTokens: number, outputTokens: number): number {
     const rates: Record<string, { in: number; out: number }> = {
-      'gemini-1.5-flash': { in: 0.000125, out: 0.000375 }, // per 1k tokens
+      'gemini-2.0-flash': { in: 0.0001, out: 0.0003 }, // estimated
+      'gemini-1.5-flash': { in: 0.000125, out: 0.000375 },
       'gemini-1.5-pro': { in: 0.0035, out: 0.0105 }
     };
 
-    const rate = rates[model] || rates['gemini-1.5-flash'];
+    const rate = rates[model] || rates['gemini-2.0-flash'] || { in: 0.0001, out: 0.0003 };
     return ((inputTokens / 1000) * rate.in) + ((outputTokens / 1000) * rate.out);
   }
 }

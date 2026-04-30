@@ -18,7 +18,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { InteractiveQuiz, QuizAttempt } from '../../types';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
-import { generateSmartContent } from '../../services/aiService';
+import { generateSmartContent } from '../../services/geminiService';
 
 export function InteractiveQuizView() {
   const { user, isProfessor } = useAuth();
@@ -109,11 +109,14 @@ export function InteractiveQuizView() {
       
       const response = await generateSmartContent({
         prompt,
-        task: 'pedagogical_gen',
-        responseFormat: 'json'
+        tipo: 'questoes',
+        perfil: isProfessor ? 'TEACHER' : 'STUDENT',
+        disciplina: 'Geral',
+        competencias: [],
+        nivel: 'medio'
       });
-      const cleanJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const data = JSON.parse(cleanJson);
+      
+      const data = typeof response === 'string' ? JSON.parse(response.replace(/```json/g, '').replace(/```/g, '').trim()) : response;
       
       setNewQuiz(prev => ({ 
         ...prev, 
