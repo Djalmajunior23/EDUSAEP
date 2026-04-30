@@ -51,6 +51,7 @@ import { AdvancedQuestionGenerator } from './AdvancedQuestionGenerator';
 import { QuestionRenderer } from '../common/QuestionRenderer';
 import { Eye, ChevronUp as ChevronUpIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import Fuse from 'fuse.js';
 
 // Configuração do worker do PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -601,28 +602,36 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
   };
 
   const filteredQuestions = useMemo(() => {
-    return questions.filter(q => {
-      const searchContent = [
-        q.enunciado,
-        q.disciplina,
-        q.competenciaNome,
-        q.temaNome,
-        q.respostaCorreta,
-        q.bloom,
-        q.dificuldade,
-        safeJoin(q.tags),
-        safeJoin(q.competencias),
-        safeJoin(q.conhecimentos),
-        safeJoin(q.habilidades)
-      ].filter(Boolean).join(" ").toLowerCase();
-
-      const matchesSearch = searchContent.includes(searchTerm.toLowerCase());
+    // 1. Apply static filters first for better performance
+    const baseFiltered = questions.filter(q => {
       const matchesDifficulty = filterDifficulty === 'all' || q.dificuldade === filterDifficulty;
       const matchesCompetency = filterCompetency === 'all' || q.competenciaNome === filterCompetency;
       const matchesAi = !filterAiOnly || q.isAiGenerated;
-      
-      return matchesSearch && matchesDifficulty && matchesCompetency && matchesAi;
+      return matchesDifficulty && matchesCompetency && matchesAi;
     });
+
+    if (!searchTerm) return baseFiltered;
+
+    // 2. Setup Fuse for fuzzy search
+    const fuse = new Fuse(baseFiltered, {
+      keys: [
+        'enunciado',
+        'disciplina',
+        'competenciaNome',
+        'temaNome',
+        'respostaCorreta',
+        'bloom',
+        'dificuldade',
+        'tags',
+        'competencias',
+        'conhecimentos',
+        'habilidades'
+      ],
+      threshold: 0.3, // Adjusted for balanced fuzzy matching
+      shouldSort: true,
+    });
+
+    return fuse.search(searchTerm).map(r => r.item);
   }, [questions, searchTerm, filterDifficulty, filterCompetency, filterAiOnly]);
 
   const filteredCompetencies = useMemo(() => {

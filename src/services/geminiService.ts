@@ -7,6 +7,8 @@ import { UserRole } from "../types";
 import { normalizeImportError } from "../utils/normalizeImportError";
 import { simpleRegexParser } from "../utils/simpleRegexParser";
 import { safeArray, safeJoin } from "../utils/safeData";
+import { z } from 'zod';
+
 
 /**
  * Local Schema Types for documentation and compatibility without heavy SDK.
@@ -1599,6 +1601,43 @@ export interface SAEPQuestion {
   atualizadoEm: any;
 }
 
+export const SAEPQuestionSchema = z.object({
+  questionUid: z.string(),
+  competenciaId: z.string(),
+  competenciaNome: z.string(),
+  temaId: z.string(),
+  temaNome: z.string(),
+  dificuldade: z.enum(['fácil', 'médio', 'difícil']),
+  bloom: z.string(),
+  perfilGeracao: z.string(),
+  tipoQuestao: z.string(),
+  enunciado: z.string(),
+  alternativas: z.array(z.object({
+      id: z.string(),
+      texto: z.string()
+  })).min(2),
+  respostaCorreta: z.string(),
+  comentarioGabarito: z.string(),
+  justificativasAlternativas: z.record(z.string(), z.string()),
+  contextoHash: z.string(),
+  tags: z.array(z.string()),
+  status: z.string(),
+  revisadaPorProfessor: z.boolean(),
+  usoTotal: z.number(),
+  ultimaUtilizacao: z.any().optional(),
+  origem: z.string(),
+  criadoEm: z.any(),
+  atualizadoEm: z.any(),
+  assets: z.array(z.object({
+      id: z.string(),
+      type: z.enum(['image', 'code', 'table', 'diagram', 'case_study']),
+      content: z.string(),
+      title: z.string().optional(),
+      caption: z.string().optional(),
+      language: z.string().optional()
+  })).optional()
+});
+
 export async function generateSAEPQuestion(competency: string, difficulty: string, modelName: string = 'fast', userRole: 'professor' | 'aluno' = 'professor'): Promise<SAEPQuestion> {
   const response = await generateContentWrapper({
     model: modelName,
@@ -1684,14 +1723,18 @@ export async function generateSAEPQuestion(competency: string, difficulty: strin
     }
   });
 
-  const parsed = safeParseJson(response.text, {});
+  const rawData = safeParseJson(response.text, {});
   
-  if (!parsed || !parsed.enunciado || !Array.isArray(parsed.alternativas) || parsed.alternativas.length < 2) {
-    console.error("[Gemini] Invalid question generated:", parsed);
+  try {
+    const validatedQuestion = SAEPQuestionSchema.parse(rawData);
+    return validatedQuestion as SAEPQuestion;
+  } catch (error) {
+    console.error("[Gemini] Validation error:", error);
+    if (error instanceof z.ZodError) {
+        throw new Error(`Erro na validação da questão: ${error.issues.map(e => e.message).join(', ')}`);
+    }
     throw new Error("A IA gerou uma questão em um formato inválido. Tente novamente.");
   }
-  
-  return parsed;
 }
 
 export interface PedagogicalAnalysisResult {
@@ -2071,6 +2114,19 @@ export async function getNextAdaptiveQuestion(proficiency: number, competency: s
   return parsed;
 }
 
+export const DiscursiveQuestionSchema = z.object({
+  questionUid: z.string(),
+  competenciaNome: z.string(),
+  enunciado: z.string(),
+  respostaEsperada: z.string(),
+  criteriosAvaliacao: z.array(z.string()),
+  comentarioGabarito: z.string(),
+  feedbackSugerido: z.string(),
+  explicabilidadeIA: z.string(),
+  dificuldade: z.enum(['fácil', 'médio', 'difícil']),
+  bloom: z.string(),
+});
+
 export async function generateDiscursiveQuestion(
   prompt: string,
   difficulty: string,
@@ -2110,69 +2166,21 @@ export async function generateDiscursiveQuestion(
       systemInstruction: getSystemInstruction(userRole, 'simulados'),
       responseMimeType: "application/json",
       ...DEFAULT_CONFIG,
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          questionUid: { type: Type.STRING },
-          competenciaNome: { type: Type.STRING },
-          temaNome: { type: Type.STRING },
-          dificuldade: { type: Type.STRING },
-          bloom: { type: Type.STRING },
-          tipoQuestao: { type: Type.STRING },
-          enunciado: { type: Type.STRING },
-          respostaEsperada: { type: Type.STRING },
-          comentarioGabarito: { type: Type.STRING },
-          feedbackProfessorSugerido: { type: Type.STRING },
-          criteriosAvaliacao: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                criterio: { type: Type.STRING },
-                pontuacao: { type: Type.NUMBER },
-                descricao: { type: Type.STRING }
-              },
-              required: ["criterio", "pontuacao", "descricao"]
-            }
-          },
-          comentarioPedagogico: { type: Type.STRING },
-          tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-          aiExplicabilidade: {
-            type: Type.OBJECT,
-            properties: {
-              justificativaDificuldade: { type: Type.STRING },
-              justificativaBloom: { type: Type.STRING },
-              analiseDistratores: { type: Type.STRING },
-              intencaoPedagogica: { type: Type.STRING }
-            },
-            required: ['justificativaDificuldade', 'justificativaBloom', 'analiseDistratores', 'intencaoPedagogica']
-          }
-        },
-        required: [
-          "questionUid", "competenciaNome", "temaNome", "dificuldade", "bloom", 
-          "tipoQuestao", "enunciado", "respostaEsperada", "comentarioGabarito", "feedbackProfessorSugerido", "criteriosAvaliacao", "aiExplicabilidade"
-        ]
-      }
     }
   });
 
-  const parsed = safeParseJson(response.text, {});
+  const rawData = safeParseJson(response.text, {});
   
-  if (!parsed || !parsed.enunciado || !parsed.respostaEsperada || !Array.isArray(parsed.criteriosAvaliacao)) {
-    console.error("[Gemini] Invalid discursive question generated:", parsed);
+  try {
+    const validatedQuestion = DiscursiveQuestionSchema.parse(rawData);
+    return validatedQuestion;
+  } catch (error) {
+    console.error("[Gemini] Validation error:", error);
+    if (error instanceof z.ZodError) {
+        throw new Error(`Erro na validação da questão discursiva: ${error.issues.map(e => e.message).join(', ')}`);
+    }
     throw new Error("A IA gerou uma questão discursiva em um formato inválido. Tente novamente.");
   }
-  
-  return {
-    ...parsed,
-    tipoQuestao: 'discursiva',
-    status: 'published',
-    revisadaPorProfessor: false,
-    usoTotal: 0,
-    origem: 'IA',
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString()
-  };
 }
 
 export async function validateAndImproveQuestion(
