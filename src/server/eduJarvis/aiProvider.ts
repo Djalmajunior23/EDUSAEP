@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { CostMode } from "../../types/eduJarvisTypes";
 
 export interface AIRequest {
   systemPrompt: string;
@@ -7,6 +8,7 @@ export interface AIRequest {
   responseFormat?: 'json' | 'text';
   model?: string;
   image?: string; // Base64
+  costMode?: CostMode;
 }
 
 export interface AIResponse {
@@ -15,7 +17,6 @@ export interface AIResponse {
 }
 
 // In this environment, we use GEMINI_API_KEY from environment variables.
-// The user specified "IA própria via backend", so we encapsulate it here.
 export async function callAI(request: AIRequest): Promise<AIResponse> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -23,20 +24,28 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Using gemini-1.5-flash for reliability and to avoid 5 NOT_FOUND errors
-  const modelName = "gemini-1.5-flash";
   
+  // Model selection based on costMode
+  let modelName = "gemini-1.5-flash";
+  if (request.costMode === "avancado") {
+    modelName = "gemini-1.5-pro";
+  }
+
   const model = genAI.getGenerativeModel({ 
     model: modelName,
     systemInstruction: request.systemPrompt,
-    generationConfig: request.responseFormat === 'json' ? { responseMimeType: "application/json" } : undefined
+    generationConfig: {
+      temperature: 0.3,
+      topP: 0.8,
+      responseMimeType: request.responseFormat === 'json' ? "application/json" : "text/plain",
+      maxOutputTokens: request.costMode === "avancado" ? 4096 : 2048
+    }
   });
 
   try {
     let promptParts: any[] = [request.userPrompt];
     
     if (request.image) {
-      // Remove data:image/jpeg;base64, prefix if exists
       const base64Data = request.image.split(',')[1] || request.image;
       promptParts.push({
         inlineData: {
@@ -54,7 +63,8 @@ export async function callAI(request: AIRequest): Promise<AIResponse> {
       text,
       metadata: {
         timestamp: new Date().toISOString(),
-        model: modelName
+        model: modelName,
+        costMode: request.costMode || "normal"
       }
     };
   } catch (error) {

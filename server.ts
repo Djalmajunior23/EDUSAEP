@@ -268,13 +268,56 @@ async function startServer() {
     next();
   };
 
+import { EduJarvisCore } from "./src/server/eduJarvis/eduJarvisCore";
+
+  // ... (inside startsServer or where routes are defined)
+
   // API Routes
   app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {
     try {
+      // Integration with 2.0 Core
+      if (req.body.agent || req.body.action) {
+        const result = await EduJarvisCore.processRequest(req.body);
+        return res.json(result);
+      }
+      
       const result = await processEduJarvisCommand(req.body);
       res.json({ success: true, ...result });
     } catch (error: any) {
       console.error("[EduJarvis API Error]:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Novos Endpoints do Roadmap 2.0
+  app.post("/api/edu-jarvis/analyze-error", async (req, res) => {
+    try {
+      const { answer, correctAnswer, context, userId } = req.body;
+      const result = await EduJarvisCore.processRequest({
+        userId,
+        userRole: "TEACHER", // Justificativa: Análise pedagógica
+        agent: "evaluator",
+        action: "analyzeError",
+        input: { answer, correctAnswer, context }
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/edu-jarvis/re-explain", async (req, res) => {
+    try {
+      const { content, format, studentProfile, userId } = req.body;
+      const result = await EduJarvisCore.processRequest({
+        userId,
+        userRole: "STUDENT",
+        agent: "tutor",
+        action: "reExplain",
+        input: { content, format, studentProfile }
+      });
+      res.json(result);
+    } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
   });

@@ -200,8 +200,8 @@ import { AIGovernanceView } from "./components/admin/AIGovernanceView";
 import { TRIDashboardView } from "./components/professor/TRIDashboardView";
 import { handleFirestoreError, OperationType } from "./services/errorService";
 
-import { PedagogicalIntelligenceHub } from "./components/professor/PedagogicalIntelligenceHub";
-import { AdvancedDashboard } from "./components/professor/AdvancedDashboard";
+import { EduJarvisUltraDashboard } from "./components/eduJarvis/EduJarvisUltraDashboard";
+import { TutorJarvisView } from "./components/eduJarvis/TutorJarvisView";
 import { ActivityGradingPage } from "./pages/professor/ActivityGradingPage";
 
 
@@ -525,6 +525,13 @@ function AppContent() {
           description: "Assistente n8n",
         },
         {
+          id: "tutor-jarvis",
+          label: "Tutor Jarvis 2.0",
+          icon: Brain,
+          path: "/tutor-jarvis",
+          description: "Apoio ao Estudo Inteligente",
+        },
+        {
           id: "smart-content",
           label: "Gerador IA",
           icon: Sparkles,
@@ -587,6 +594,13 @@ function AppContent() {
         icon: BrainCircuit,
         path: "/intelligence",
         description: "20 Módulos de IA Educacional",
+      },
+      {
+        id: "edujarvis-ultra",
+        label: "EduJarvis ULTRA",
+        icon: ZapIcon,
+        path: "/edujarvis-ultra",
+        description: "Orquestrador Pedagógico 2.0",
       },
       {
         id: "class-health",
@@ -3954,6 +3968,28 @@ function AppContent() {
                       ) : (
                         <Navigate to="/input" />
                       )}
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/edujarvis-ultra"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
+                    >
+                      <EduJarvisUltraDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tutor-jarvis"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["STUDENT", "MONITOR"]}
+                    >
+                      <TutorJarvisView />
                     </ProtectedRoute>
                   }
                 />

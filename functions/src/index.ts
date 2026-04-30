@@ -4,6 +4,8 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { analyzeStudentError } from './pedagogical/errorIntelligenceEngine';
 import { trackRecurringErrors } from './pedagogical/errorMemoryEngine';
+import { reExplainContent } from './pedagogical/reExplainEngine';
+import { generateTeacherInsights } from './pedagogical/teacherInsightsEngine';
 
 initializeApp();
 const db = getFirestore();
@@ -21,6 +23,18 @@ export const reportError = onCall(async (request) => {
     const { studentId, competencyId, errorType } = request.data;
     await trackRecurringErrors(studentId, competencyId, errorType);
     return { success: true };
+});
+
+export const reExplain = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+    const { originalAnswer, studentProfile, format } = request.data;
+    return await reExplainContent(originalAnswer, studentProfile, format);
+});
+
+export const getTeacherInsights = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+    const { classId } = request.data;
+    return await generateTeacherInsights(classId);
 });
 
 // ... existing onResultCreated

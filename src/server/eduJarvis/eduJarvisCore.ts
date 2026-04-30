@@ -1,40 +1,169 @@
-import { EduJarvisRequest, EduJarvisResponse } from "../../types/eduJarvisTypes";
-import { AgentContext } from "./agents/baseAgent";
-import { professorAgent } from "./agents/professorAgent";
-import { gamificationAgent } from "./agents/gamificationAgent";
+import { EduJarvisRequest, EduJarvisResponse, AgentType } from "../../types/eduJarvisTypes";
+import { generatePromptHash, getAICache, saveAICache } from "./aiCache";
+import { logAIUsage } from "./aiLogger";
+import { routeToAgent } from "./agentRouter";
 
 export class EduJarvisCore {
     
-    public static async processRequest(
-        request: EduJarvisRequest,
-        context: AgentContext
-    ): Promise<EduJarvisResponse> {
-        console.log(`[EduJarvis] Orquestrando agente: ${request.agent} para usuário ${request.userId}`);
+    private static canUseLocalRule(request: EduJarvisRequest): boolean {
+        const localActions = [
+            "calculateEduScore",
+            "classifyPerformance",
+            "recommendByScore",
+            "simpleRanking"
+        ];
+        return localActions.includes(request.action || "");
+    }
+
+    private static executeLocalRule(request: EduJarvisRequest): any {
+        const score = request.input?.score ?? 0;
         
-        // Em um sistema real, poderíamos ter um registro de agentes
-        let agent;
-        switch(request.agent) {
-            case 'professor':
-                agent = professorAgent;
-                break;
-            case 'gamification':
-                agent = gamificationAgent;
-                break;
-            default:
-                throw new Error("Agente não implementado na nova arquitetura.");
+        if (request.action === "classifyPerformance") {
+            if (score < 40) return { level: "crítico", recommendation: "recuperação imediata" };
+            if (score < 60) return { level: "baixo", recommendation: "reforço pedagógico" };
+            if (score < 80) return { level: "médio", recommendation: "prática orientada" };
+            return { level: "alto", recommendation: "desafio avançado" };
         }
 
-        const data = await agent.process(request, context);
-        
-        return {
-            response: "Processamento concluído com sucesso.",
-            success: true,
-            agent: request.agent,
-            action: request.action,
-            data,
-            metadata: {
-                createdAt: new Date().toISOString()
+        if (request.action === "calculateEduScore") {
+            const performance = request.input?.performance ?? 0;
+            const consistency = request.input?.consistency ?? 0;
+            const evolution = request.input?.evolution ?? 0;
+
+            return {
+                eduScore: Math.round(performance * 0.5 + consistency * 0.25 + evolution * 0.25)
+            };
+        }
+
+        return null;
+    }
+
+    public static async processRequest(
+        request: EduJarvisRequest
+    ): Promise<EduJarvisResponse> {
+        const costMode = request.costMode ?? "economico";
+        const userId = request.userId;
+
+        try {
+            // 1. Local Rule Check
+            if (this.canUseLocalRule(request)) {
+                const data = this.executeLocalRule(request);
+                await logAIUsage({
+                    userId,
+                    agent: request.agent as string,
+                    action: request.action as string,
+                    source: "local_rule",
+                    status: "success",
+                    costMode
+                });
+
+                return {
+                    success: true,
+                    source: "local_rule",
+                    agent: request.agent,
+                    action: request.action,
+                    response: "Processamento via motor de regras locais concluído.",
+                    data,
+                    metadata: {
+                        createdAt: new Date().toISOString(),
+                        cached: false,
+                        costMode
+                    }
+                };
             }
-        };
+
+            // 2. Cache Check
+            const hash = generatePromptHash({
+                agent: request.agent,
+                action: request.action,
+                input: request.input,
+                context: request.context,
+                command: request.command
+            });
+
+            const cached = await getAICache(hash);
+            if (cached) {
+                await logAIUsage({
+                    userId,
+                    agent: request.agent as string,
+                    action: request.action as string,
+                    source: "cache",
+                    status: "success",
+                    costMode
+                });
+
+                return {
+                    success: true,
+                    source: "cache",
+                    agent: request.agent,
+                    action: request.action,
+                    response: typeof cached === 'string' ? cached : "Dados recuperados do cache inteligente.",
+                    data: typeof cached === 'object' ? cached : null,
+                    metadata: {
+                        createdAt: new Date().toISOString(),
+                        cached: true,
+                        costMode
+                    }
+                };
+            }
+
+            // 3. AI Agent Routing
+            console.log(`[EduJarvis 2.0] Roteando para agente: ${request.agent} - Ação: ${request.action}`);
+            const data = await routeToAgent(request);
+
+            // 4. Save to Cache
+            await saveAICache({
+                hash,
+                response: data,
+                feature: `${request.agent}:${request.action}`,
+                ttlHours: 24
+            });
+
+            // 5. Log Success
+            await logAIUsage({
+                userId,
+                agent: request.agent as string,
+                action: request.action as string,
+                source: "ai",
+                status: "success",
+                costMode
+            });
+
+            return {
+                success: true,
+                source: "ai",
+                agent: request.agent,
+                action: request.action,
+                response: data.response || data.text || "Insight gerado com sucesso pelo EduJarvis.",
+                data,
+                metadata: {
+                    createdAt: new Date().toISOString(),
+                    cached: false,
+                    costMode
+                }
+            };
+
+        } catch (error: any) {
+            console.error("[EduJarvis Orchestrator] Error:", error);
+            await logAIUsage({
+                userId,
+                agent: request.agent as string,
+                action: request.action as string,
+                source: "ai",
+                status: "error",
+                costMode,
+                error: error.message
+            });
+
+            return {
+                success: false,
+                response: "Ocorreu um erro no processamento inteligente. Tente novamente em instantes.",
+                data: null,
+                metadata: {
+                    createdAt: new Date().toISOString(),
+                    costMode
+                }
+            };
+        }
     }
 }

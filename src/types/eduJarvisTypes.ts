@@ -9,27 +9,44 @@ export interface EduJarvisMessageType {
   payload?: any;
 }
 
+export type AgentType =
+  | "professor"
+  | "student"
+  | "evaluator"
+  | "question"
+  | "bi"
+  | "tutor"
+  | "fallback"
+  | "adaptiveTrail";
+
+export type CostMode = "economico" | "normal" | "avancado";
+
 export interface EduJarvisRequest {
   userId: string;
   userRole: UserRole;
-  command: string;
-  context?: Record<string, unknown>;
-  image?: string; // Base64 image for vision tasks
+  command?: string;
+  context?: Record<string, any>;
+  image?: string; // Base64 image
   action?: string;
   input?: Record<string, any>;
-  agent?: string;
+  agent?: AgentType | string;
+  costMode?: CostMode;
 }
 
 export interface EduJarvisResponse {
-  response: string;
-  actionType?: Intent;
-  generatedId?: string;
-  payload?: any;
-  data?: any;
-  success?: boolean;
-  agent?: string;
+  success: boolean;
+  source?: "local_rule" | "database" | "cache" | "ai";
+  agent?: AgentType | string;
   action?: string;
-  metadata?: any;
+  response: string;
+  data?: any;
+  payload?: any;
+  metadata: {
+    createdAt: string;
+    cached?: boolean;
+    costMode?: CostMode;
+    estimatedCost?: number;
+  };
 }
 
 export type Intent =
