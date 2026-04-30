@@ -272,23 +272,23 @@ async function startServer() {
   app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {
     try {
       const result = await processEduJarvisCommand(req.body);
-      res.json(result);
+      res.json({ success: true, ...result });
     } catch (error: any) {
       console.error("[EduJarvis API Error]:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
   app.post("/api/ai/completions", promptInjectionGuard, async (req, res) => {
     try {
       const { prompt, systemInstruction, responseFormat, responseSchema, task, userId, userRole, model } = req.body;
-      if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+      if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
       const result = await executeAIRequest({
         prompt, systemInstruction, responseFormat, responseSchema, task: task || "generic", userId: userId || "anonymous", userRole: userRole || "GUEST", model
       });
-      res.json(result);
+      res.json({ success: true, ...result });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -312,9 +312,9 @@ async function startServer() {
 
       const result = JSON.parse(aiResult.text);
       await db.collection('studentRiskScores').doc(studentId).set({ ...result, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      res.json(result);
+      res.json({ success: true, data: result });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -326,10 +326,11 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req.body)
       });
-      res.json(await response.json().catch(() => ({ status: "ok" })));
+      const data = await response.json().catch(() => ({ status: "ok" }));
+      res.json({ success: true, data });
     } catch (error: any) {
       console.error("[n8n forms] Error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -341,10 +342,10 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      res.json({ ok: response.ok, status: response.status });
+      res.json({ success: true, ok: response.ok, status: response.status });
     } catch (error: any) {
       console.error("[n8n test] Error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -364,10 +365,11 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req.body)
       });
-      res.json(await response.json().catch(() => ({ status: "ok" })));
+      const data = await response.json().catch(() => ({ status: "ok" }));
+      res.json({ success: true, data });
     } catch (error: any) {
       console.error(`[n8n ${req.params.endpoint}] Error:`, error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -377,23 +379,20 @@ async function startServer() {
       const { functionName, data } = req.body;
       console.log(`[Pedagogical Engine] Call: ${functionName}`, data);
       
-      // Basic simulation/mock for the engine functions since they are handled locally now
-      // but the frontend still expects an API response.
       if (functionName === 'runStudentEvaluation') {
         const { studentId, classId } = data;
-        // In a real app, this would trigger a more complex logic or cloud function
-        return res.json({ result: { status: 'success', studentId, classId, evaluatedAt: new Date().toISOString() } });
+        return res.json({ success: true, result: { status: 'success', studentId, classId, evaluatedAt: new Date().toISOString() } });
       }
 
       if (functionName === 'runPedagogicalEngineForClass') {
         const { classId } = data;
-        return res.json({ result: { status: 'success', classId, evaluationsCount: 1, batchProcessed: true } });
+        return res.json({ success: true, result: { status: 'success', classId, evaluationsCount: 1, batchProcessed: true } });
       }
 
-      res.status(400).json({ error: `Function ${functionName} not implemented in proxy.` });
+      res.status(400).json({ success: false, error: `Function ${functionName} not implemented in proxy.` });
     } catch (error: any) {
       console.error("[Pedagogical Engine Proxy] Error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -401,7 +400,7 @@ async function startServer() {
 
   // Redirection and static files
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/') && req.path.length > 5 && req.path.endsWith('/')) {
+    if (req.method !== 'POST' && req.path.startsWith('/api/') && req.path.length > 5 && req.path.endsWith('/')) {
       res.redirect(307, req.path.slice(0, -1) + req.url.slice(req.path.length));
     } else {
       next();

@@ -202,6 +202,7 @@ import { handleFirestoreError, OperationType } from "./services/errorService";
 
 import { PedagogicalIntelligenceHub } from "./components/professor/PedagogicalIntelligenceHub";
 import { AdvancedDashboard } from "./components/professor/AdvancedDashboard";
+import { ActivityGradingPage } from "./pages/professor/ActivityGradingPage";
 
 
 
@@ -3964,6 +3965,17 @@ function AppContent() {
                       allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
                     >
                       <MassRescueDashboard userProfile={userProfile} />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/activity-grading/:activityId"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
+                    >
+                      <ActivityGradingPage />
                     </ProtectedRoute>
                   }
                 />

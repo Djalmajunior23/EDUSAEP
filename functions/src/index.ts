@@ -1,15 +1,29 @@
 import * as functions from 'firebase-functions/v2/firestore';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { analyzeStudentError } from './pedagogical/errorIntelligenceEngine';
+import { trackRecurringErrors } from './pedagogical/errorMemoryEngine';
 
 initializeApp();
 const db = getFirestore();
 
-// --- EDUAI CORE PEDAGOGICAL ENGINE EXPORTS ---
-export { runPedagogicalEngineForClass } from './pedagogical-engine/runPedagogicalEngine';
-export { runStudentEvaluation } from './pedagogical-engine/runStudentEvaluation';
-export { onSubmissionGraded } from './pedagogical-engine/onSubmissionGraded';
-export { onAssessmentCompleted } from './pedagogical-engine/onAssessmentCompleted';
+// ... existing pedagogical exports
+
+export const analyzeError = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+    const { answer, correctAnswer, context } = request.data;
+    return await analyzeStudentError(answer, correctAnswer, context);
+});
+
+export const reportError = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+    const { studentId, competencyId, errorType } = request.data;
+    await trackRecurringErrors(studentId, competencyId, errorType);
+    return { success: true };
+});
+
+// ... existing onResultCreated
 
 export const onResultCreated = functions.onDocumentCreated(
   { document: 'resultados/{resultadoId}' },

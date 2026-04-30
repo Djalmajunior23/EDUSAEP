@@ -39,7 +39,12 @@ export class EduJarvis {
         throw new Error(err.error || `Erro ${response.status} ao processar comando EduJarvis`);
       }
 
-      return await response.json();
+      const json = await response.json();
+      if (!json.success) {
+        throw new Error(json.error || 'Erro ao processar comando EduJarvis');
+      }
+
+      return json;
     } catch (error: any) {
       console.error("[EduJarvis Service] Execution Error:", error);
       throw error;

@@ -15,6 +15,9 @@ export interface EduJarvisRequest {
   command: string;
   context?: Record<string, unknown>;
   image?: string; // Base64 image for vision tasks
+  action?: string;
+  input?: Record<string, any>;
+  agent?: string;
 }
 
 export interface EduJarvisResponse {
@@ -23,6 +26,10 @@ export interface EduJarvisResponse {
   generatedId?: string;
   payload?: any;
   data?: any;
+  success?: boolean;
+  agent?: string;
+  action?: string;
+  metadata?: any;
 }
 
 export type Intent =

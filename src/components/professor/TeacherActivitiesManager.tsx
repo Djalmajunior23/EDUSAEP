@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { FileText, Plus, Users, Calendar, CheckCircle2, Clock, Loader2, Sparkles, AlertCircle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +19,7 @@ export function TeacherActivitiesManager({ userProfile, selectedModel }: { userP
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<ActivitySubmission | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Create Form State
   const [newActivity, setNewActivity] = useState({
@@ -348,9 +350,15 @@ export function TeacherActivitiesManager({ userProfile, selectedModel }: { userP
                     fetchSubmissions(activity.id!);
                     setView('grade');
                   }}
-                  className="w-full py-2 bg-indigo-50 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2 bg-indigo-50 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2 mb-2"
                 >
-                  <Users size={18} /> Ver Entregas
+                  <Users size={18} /> Ver Entregas (Internal)
+                </button>
+                <button
+                  onClick={() => navigate(`/activity-grading/${activity.id}`)}
+                  className="w-full py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Users size={18} /> Gerenciar Notas (Novo)
                 </button>
               </motion.div>
             ))
