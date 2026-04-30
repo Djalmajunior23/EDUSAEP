@@ -16,7 +16,16 @@ export function detectIntent(command?: string): string {
   if (lowerCmd.includes("trilha") || lowerCmd.includes("roteiro")) return "GERAR_TRILHA_APRENDIZAGEM";
   if (lowerCmd.includes("risco") || lowerCmd.includes("evasão")) return "ANALISAR_RISCO_ACADEMICO";
   if (lowerCmd.includes("bi") || lowerCmd.includes("insight")) return "GERAR_BI_INSIGHTS";
-  if (lowerCmd.includes("plano de aula")) return "GERAR_PLANO_AULA";
+  if (lowerCmd.includes("plano de aula") || lowerCmd.includes("planejamento")) return "GERAR_PLANO_AULA";
+  if (lowerCmd.includes("aula invertida") || lowerCmd.includes("flipped")) return "GERAR_AULA_INVERTIDA";
+  if (lowerCmd.includes("estudo de caso")) return "GERAR_ESTUDO_CASO";
+  if (lowerCmd.includes("rubrica")) return "GERAR_RUBRICA";
+  if (lowerCmd.includes("aula") && lowerCmd.includes("gerar")) return "GERAR_AULA";
+  if (lowerCmd.includes("atividade") && lowerCmd.includes("prática")) return "GERAR_ATIVIDADE_PRATICA";
+  if (lowerCmd.includes("intervenção") || lowerCmd.includes("ajuda")) return "SUGERIR_INTERVENCAO";
+  if (lowerCmd.includes("corrigir") || lowerCmd.includes("correção")) return "CORRIGIR_RESPOSTA";
+  if (lowerCmd.includes("avaliar") || lowerCmd.includes("avaliação")) return "AVALIAR_CONTEUDO";
+  if (lowerCmd.includes("erro conceitual") || lowerCmd.includes("diagnóstico")) return "IDENTIFICAR_ERROS";
   
   return "COMANDO_GERAL";
 }

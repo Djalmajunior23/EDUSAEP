@@ -7,6 +7,8 @@ import { pedagogicalAgent } from './agents/pedagogicalAgent';
 import { assessmentAgent } from './agents/assessmentAgent';
 import { performanceAgent } from './agents/performanceAgent';
 import { teacherCopilotAgent } from './agents/teacherCopilotAgent';
+import { professorAgent } from './agents/professorAgent';
+import { evaluatorAgent } from './agents/evaluatorAgent';
 import { learningPathAgent } from './agents/learningPathAgent';
 import { interventionAgent } from './agents/interventionAgent';
 import { predictionAgent } from './agents/predictionAgent';
@@ -125,14 +127,6 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
           metadata: responseMetadata
         };
         break;
-      case "SUGERIR_INTERVENCAO":
-        const intResult = await interventionAgent(command || "", userId, enhancedContext);
-        result = {
-          success: true,
-          ...intResult,
-          metadata: responseMetadata
-        };
-        break;
       case "IMPORTAR_QUESTOES":
         const questionsImported = await importAgent(command || "", enhancedContext);
         result = { 
@@ -152,26 +146,26 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         };
         break;
       case "GERAR_ESTUDO_CASO":
-        const caseResult = await teacherCopilotAgent(command || "", userId, 'GERAR_ESTUDO_CASO', enhancedContext);
-        result = {
-          success: true,
-          ...caseResult,
-          metadata: responseMetadata
-        };
-        break;
       case "GERAR_AULA_INVERTIDA":
-        const flipResult = await teacherCopilotAgent(command || "", userId, 'GERAR_AULA_INVERTIDA', enhancedContext);
+      case "GERAR_PLANO_AULA":
+      case "GERAR_AULA":
+      case "GERAR_ATIVIDADE_PRATICA":
+      case "GERAR_RUBRICA":
+      case "SUGERIR_INTERVENCAO":
+        const profResult = await professorAgent.process({ ...request, action: intent as any }, { userId, role: userRole, metadata: enhancedContext });
         result = {
           success: true,
-          ...flipResult,
+          ...profResult,
           metadata: responseMetadata
         };
         break;
-      case "GERAR_PLANO_AULA":
-        const planResult = await teacherCopilotAgent(command || "", userId, 'GERAR_PLANO_AULA', enhancedContext);
+      case "CORRIGIR_RESPOSTA":
+      case "AVALIAR_CONTEUDO":
+      case "IDENTIFICAR_ERROS":
+        const evalResult = await evaluatorAgent({ ...request, action: intent as any });
         result = {
           success: true,
-          ...planResult,
+          ...evalResult,
           metadata: responseMetadata
         };
         break;

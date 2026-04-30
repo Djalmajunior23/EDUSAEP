@@ -160,8 +160,8 @@ export const TRIDashboardView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <div className="h-[400px] min-h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={curveData}>
                       <defs>
                         <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">

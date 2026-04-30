@@ -161,12 +161,61 @@ export function TutorJarvisView() {
               )}>
                 {msg.content}
                 
+                {msg.data?.insightHistoryUsed && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg w-fit">
+                    <Clock size={10} />
+                    Lembrança: {msg.data.insightHistoryUsed}
+                  </div>
+                )}
+
+                {msg.data?.difficultyDetected?.nivel !== 'nenhuma' && msg.data?.difficultyDetected?.nivel && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-lg w-fit">
+                    <AlertCircle size={10} />
+                    Alerta de Dificuldade: {msg.data.difficultyDetected.pontoChave || msg.data.difficultyDetected.habilidade}
+                  </div>
+                )}
+                
                 {msg.data?.perguntaGuia && (
                   <div className="mt-4 p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl border border-indigo-100 dark:border-indigo-800">
                     <p className="font-bold text-indigo-700 dark:text-indigo-300 text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
                       <ChevronRight size={14} /> Pense nisto:
                     </p>
                     <p className="text-indigo-900 dark:text-indigo-100 italic">"{msg.data.perguntaGuia}"</p>
+                  </div>
+                )}
+
+                {msg.data?.suggestedExercise && (
+                  <div className="mt-4 p-5 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-emerald-500 rounded-lg text-white">
+                        <Zap size={14} />
+                      </div>
+                      <p className="font-black text-emerald-800 dark:text-emerald-300 text-xs uppercase tracking-tighter">Micro-Desafio Proposto</p>
+                    </div>
+                    <p className="text-emerald-900 dark:text-emerald-100 font-medium mb-4">{msg.data.suggestedExercise.enunciado}</p>
+                    
+                    {msg.data.suggestedExercise.tipo === 'multipla' && msg.data.suggestedExercise.opcoes && (
+                      <div className="grid gap-2">
+                        {msg.data.suggestedExercise.opcoes.map((opt: string, idx: number) => (
+                          <button 
+                            key={idx}
+                            onClick={() => setInput(`Minha resposta para o desafio é: ${opt}`)}
+                            className="text-left px-4 py-2.5 bg-white dark:bg-gray-800 border border-emerald-200 dark:border-emerald-800/50 rounded-xl text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white transition-all"
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {msg.data.suggestedExercise.tipo === 'aberta' && (
+                      <button 
+                        onClick={() => setInput("Minha resposta é: ")}
+                        className="w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 dark:shadow-none"
+                      >
+                        Responder agora
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

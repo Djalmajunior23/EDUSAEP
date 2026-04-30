@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, RotateCcw, Zap, Info } from 'lucide-react';
 
 interface Submission {
   id: string;
@@ -15,6 +15,7 @@ interface Submission {
   feedback?: string;
   status: 'submitted' | 'graded' | 'returned';
   submittedAt: any;
+  aiAnalysis?: any;
 }
 
 export function ActivityGradingPage() {
@@ -23,19 +24,18 @@ export function ActivityGradingPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [activity, setActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [gradingAI, setGradingAI] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activityId) return;
 
     const fetchData = async () => {
       try {
-        // Fetch Activity
         const activityDoc = await getDoc(doc(db, 'activities', activityId));
         if (activityDoc.exists()) {
           setActivity(activityDoc.data());
         }
 
-        // Fetch Submissions
         const q = query(collection(db, 'submissions'), where('activityId', '==', activityId));
         const querySnapshot = await getDocs(q);
         const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Submission[];
@@ -49,6 +49,49 @@ export function ActivityGradingPage() {
     };
     fetchData();
   }, [activityId]);
+
+  const handleAIAnalyze = async (sub: Submission) => {
+    if (gradingAI) return;
+    setGradingAI(sub.id);
+    
+    try {
+      const response = await fetch("/api/edu-jarvis/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "system",
+          userRole: "TEACHER",
+          agent: "evaluator",
+          action: "CORRIGIR_RESPOSTA",
+          input: {
+            activityTitle: activity?.title,
+            studentResponse: sub.content,
+            rubrics: activity?.rubrics || [],
+            expectedAnswer: activity?.expectedAnswer || ""
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setSubmissions(prev => prev.map(s => s.id === sub.id ? { 
+          ...s, 
+          grade: result.data.score / 10, // Assuming internal 0-100 scale
+          feedback: result.data.feedback,
+          aiAnalysis: result.data
+        } : s));
+        toast.success("Análise da IA concluída!");
+      } else {
+        throw new Error("Falha na resposta da IA");
+      }
+    } catch (error) {
+      console.error("Erro na correção AI:", error);
+      toast.error("Não foi possível usar a IA para esta correção.");
+    } finally {
+      setGradingAI(null);
+    }
+  };
 
   const handleGrade = async (submissionId: string, grade: number, feedback: string, status: 'graded' | 'returned') => {
     try {
@@ -88,6 +131,14 @@ export function ActivityGradingPage() {
                 <p className="text-sm text-gray-500">Status: {sub.status}</p>
               </div>
               <div className="flex gap-2">
+                <button 
+                  className={`flex items-center px-3 py-1.5 rounded-lg text-sm transition-colors ${gradingAI === sub.id ? 'bg-amber-100 text-amber-600' : 'bg-amber-600 text-white hover:bg-amber-700'}`}
+                  onClick={() => handleAIAnalyze(sub)}
+                  disabled={gradingAI === sub.id}
+                >
+                  <Zap className={`mr-2 h-4 w-4 ${gradingAI === sub.id ? 'animate-pulse' : ''}`} />
+                  {gradingAI === sub.id ? 'Analisando...' : 'EduJarvis AI'}
+                </button>
                 {sub.status === 'submitted' && (
                     <button className="flex items-center bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-green-700" onClick={() => handleGrade(sub.id, sub.grade || 0, sub.feedback || '', 'graded')}>
                         <CheckCircle className="mr-2 h-4 w-4" /> Aprovar
@@ -102,6 +153,29 @@ export function ActivityGradingPage() {
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
                 <p className="whitespace-pre-wrap">{sub.content}</p>
             </div>
+
+            {sub.aiAnalysis && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                <div className="flex items-center gap-2 mb-2 text-amber-800 font-bold text-sm">
+                  <Info size={16} />
+                  Diagnóstico do EduJarvis
+                </div>
+                {sub.aiAnalysis.errosConceituais?.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs font-bold text-red-600 uppercase mb-1">Erros Conceituais Detectados:</p>
+                    <ul className="list-disc list-inside text-sm text-gray-700">
+                      {sub.aiAnalysis.errosConceituais.map((err: string, i: number) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-bold text-amber-600 uppercase mb-1">Sugestão de Intervenção:</p>
+                  <p className="text-sm text-gray-700">{sub.aiAnalysis.sugestaoRecuperacao}</p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
                 <input 

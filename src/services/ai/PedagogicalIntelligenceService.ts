@@ -15,25 +15,34 @@ export interface PedagogicalAnalysisResult {
   nivelRisco: "baixo" | "medio" | "alto";
 }
 
-export class PedagogicalIntelligenceHub {
+export class PedagogicalIntelligenceService {
   static async analyze(
     input: PedagogicalAnalysisInput
   ): Promise<PedagogicalAnalysisResult> {
     try {
-      // Simulação de chamada para o backend EduJarvis
+      // Chamada para o backend EduJarvis
       const response = await fetch("/api/edu-jarvis/process", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
           body: JSON.stringify({
-              userId: "system", // Em um cenário real, pegar o ID logado
+              userId: "system",
               userRole: "TEACHER",
               agent: "bi",
               action: "pedagogicalAnalysis",
               input: input
           })
+      }).catch(err => {
+        console.warn("[EduJarvis Service] Fetch Error:", err);
+        throw new Error("Erro de comunicação backend");
       });
 
-      if (!response.ok) throw new Error("Falha na API de IA");
+      if (!response.ok) {
+        console.error(`[EduJarvis Service] HTTP Error: ${response.status} ${response.statusText}`);
+        throw new Error(`Falha na API de IA: ${response.status}`);
+      }
       
       const result = await response.json();
       
@@ -58,7 +67,7 @@ export class PedagogicalIntelligenceHub {
         nivelRisco: "baixo"
       };
     } catch (error) {
-      console.error("Erro no PedagogicalIntelligenceHub:", error);
+      console.error("Erro no PedagogicalIntelligenceService:", error);
 
       return {
         resumo: "Não foi possível gerar a análise automática neste momento.",
@@ -71,4 +80,4 @@ export class PedagogicalIntelligenceHub {
   }
 }
 
-export default PedagogicalIntelligenceHub;
+export default PedagogicalIntelligenceService;

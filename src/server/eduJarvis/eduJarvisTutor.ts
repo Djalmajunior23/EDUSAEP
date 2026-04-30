@@ -1,6 +1,7 @@
 import { db } from "../firebaseAdmin";
 import { callAI } from "./aiProvider";
 import * as admin from 'firebase-admin';
+import { memoryAgent } from "./agents/memoryAgent";
 
 export async function getStudentLearningProfile(studentId: string) {
   const doc = await db.collection("studentLearningProfiles").doc(studentId).get();
@@ -26,71 +27,70 @@ export async function runEduJarvisTutor(params: {
   competencyId?: string;
 }) {
   const profile = await getStudentLearningProfile(params.studentId);
-
-  const recentMessagesSnap = await db
-    .collection("tutorMessages")
-    .where("studentId", "==", params.studentId)
-    .orderBy("createdAt", "desc")
-    .limit(8)
-    .get();
-
-  const recentMessages = recentMessagesSnap.docs.map(doc => doc.data()).reverse();
+  const memorySummary = await memoryAgent.getMemorySummary(params.studentId);
 
   const systemInstruction = `
-Você é o EduJarvis Tutor, um tutor educacional inteligente do EduAiCore.
-Seu papel é ensinar, orientar e estimular o raciocínio do aluno.
-Não entregue resposta pronta quando a pergunta for claramente uma atividade avaliativa.
-Use linguagem clara, acolhedora e adequada ao nível do aluno.
-Explique de forma progressiva.
-Quando possível, faça perguntas para estimular o aluno a pensar.
-Conecte a explicação às competências do curso.
+Você é o Tutor IA Conversacional Ultra do EduAiCore.
+Sua missão é atuar como um mentor pedagógico inteligente que lembra o histórico, adapta a linguagem e identifica dificuldades.
+
+DIRETRIZES:
+1. FOCO NO ALUNO: Adapte a explicação ao nível e estilo do aluno (Perfil fornecido).
+2. MEMÓRIA: Use o Histórico/Resumo de memória para dar continuidade ao aprendizado.
+3. MÉTODO SOCRÁTICO: Estimule o pensamento crítico. Não dê respostas diretas se for um desafio.
+4. MICRO-EXERCÍCIOS: Se perceber que o aluno entendeu um conceito, proponha um pequeno exercício para validar.
+5. DIAGNÓSTICO: Identifique dificuldades conceituais e mencione-as suavemente.
 `;
 
   const prompt = `
-Perfil pedagógico do aluno:
+RESUMO DA MEMÓRIA PEDAGÓGICA:
+${memorySummary}
+
+PERFIL DO ALUNO:
 ${JSON.stringify(profile, null, 2)}
 
-Histórico recente da conversa:
-${JSON.stringify(recentMessages, null, 2)}
+CONTEXTO:
+Tópico: ${params.currentTopic ?? "não informado"}
+Competência: ${params.competencyId ?? "não informada"}
 
-Tópico atual:
-${params.currentTopic ?? "não informado"}
-
-Competência:
-${params.competencyId ?? "não informada"}
-
-Mensagem do aluno:
+MENSAGEM ATUAL DO ALUNO:
 ${params.message}
 
-Responda em JSON válido:
+RESPONDA EXCLUSIVAMENTE EM JSON:
 {
-  "answer": "",
-  "learningStrategy": "",
-  "suggestedExercise": "",
-  "competencyRelated": "",
-  "difficultyDetected": "nenhuma | leve | media | alta",
-  "nextStep": "",
+  "answer": "Sua resposta formativa para o aluno",
+  "learningStrategy": "socratica | direta | revisao | desafio",
+  "suggestedExercise": {
+    "enunciado": "string",
+    "tipo": "aberta | multipla",
+    "opcoes": ["..."],
+    "gabarito": "string"
+  } | null,
+  "difficultyDetected": {
+    "nivel": "nenhuma | leve | media | alta",
+    "pontoChave": "string"
+  },
+  "insightHistoryUsed": "string",
   "shouldNotifyTeacher": false
 }
 `;
 
-  const result = await callAI({systemPrompt: systemInstruction, userPrompt: prompt});
+  const result = await callAI({
+    systemPrompt: systemInstruction, 
+    userPrompt: prompt,
+    responseFormat: 'json'
+  });
+  
   const parsed = JSON.parse(result.text);
 
-  await db.collection("tutorMessages").add({
-    studentId: params.studentId,
-    classId: params.classId,
-    role: "student",
-    message: params.message,
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-
-  await db.collection("tutorMessages").add({
-    studentId: params.studentId,
-    classId: params.classId,
+  // Registro na memória pedagógica
+  await memoryAgent.recordInteraction(params.studentId, "TUTOR_CONVERSA", params.message, parsed.answer);
+  
+  // Registro para o chat histórico (UI)
+  await db.collection("tutor_chat_history").add({
+    userId: params.studentId,
     role: "assistant",
-    message: parsed.answer,
-    metadata: parsed,
+    content: parsed.answer,
+    data: parsed,
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 

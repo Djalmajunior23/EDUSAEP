@@ -10,6 +10,7 @@ import admin from "firebase-admin";
 import { getFirestore } from 'firebase-admin/firestore';
 import { processCommand as processEduJarvisCommand } from "./src/server/eduJarvis/processCommand";
 import { EduJarvisCore } from "./src/server/eduJarvis/eduJarvisCore";
+import cors from "cors";
 
 import fs from "fs";
 
@@ -56,14 +57,23 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Global CORS middleware
+  // Use the cors package for robust CORS handling
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow all origins (reflection)
+      callback(null, origin || "*");
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    credentials: true
+  }));
+
+  // Redirect API trailing slashes using 307 to preserve HTTP method
   app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
-    
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
+    if (req.path.startsWith('/api/') && req.path.length > 5 && req.path.endsWith('/')) {
+      const query = req.url.slice(req.path.length);
+      const safepath = req.path.slice(0, -1);
+      return res.redirect(307, safepath + query);
     }
     next();
   });
@@ -273,6 +283,14 @@ async function startServer() {
     next();
   };
 
+  // AI Generation proxy error handler helper
+  const handleMethodNotAllowed = (allowedMethod: string) => (req: any, res: any) => {
+    res.status(405).json({ 
+      success: false, 
+      error: `Método ${req.method} não permitido nesta rota. Use ${allowedMethod}.` 
+    });
+  };
+
   // API Routes
   app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {
     try {
@@ -319,15 +337,45 @@ async function startServer() {
     }
   });
 
+  // n8n Compatibility Endpoints
+  app.post("/api/n8n/:endpoint", async (req, res) => {
+    try {
+      const { endpoint } = req.params;
+      const n8nEndpoints: Record<string, string> = {
+        'alerts': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/alerts",
+        'plans': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/plans",
+        'import': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/import",
+        'generate-questions': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/gerar-questoes"
+      };
+
+      const targetUrl = n8nEndpoints[endpoint] || `https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/${endpoint}`;
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json().catch(() => ({ status: "ok" }));
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
-  // Redirection and static files
-  app.use((req, res, next) => {
-    if (req.method !== 'POST' && req.path.startsWith('/api/') && req.path.length > 5 && req.path.endsWith('/')) {
-      res.redirect(307, req.path.slice(0, -1) + req.url.slice(req.path.length));
-    } else {
-      next();
-    }
+  app.all("/api/edu-jarvis/process", (req, res, next) => {
+    if (req.method !== 'POST') return handleMethodNotAllowed('POST')(req, res);
+    next();
+  });
+
+  app.all("/api/ai/completions", (req, res, next) => {
+    if (req.method !== 'POST') return handleMethodNotAllowed('POST')(req, res);
+    next();
+  });
+
+  // Final catch-all for API to prevent fallthrough to Vite/Static (which cause 405s)
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ success: false, error: `API route ${req.method} ${req.path} not found` });
   });
 
   if (process.env.NODE_ENV !== "production") {

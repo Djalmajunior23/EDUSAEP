@@ -154,13 +154,14 @@ export function ExamsManagementView({ user, userProfile, selectedModel, defaultT
       const questionIds: string[] = [];
 
       const savedQuestions: any[] = [];
+      const now = new Date();
       for (const q of questions) {
         const qRef = doc(collection(db, 'questions'));
         const qData = {
           ...q,
           createdBy: user.uid,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: now,
+          updatedAt: now,
           usoTotal: 0
         };
         batch.set(qRef, qData);

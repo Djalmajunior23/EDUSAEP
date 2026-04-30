@@ -1,2 +1,2 @@
-export { default as PedagogicalIntelligenceHub } from "./PedagogicalIntelligenceHub";
-export type { PedagogicalAnalysisInput, PedagogicalAnalysisResult } from "./PedagogicalIntelligenceHub";
+export { default as PedagogicalIntelligenceService } from "./PedagogicalIntelligenceService";
+export type { PedagogicalAnalysisInput, PedagogicalAnalysisResult } from "./PedagogicalIntelligenceService";
