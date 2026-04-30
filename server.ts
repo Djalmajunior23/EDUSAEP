@@ -57,10 +57,14 @@ async function startServer() {
   app.use(express.json());
 
   // Global CORS middleware
-  app.use((_req, res, next) => {
+  app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     next();
   });
 
@@ -272,7 +276,6 @@ async function startServer() {
   // API Routes
   app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {
     try {
-      // Integration with 2.0 Core
       if (req.body.agent || req.body.action) {
         const result = await EduJarvisCore.processRequest(req.body);
         return res.json(result);
@@ -292,26 +295,10 @@ async function startServer() {
       const { answer, correctAnswer, context, userId } = req.body;
       const result = await EduJarvisCore.processRequest({
         userId,
-        userRole: "TEACHER", // Justificativa: Análise pedagógica
+        userRole: "TEACHER",
         agent: "evaluator",
         action: "analyzeError",
         input: { answer, correctAnswer, context }
-      });
-      res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/edu-jarvis/re-explain", async (req, res) => {
-    try {
-      const { content, format, studentProfile, userId } = req.body;
-      const result = await EduJarvisCore.processRequest({
-        userId,
-        userRole: "STUDENT",
-        agent: "tutor",
-        action: "reExplain",
-        input: { content, format, studentProfile }
       });
       res.json(result);
     } catch (error: any) {
@@ -328,110 +315,6 @@ async function startServer() {
       });
       res.json({ success: true, ...result });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/ai/dropout-risk", async (req, res) => {
-    try {
-      const { studentId, userId, userRole } = req.body;
-      const [submissions, engagement, activities, profile] = await Promise.all([
-        db.collection('resultados').where('studentId', '==', studentId).limit(10).get(),
-        db.collection('engagement_logs').where('userId', '==', studentId).orderBy('timestamp', 'desc').limit(20).get(),
-        db.collection('activity_submissions').where('studentId', '==', studentId).get(),
-        db.collection('users').doc(studentId).get()
-      ]);
-
-      const subData = submissions.docs.map(d => d.data());
-      const prompt = `Analise o risco de evasão para o aluno ${profile.data()?.displayName}. Dados: ${JSON.stringify({ subData, engagement: engagement.docs.length, activities: activities.docs.length })}`;
-      
-      const aiResult = await executeAIRequest({
-        prompt, systemInstruction: "Especialista em evasão.", responseFormat: "json",
-        task: "dropout_risk", userId: userId || "system", userRole: userRole || "TEACHER"
-      });
-
-      const result = JSON.parse(aiResult.text);
-      await db.collection('studentRiskScores').doc(studentId).set({ ...result, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      res.json({ success: true, data: result });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/n8n/forms", async (req, res) => {
-    try {
-      const n8nUrl = "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/forms";
-      const response = await fetch(n8nUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body)
-      });
-      const data = await response.json().catch(() => ({ status: "ok" }));
-      res.json({ success: true, data });
-    } catch (error: any) {
-      console.error("[n8n forms] Error:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/n8n/test", async (req, res) => {
-    try {
-      const { url, data } = req.body;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      res.json({ success: true, ok: response.ok, status: response.status });
-    } catch (error: any) {
-      console.error("[n8n test] Error:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/n8n/:endpoint", async (req, res) => {
-    try {
-      const { endpoint } = req.params;
-      const n8nEndpoints: Record<string, string> = {
-        'alerts': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/alerts",
-        'plans': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/plans",
-        'import': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/import",
-        'generate-questions': "https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/gerar-questoes"
-      };
-
-      const targetUrl = n8nEndpoints[endpoint] || `https://n8n-dqqj.srv1299532.hstgr.cloud/webhook-test/${endpoint}`;
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body)
-      });
-      const data = await response.json().catch(() => ({ status: "ok" }));
-      res.json({ success: true, data });
-    } catch (error: any) {
-      console.error(`[n8n ${req.params.endpoint}] Error:`, error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // Pedagogical Engine Proxy
-  app.post("/api/engine/proxy", async (req, res) => {
-    try {
-      const { functionName, data } = req.body;
-      console.log(`[Pedagogical Engine] Call: ${functionName}`, data);
-      
-      if (functionName === 'runStudentEvaluation') {
-        const { studentId, classId } = data;
-        return res.json({ success: true, result: { status: 'success', studentId, classId, evaluatedAt: new Date().toISOString() } });
-      }
-
-      if (functionName === 'runPedagogicalEngineForClass') {
-        const { classId } = data;
-        return res.json({ success: true, result: { status: 'success', classId, evaluationsCount: 1, batchProcessed: true } });
-      }
-
-      res.status(400).json({ success: false, error: `Function ${functionName} not implemented in proxy.` });
-    } catch (error: any) {
-      console.error("[Pedagogical Engine Proxy] Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

@@ -139,14 +139,14 @@ export function TeacherCopilotDashboard({ userProfile, selectedModel }: { userPr
               Prioridades do Dia
             </h3>
             
-            {priorities.length === 0 ? (
+            {Array.isArray(priorities) && priorities.length === 0 ? (
               <div className="animate-pulse space-y-3">
                 <div className="h-16 bg-gray-100 rounded-xl"></div>
                 <div className="h-16 bg-gray-100 rounded-xl"></div>
               </div>
             ) : (
               <div className="space-y-3">
-                {priorities.map((p, idx) => (
+                {Array.isArray(priorities) && priorities.map((p, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
                     <div className="flex items-start justify-between mb-1">
                       <span className={`text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded ${
@@ -213,7 +213,7 @@ export function TeacherCopilotDashboard({ userProfile, selectedModel }: { userPr
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 custom-scrollbar">
-            {messages.map((msg) => (
+            {(Array.isArray(messages) ? messages : []).map((msg) => (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

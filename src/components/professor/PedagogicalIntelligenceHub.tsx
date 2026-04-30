@@ -56,7 +56,7 @@ export function PedagogicalIntelligenceHub() {
     </div>
   );
 
-  const radarData = errorMap.map(entry => {
+  const radarData = (Array.isArray(errorMap) ? errorMap : []).map(entry => {
     const defaultSubject = typeof entry.skillId === 'string' ? entry.skillId : 'Unknown';
     return {
       subject: typeof entry.skillId === 'string' && entry.skillId.includes('-') ? entry.skillId.split('-')[1] || defaultSubject : defaultSubject,
@@ -115,7 +115,7 @@ export function PedagogicalIntelligenceHub() {
 
               {/* Error List */}
               <div className="space-y-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-                {errorMap.map((error, idx) => (
+                {(Array.isArray(errorMap) ? errorMap : []).map((error, idx) => (
                   <div key={idx} className="p-4 rounded-2xl border border-gray-100 bg-white hover:border-red-200 transition-colors">
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{error.skillId}</span>
@@ -128,7 +128,7 @@ export function PedagogicalIntelligenceHub() {
                     </p>
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ação Recomendada (IA):</p>
-                      {error.suggestedInterventions.map((action, i) => (
+                      {(Array.isArray(error.suggestedInterventions) ? error.suggestedInterventions : []).map((action, i) => (
                         <div key={i} className="flex items-start gap-2 text-sm text-gray-700 bg-gray-50 p-2 rounded-lg border border-gray-100">
                           <Zap size={14} className="text-amber-500 mt-0.5 shrink-0" />
                           <span className="font-medium">{action}</span>

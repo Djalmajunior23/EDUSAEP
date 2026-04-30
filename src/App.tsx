@@ -200,6 +200,7 @@ import { AIGovernanceView } from "./components/admin/AIGovernanceView";
 import { TRIDashboardView } from "./components/professor/TRIDashboardView";
 import { handleFirestoreError, OperationType } from "./services/errorService";
 
+import { PedagogicalIntelligenceHub } from "./components/professor/PedagogicalIntelligenceHub";
 import { EduJarvisUltraDashboard } from "./components/eduJarvis/EduJarvisUltraDashboard";
 import { TutorJarvisView } from "./components/eduJarvis/TutorJarvisView";
 import { ActivityGradingPage } from "./pages/professor/ActivityGradingPage";
@@ -2783,7 +2784,7 @@ function AppContent() {
                       userProfile={userProfile}
                       allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
                     >
-                      <EduJarvisUltraDashboard />
+                      <PedagogicalIntelligenceHub />
                     </ProtectedRoute>
                   }
                 />
