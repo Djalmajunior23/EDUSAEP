@@ -1,7 +1,5 @@
-import { db } from "../firebaseAdmin";
-import { callAI } from "../eduJarvis/aiProvider";
+import { generateContentWrapper } from "../../services/geminiService";
 import { ErrorAnalysis } from "./errorIntelligenceTypes";
-import * as admin from 'firebase-admin';
 
 export async function analyzeStudentError(
   answer: string, 
@@ -15,7 +13,7 @@ export async function analyzeStudentError(
   Correta: ${correctAnswer}
   Contexto da questão: ${context}
   
-  Responda:
+  Responda APENAS em JSON válido, sem markdown:
   {
     "tipoErro": "conceitual | interpretacao | distracao | desconhecido",
     "descricao": "",
@@ -24,6 +22,24 @@ export async function analyzeStudentError(
     "nivelGravidade": "leve | medio | alto"
   }`;
   
-  const result = await callAI({systemPrompt: systemInstruction, userPrompt: prompt});
-  return JSON.parse(result.text);
+  const result = await generateContentWrapper({
+    model: "gemini-1.5-flash",
+    contents: [
+      { role: "user", parts: [{ text: systemInstruction + "\n\n" + prompt }] }
+    ]
+  });
+  
+  try {
+    const text = result.text.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Erro no parse JSON de analyzeStudentError", e);
+    return {
+      tipoErro: "desconhecido",
+      descricao: "Falha na análise",
+      causaProvavel: "Erro ao gerar IA",
+      recomendacao: "Verificar manualmente",
+      nivelGravidade: "medio"
+    } as any;
+  }
 }

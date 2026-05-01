@@ -3554,7 +3554,7 @@ function AppContent() {
                                         Conhecimentos Críticos
                                       </p>
                                       <div className="flex flex-wrap gap-1.5">
-                                        {comp.conhecimentos_fracos.map(
+                                        {(comp.conhecimentos_fracos || []).map(
                                           (c, j) => (
                                             <span
                                               key={j}
@@ -3564,8 +3564,8 @@ function AppContent() {
                                             </span>
                                           ),
                                         )}
-                                        {comp.conhecimentos_fracos.length ===
-                                          0 && (
+                                        {(!comp.conhecimentos_fracos || comp.conhecimentos_fracos.length ===
+                                          0) && (
                                           <span className="text-[10px] text-gray-400 italic">
                                             Nenhum identificado
                                           </span>
