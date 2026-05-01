@@ -1,11 +1,14 @@
 import { callAI } from '../aiProvider';
 import admin from 'firebase-admin';
 
-export async function assessmentAgent(command: string, userId: string, context?: any) {
+import { EduJarvisRequest } from '../../../types/eduJarvisTypes';
+
+export async function assessmentAgent(request: EduJarvisRequest) {
+  const { command, userId, context } = request;
   const db = admin.firestore();
   
   // Extract specific adaptive simulation request if requested
-  const isAdaptive = command.toLowerCase().includes('adaptativo') || command.toLowerCase().includes('dinamicamente');
+  const isAdaptive = command?.toLowerCase().includes('adaptativo') || command?.toLowerCase().includes('dinamicamente');
 
   const quantity = 15; // Example dynamic quantity
   

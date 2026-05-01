@@ -1,7 +1,9 @@
 import { callAI } from '../aiProvider';
 import admin from 'firebase-admin';
+import { EduJarvisRequest } from '../../../types/eduJarvisTypes';
 
-export async function performanceAgent(command: string, userId: string, context?: any) {
+export async function performanceAgent(request: EduJarvisRequest) {
+  const { command = "", userId, context } = request;
   const db = admin.firestore();
   
   let performanceData = {
@@ -55,12 +57,15 @@ Sua missão é realizar uma análise profunda do progresso ${isClassAnalysis ? '
 Identifique:
 ${isClassAnalysis ? 
 `- As principais tendências de aprendizado da turma.
+- Mapa de Lacunas de Aprendizado (Competências com desempenho crítico).
 - Pontos fortes e áreas de melhoria (gargalos) em todas as competências.
 - Alunos em risco ou fatores qualitativos de engajamento da turma.
 - Recomendações pedagógicas para o professor aplicar.` 
 : 
-`- Se o aluno está ficando para trás ou avançando muito rápido em relação à média da turma.
+`- Mapa Individual de Lacunas de Aprendizado.
+- Se o aluno está ficando para trás ou avançando muito rápido em relação à média da turma.
 - O nível de risco de evasão ou baixo desempenho.
+- Plano de Recuperação Individual sugerido.
 - Fatores qualitativos que justificam o desempenho (ex: engajamento, tempo de resposta, padrões de erro).
 - Recomendações pedagógicas personalizadas.`}
 
@@ -69,8 +74,12 @@ VOCÊ DEVE RETORNAR APENAS UM JSON VÁLIDO com a seguinte estrutura:
   ${!isClassAnalysis ? `"studentId": "id_do_aluno",` : `"turmaId": "id_da_turma",`}
   "predictedPerformance": 0-100,
   "riskLevel": "Baixo" | "Médio" | "Alto",
-  "factors": ["string"],
+  "mapaLacunas": [
+    { "competencia": "string", "nivelDefasagem": "critico|moderado|leve", "detalhe": "string" }
+  ],
   "recommendations": ["string"],
+  "planoRecuperacaoSugerido": "string",
+  "factors": ["string"],
   "comparativoTurma": {
     "mediaTurma": "number",
     "posicaoRelativa": "Abaixo" | "Na Média" | "Acima"

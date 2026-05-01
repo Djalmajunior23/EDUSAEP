@@ -1,7 +1,9 @@
 import { callAI } from '../aiProvider';
 import admin from 'firebase-admin';
+import { EduJarvisRequest } from '../../../types/eduJarvisTypes';
 
-export async function interventionAgent(command: string, userId: string, context?: any) {
+export async function interventionAgent(request: EduJarvisRequest) {
+  const { command = "", userId, context } = request;
   const db = admin.firestore();
   
   const systemPrompt = `

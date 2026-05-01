@@ -144,26 +144,49 @@ export class EduJarvisCore {
             };
 
         } catch (error: any) {
-            console.error("[EduJarvis Orchestrator] Error:", error);
-            await logAIUsage({
-                userId,
-                agent: request.agent as string,
-                action: request.action as string,
-                source: "ai",
-                status: "error",
-                costMode,
-                error: error.message
-            });
+            console.error("[EduJarvis Orchestrator] Agent Error, trying fallback:", error.message);
+            
+            try {
+                // Tenta rotear para o fallbackAgent se o agente específico falhar
+                const { fallbackAgent } = await import("./agents/fallbackAgent");
+                const fallbackData = await fallbackAgent(request);
+                
+                return {
+                    success: true,
+                    source: "ai_fallback",
+                    agent: "fallback",
+                    action: request.action,
+                    response: fallbackData.response || fallbackData.text || "Insight gerado via agente de contingência.",
+                    data: fallbackData,
+                    metadata: {
+                        createdAt: new Date().toISOString(),
+                        cached: false,
+                        costMode: "economico",
+                        error_fallback: error.message
+                    }
+                };
+            } catch (fallbackError: any) {
+                console.error("[EduJarvis Orchestrator] Critical Failure:", fallbackError);
+                await logAIUsage({
+                    userId,
+                    agent: request.agent as string,
+                    action: request.action as string,
+                    source: "ai",
+                    status: "error",
+                    costMode,
+                    error: `${error.message} | Fallback Error: ${fallbackError.message}`
+                });
 
-            return {
-                success: false,
-                response: "Ocorreu um erro no processamento inteligente. Tente novamente em instantes.",
-                data: null,
-                metadata: {
-                    createdAt: new Date().toISOString(),
-                    costMode
-                }
-            };
+                return {
+                    success: false,
+                    response: "Não foi possível processar sua solicitação nem mesmo com o sistema de contingência. Por favor, tente um comando mais simples.",
+                    data: null,
+                    metadata: {
+                        createdAt: new Date().toISOString(),
+                        costMode
+                    }
+                };
+            }
         }
     }
 }

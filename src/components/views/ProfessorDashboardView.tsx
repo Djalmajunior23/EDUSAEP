@@ -125,10 +125,26 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
 
       {/* Módulo de IA Avançada */}
       <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-3xl p-8 text-white shadow-xl">
-        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-          <Brain size={24} className="text-purple-400" />
-          Inteligência Pedagógica Avançada
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Brain size={24} className="text-purple-400" />
+            Inteligência Pedagógica Avançada
+          </h2>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => navigate('/bi-inteligente')}
+              className="px-4 py-2 bg-indigo-600/50 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold border border-indigo-500/50 transition-all flex items-center gap-2"
+            >
+              <Database size={14} /> BI Inteligente
+            </button>
+            <button 
+              onClick={() => navigate('/gamificacao')}
+              className="px-4 py-2 bg-amber-600/50 hover:bg-amber-600 text-white rounded-xl text-xs font-bold border border-amber-500/50 transition-all flex items-center gap-2"
+            >
+              <Trophy size={14} /> Gamificação
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { id: 'copilot', label: 'Copiloto Pedagógico' },

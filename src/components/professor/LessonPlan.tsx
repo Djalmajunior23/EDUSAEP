@@ -41,8 +41,8 @@ export function LessonPlan({ plan, onClose, activityNotes = {}, onUpdateActivity
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1 space-y-6">
             <div>
               <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Objetivos</h4>
               <ul className="space-y-2">
@@ -54,34 +54,96 @@ export function LessonPlan({ plan, onClose, activityNotes = {}, onUpdateActivity
                 ))}
               </ul>
             </div>
-            <div>
-              <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Tópicos para Revisão</h4>
-              <div className="flex flex-wrap gap-2">
-                {plan.topicsToReview?.map((topic, i) => (
-                  <span key={i} className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium">
-                    {topic}
-                  </span>
-                ))}
+
+            {plan.recursos_necessarios && (
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Recursos Necessários</h4>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-emerald-300 mb-1">Materiais/Insumos</p>
+                    <div className="flex flex-wrap gap-2">
+                      {plan.recursos_necessarios.materiais.map((m, i) => (
+                        <span key={i} className="px-2 py-1 bg-white/10 rounded-lg text-xs">{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-emerald-300 mb-1">Digitais/Softwares</p>
+                    <div className="flex flex-wrap gap-2">
+                      {plan.recursos_necessarios.digitais.map((d, i) => (
+                        <span key={i} className="px-2 py-1 bg-white/10 rounded-lg text-xs">{d}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {plan.plano_avaliacao && (
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Avaliação Tríplice</h4>
+                <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-300">DIAGNÓSTICA</p>
+                    <p className="text-xs">{plan.plano_avaliacao.diagnostica}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-300">FORMATIVA</p>
+                    <p className="text-xs">{plan.plano_avaliacao.formativa}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-300">SOMATIVA</p>
+                    <p className="text-xs">{plan.plano_avaliacao.somativa}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-6">
+          <div className="lg:col-span-2 space-y-6">
+            {plan.cronograma_detalhado && (
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Cronograma Detalhado</h4>
+                <div className="overflow-hidden rounded-2xl border border-white/10">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-white/10 text-emerald-200">
+                        <th className="p-3 text-left">Tempo</th>
+                        <th className="p-3 text-left">Atividade</th>
+                        <th className="p-3 text-left">Ação Professor</th>
+                        <th className="p-3 text-left">Ação Aluno</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {plan.cronograma_detalhado.map((item, i) => (
+                        <tr key={i} className="hover:bg-white/5">
+                          <td className="p-3 font-bold">{item.tempo}</td>
+                          <td className="p-3">{item.atividade}</td>
+                          <td className="p-3 text-emerald-100">{item.acao_professor}</td>
+                          <td className="p-3 text-emerald-100">{item.acao_aluno}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             <div>
-              <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Atividades Sugeridas</h4>
+              <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-emerald-200">Atividades Práticas Sugeridas</h4>
               <ul className="space-y-3">
                 {plan.practicalActivities?.map((act, i) => (
-                  <li key={i} className="p-3 bg-white/10 rounded-2xl text-sm flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
+                  <li key={i} className="p-4 bg-white/10 rounded-2xl text-sm flex flex-col gap-1 border border-white/5 hover:border-white/20 transition-all">
+                    <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 bg-white/20 rounded-xl text-xs font-bold">{i + 1}</div>
                       <span className="font-bold">{act.name}</span>
-                      <span className="text-xs bg-white/20 px-2 py-1 rounded-md">{act.duration}</span>
+                      <span className="text-xs bg-white/20 px-2 py-1 rounded-md ml-auto">{act.duration}</span>
                     </div>
-                    <p className="text-xs text-emerald-100 pl-10">{act.description}</p>
+                    <p className="text-xs text-emerald-100 mb-2">{act.description}</p>
                     {onUpdateActivityNote && (
                       <textarea
                         placeholder="Adicionar observações para esta atividade..."
-                        className="mt-2 w-full p-2 text-xs bg-white/10 rounded-lg border border-white/20 focus:ring-1 focus:ring-white outline-none"
+                        className="w-full p-3 text-xs bg-black/20 rounded-xl border border-white/10 focus:ring-1 focus:ring-emerald-400 outline-none text-white"
                         value={activityNotes[i] || act.professor_notes || ''}
                         onChange={(e) => onUpdateActivityNote(i, e.target.value)}
                       />

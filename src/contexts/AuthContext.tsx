@@ -3,7 +3,8 @@ import { auth, db } from '../firebase';
 import { 
   onAuthStateChanged, 
   User, 
-  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   signInWithEmailAndPassword,
@@ -37,6 +38,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        await getRedirectResult(auth);
+      } catch (err) {
+        console.error("Error checking redirect result:", err);
+      }
+    };
+    checkRedirect();
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
@@ -107,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (error) {
       console.error("Error signing in with Google:", error);
       throw error;

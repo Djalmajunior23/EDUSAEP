@@ -405,55 +405,59 @@ export function ReportsView({ history }: ReportsViewProps) {
             {Object.entries(groupedData).map(([student, data]) => (
               <div key={student} className="mb-8">
                 <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">{student}</h4>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <LineChart data={data}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="date" 
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: '#9ca3af' }}
-                        dy={10}
-                      />
-                      <YAxis 
-                        domain={[0, 100]}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: '#9ca3af' }}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          borderRadius: '12px', 
-                          border: 'none', 
-                          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                          backgroundColor: '#fff',
-                          color: '#111'
-                        }}
-                      />
-                      <Legend verticalAlign="top" align="right" height={36} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="acuracia" 
-                        name={selectedCompetency === 'all' ? "Média Geral" : `Acurácia - ${selectedCompetency}`}
-                        stroke="#10b981" 
-                        strokeWidth={3}
-                        dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 6, strokeWidth: 0 }}
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="acuraciaPonderada" 
-                        name={selectedCompetency === 'all' ? "Média Ponderada" : `Acurácia Ponderada - ${selectedCompetency}`}
-                        stroke="#3b82f6" 
-                        strokeWidth={3}
-                        dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 6, strokeWidth: 0 }}
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="h-[320px] min-h-[320px] w-full">
+                  {data && Array.isArray(data) && data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <LineChart data={data}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: '#9ca3af' }}
+                          dy={10}
+                        />
+                        <YAxis 
+                          domain={[0, 100]}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: '#9ca3af' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '12px', 
+                            border: 'none', 
+                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                            backgroundColor: '#fff',
+                            color: '#111'
+                          }}
+                        />
+                        <Legend verticalAlign="top" align="right" height={36} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="acuracia" 
+                          name={selectedCompetency === 'all' ? "Média Geral" : `Acurácia - ${selectedCompetency}`}
+                          stroke="#10b981" 
+                          strokeWidth={3}
+                          dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          isAnimationActive={false}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="acuraciaPonderada" 
+                          name={selectedCompetency === 'all' ? "Média Ponderada" : `Acurácia Ponderada - ${selectedCompetency}`}
+                          stroke="#3b82f6" 
+                          strokeWidth={3}
+                          dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-400 font-medium">Sem dados para este aluno</div>
+                  )}
                 </div>
               </div>
             ))}

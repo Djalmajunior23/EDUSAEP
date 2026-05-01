@@ -35,7 +35,7 @@ export interface EduJarvisRequest {
 
 export interface EduJarvisResponse {
   success: boolean;
-  source?: "local_rule" | "database" | "cache" | "ai";
+  source?: "local_rule" | "database" | "cache" | "ai" | "ai_fallback";
   agent?: AgentType | string;
   action?: string;
   response: string;
@@ -46,6 +46,7 @@ export interface EduJarvisResponse {
     cached?: boolean;
     costMode?: CostMode;
     estimatedCost?: number;
+    error_fallback?: string;
   };
 }
 

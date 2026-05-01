@@ -198,10 +198,10 @@ service cloud.firestore {
                data.score is number &&
                data.maxScore is number;
       }
-      allow get: if isSignedIn() && (isTeacher() || isOwner(existing().studentId));
-      allow list: if isSignedIn() && (isTeacher() || resource.data.studentId == request.auth.uid);
+      allow get: if isSignedIn() && (isTeacher() || isAdmin() || isOwner(existing().studentId));
+      allow list: if isSignedIn() && (isTeacher() || isAdmin() || resource.data.studentId == request.auth.uid || request.auth != null);
       allow create: if isSignedIn() && isValidSubmission(request.resource.data);
-      allow update: if (isTeacher() || isOwner(existing().studentId)) && 
+      allow update: if (isTeacher() || isAdmin() || isOwner(existing().studentId)) && 
                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['professorFeedback', 'professorNota', 'updatedAt', 'notified']);
       allow delete: if isAdmin();
     }
@@ -420,6 +420,36 @@ service cloud.firestore {
 
     match /studentRiskScores/{studentId} {
       allow read: if isAuthenticated() && (isAdmin() || isProfessor() || studentId == request.auth.uid);
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /avaliacoes/{examId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /analises_performance/{analysisId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.alunoId == request.auth.uid);
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /mapas_lacunas/{mapId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.alunoId == request.auth.uid);
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /planos_recuperacao/{planId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.alunoId == request.auth.uid);
+      allow write: if isAdmin() || isProfessor();
+    }
+
+    match /tutor_chat_history/{chatId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.userId == request.auth.uid);
+      allow write: if isAuthenticated() && (isAdmin() || isProfessor() || request.resource.data.userId == request.auth.uid);
+    }
+    
+    match /LearningDNA/{dnaId} {
+      allow read: if isAuthenticated() && (isAdmin() || isProfessor() || resource.data.userId == request.auth.uid);
       allow write: if isAdmin() || isProfessor();
     }
 

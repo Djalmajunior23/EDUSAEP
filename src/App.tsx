@@ -201,6 +201,9 @@ import { TRIDashboardView } from "./components/professor/TRIDashboardView";
 import { handleFirestoreError, OperationType } from "./services/errorService";
 
 import { PedagogicalIntelligenceHub } from "./components/professor/PedagogicalIntelligenceHub";
+import BIInteligentePage from "./pages/BIInteligentePage";
+import GamificacaoPage from "./pages/GamificacaoPage";
+import SupabaseAdminStatusPage from "./pages/SupabaseAdminStatusPage";
 import { EduJarvisUltraDashboard } from "./components/eduJarvis/EduJarvisUltraDashboard";
 import { TutorJarvisView } from "./components/eduJarvis/TutorJarvisView";
 import { ActivityGradingPage } from "./pages/professor/ActivityGradingPage";
@@ -3957,6 +3960,39 @@ function AppContent() {
                       allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
                     >
                       <ActivityGradingPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/bi-inteligente"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
+                    >
+                      <BIInteligentePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/gamificacao"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["TEACHER", "ADMIN", "COORDINATOR", "STUDENT", "MONITOR"]}
+                    >
+                      <GamificacaoPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/supabase-status"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["ADMIN"]}
+                    >
+                      <SupabaseAdminStatusPage />
                     </ProtectedRoute>
                   }
                 />

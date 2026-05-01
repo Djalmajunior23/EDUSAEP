@@ -28,11 +28,18 @@ export function TeacherCopilotDashboard({ userProfile, selectedModel }: { userPr
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [priorities, setPriorities] = useState<any[]>([]);
+  const [prioritiesError, setPrioritiesError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (userProfile?.uid) {
-      TeacherCopilotService.generateDailyPriorities(userProfile.uid, selectedModel).then(setPriorities);
+      setPrioritiesError(false);
+      TeacherCopilotService.generateDailyPriorities(userProfile.uid, selectedModel)
+        .then(setPriorities)
+        .catch(err => {
+          console.error("Error fetching priorities:", err);
+          setPrioritiesError(true);
+        });
     }
   }, [userProfile?.uid, selectedModel]);
 
@@ -139,14 +146,24 @@ export function TeacherCopilotDashboard({ userProfile, selectedModel }: { userPr
               Prioridades do Dia
             </h3>
             
-            {Array.isArray(priorities) && priorities.length === 0 ? (
+            {prioritiesError ? (
+              <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-center">
+                <p className="text-xs text-red-600 font-medium">Não foi possível carregar as prioridades agora.</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="mt-2 text-[10px] font-bold text-red-700 uppercase underline"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
+            ) : Array.isArray(priorities) && priorities.length === 0 ? (
               <div className="animate-pulse space-y-3">
                 <div className="h-16 bg-gray-100 rounded-xl"></div>
                 <div className="h-16 bg-gray-100 rounded-xl"></div>
               </div>
-            ) : (
+            ) : priorities && Array.isArray(priorities) ? (
               <div className="space-y-3">
-                {Array.isArray(priorities) && priorities.map((p, idx) => (
+                {priorities.map((p, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
                     <div className="flex items-start justify-between mb-1">
                       <span className={`text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded ${
@@ -167,6 +184,8 @@ export function TeacherCopilotDashboard({ userProfile, selectedModel }: { userPr
                   </div>
                 ))}
               </div>
+            ) : (
+                <div className="p-4 text-center text-gray-400 text-xs italic">Nenhuma prioridade urgente para hoje.</div>
             )}
           </div>
 

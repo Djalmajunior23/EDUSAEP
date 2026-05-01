@@ -104,7 +104,7 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         };
         break;
       case "GERAR_SIMULADO":
-        const assessmentResult = await assessmentAgent(command || "", userId, enhancedContext);
+        const assessmentResult = await assessmentAgent({ ...request, command: command || "", context: enhancedContext });
         result = {
           success: true,
           ...assessmentResult,
@@ -112,7 +112,7 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         };
         break;
       case "ANALISAR_DESEMPENHO":
-        const perfResult = await performanceAgent(command || "", userId, enhancedContext);
+        const perfResult = await performanceAgent({ ...request, command: command || "", context: enhancedContext });
         result = {
           success: true,
           ...perfResult,
@@ -120,7 +120,7 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         };
         break;
       case "GERAR_TRILHA_APRENDIZAGEM":
-        const lpResult = await learningPathAgent(command || "", userId, enhancedContext);
+        const lpResult = await learningPathAgent({ ...request, command: command || "", context: enhancedContext });
         result = {
           success: true,
           ...lpResult,

@@ -69,16 +69,56 @@ export class TeacherCopilotService {
   }
 
   public static async generateDailyPriorities(teacherId: string, model?: string): Promise<any[]> {
-    return [
-      { id: '1', title: 'Revisar Turma A', description: 'Baixo desempenho em Matemática', priority: 'HIGH' }
-    ];
+    try {
+      const response = await fetch('/api/edu-jarvis/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: teacherId,
+          userRole: 'TEACHER',
+          command: "Quais são minhas prioridades pedagógicas para hoje?",
+          context: { teacherId }
+        })
+      });
+      const data = await response.json();
+      return data.priorities || [
+        { id: '1', title: 'Revisar Turma A', desc: 'Dificuldade detectada em lógica de programação.', type: 'urgente' },
+        { id: '2', title: 'Feedback Atividade 4', desc: 'Aguardando sua validação para liberação.', type: 'correcao' }
+      ];
+    } catch (err) {
+      console.error("Error generateDailyPriorities:", err);
+      return [];
+    }
   }
 
   public static async generateAndSavePBLActivity(teacherId: string, topic: string, model?: string): Promise<{ text: string }> {
-    return { text: "PBL activity content" };
+    const response = await fetch('/api/edu-jarvis/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: teacherId,
+        userRole: 'TEACHER',
+        command: `Gerar um Estudo de Caso Prático (PBL) para o tema: ${topic}`,
+        action: 'GERAR_ESTUDO_CASO',
+        input: { topic }
+      })
+    });
+    const data = await response.json();
+    return { text: data.text || data.response || "Falha ao gerar atividade." };
   }
 
   public static async processMessage(teacherId: string, message: string, history: any[], model?: string): Promise<string> {
-    return "Resposta do copiloto";
+    const response = await fetch('/api/edu-jarvis/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: teacherId,
+        userRole: 'TEACHER',
+        command: message,
+        context: { history }
+      })
+    });
+    const data = await response.json();
+    return data.response || data.text || "Desculpe, não consegui processar sua mensagem.";
   }
 }

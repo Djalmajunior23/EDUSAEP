@@ -357,21 +357,25 @@ export function StudentInsights({ studentId, selectedModel = "gemini-1.5-flash" 
             <Target className="text-emerald-600" size={20} />
           </div>
           
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar
-                  name="Aluno"
-                  dataKey="A"
-                  stroke="#059669"
-                  fill="#10b981"
-                  fillOpacity={0.5}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+          <div className="h-[320px] min-h-[320px] w-full">
+            {radarData && Array.isArray(radarData) && radarData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <Radar
+                    name="Aluno"
+                    dataKey="A"
+                    stroke="#059669"
+                    fill="#10b981"
+                    fillOpacity={0.5}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400 font-medium">Sem dados de radar disponíveis</div>
+            )}
           </div>
         </motion.div>
 
@@ -388,22 +392,26 @@ export function StudentInsights({ studentId, selectedModel = "gemini-1.5-flash" 
             <TrendingUp className="text-blue-600" size={20} />
           </div>
 
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <LineChart data={submissions.slice().reverse().map(s => ({
-                date: s.completedAt?.seconds ? new Date(s.completedAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '---',
-                ...Object.fromEntries(Object.entries(s.competencyResults || {}).map(([k, v]: any) => [k, v.acuracia * 100]))
-              }))}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                {Object.keys(submissions[0]?.competencyResults || {}).map((key, i) => (
-                  <Line key={key} type="monotone" dataKey={key} stroke={`hsl(${i * 40}, 70%, 50%)`} strokeWidth={2} dot={{ r: 4 }} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="h-[320px] min-h-[320px] w-full">
+            {submissions && Array.isArray(submissions) && submissions.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <LineChart data={submissions.slice().reverse().map(s => ({
+                  date: s.completedAt?.seconds ? new Date(s.completedAt.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '---',
+                  ...Object.fromEntries(Object.entries(s.competencyResults || {}).map(([k, v]: any) => [k, v.acuracia * 100]))
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                  {Object.keys(submissions[0]?.competencyResults || {}).map((key, i) => (
+                    <Line key={key} type="monotone" dataKey={key} stroke={`hsl(${i * 40}, 70%, 50%)`} strokeWidth={2} dot={{ r: 4 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400 font-medium">Sem histórico de evolução disponível</div>
+            )}
           </div>
         </motion.div>
       </div>
@@ -458,7 +466,7 @@ export function StudentInsights({ studentId, selectedModel = "gemini-1.5-flash" 
                     <span className="font-bold text-gray-700 dark:text-gray-300">{item.subject}</span>
                     <span className="text-xs text-gray-500">Aluno: {item.A.toFixed(0)}% | Turma: {avg.toFixed(0)}%</span>
                   </div>
-                  <div className="h-20 w-full">
+                  <div className="h-[120px] min-h-[120px] w-full">
                     <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <BarChart data={[{ name: 'Aluno', value: item.A }, { name: 'Turma', value: avg }]} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                         <XAxis type="number" domain={[0, 100]} hide />

@@ -1,7 +1,9 @@
 import { callAI } from '../aiProvider';
 import admin from 'firebase-admin';
+import { EduJarvisRequest } from '../../../types/eduJarvisTypes';
 
-export async function learningPathAgent(command: string, userId: string, context?: any) {
+export async function learningPathAgent(request: EduJarvisRequest) {
+  const { command = "", userId, context } = request;
   const db = admin.firestore();
   
   let targetStudentId = context?.studentId || userId;

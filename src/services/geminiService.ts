@@ -1283,12 +1283,27 @@ export interface LessonPlanResult {
   title: string;
   objectives: string[];
   topicsToReview: string[];
+  cronograma_detalhado?: Array<{
+    tempo: string;
+    atividade: string;
+    acao_professor: string;
+    acao_aluno: string;
+  }>;
   practicalActivities: Array<{
     name: string;
     description: string;
     duration: string;
     professor_notes?: string;
   }>;
+  recursos_necessarios?: {
+    materiais: string[];
+    digitais: string[];
+  };
+  plano_avaliacao?: {
+    diagnostica: string;
+    formativa: string;
+    somativa: string;
+  };
   suggestedMaterials: string[];
   aiInsights: string;
 }
@@ -1301,31 +1316,29 @@ export async function generateLessonPlan(classData: any, cognitiveAnalyses: any[
         role: "user",
         parts: [
           {
-            text: `Com base nos dados de desempenho da turma e nas análises de erros cognitivos, gere um plano de aula focado em remediar as dificuldades mais comuns.
+            text: `Gere um Plano de Aula Pedagógico de Alta Performance (Padrão SENAI/SAEP) focado em remediar as dificuldades da turma.
             
-            DADOS DA TURMA (Desempenho por competência):
+            DADOS DA TURMA:
             ${JSON.stringify(classData)}
             
-            ANÁLISES DE ERROS COGNITIVOS DA TURMA:
+            ANÁLISES DE ERROS COGNITIVOS:
             ${JSON.stringify(cognitiveAnalyses)}
             
-            INSTRUÇÕES ADICIONAIS:
-            1. Agrupe os erros cognitivos por competência.
-            2. Priorize as competências com menor desempenho (identificadas nos dados da turma).
-            3. Gere o plano de aula focado nessas competências críticas.
-            
+            EXIGÊNCIAS OBRIGATÓRIAS NO JSON:
+            1. cronograma_detalhado: Divisão minuto a minuto com ações de professor e aluno.
+            2. recursos_necessarios: Liste materiais físicos e digitais separadamente.
+            3. plano_avaliacao: Estratégia Diagnóstica, Formativa e Somativa.
+            4. practicalActivities: Atividades práticas de "mão na massa".
+
             RETORNE UM JSON COM:
             {
               "title": string,
               "objectives": [string],
               "topicsToReview": [string],
-              "practicalActivities": [
-                {
-                  "name": string,
-                  "description": string,
-                  "duration": string
-                }
-              ],
+              "cronograma_detalhado": [{ "tempo": string, "atividade": string, "acao_professor": string, "acao_aluno": string }],
+              "practicalActivities": [{ "name": string, "description": string, "duration": string }],
+              "recursos_necessarios": { "materiais": [string], "digitais": [string] },
+              "plano_avaliacao": { "diagnostica": string, "formativa": string, "somativa": string },
               "suggestedMaterials": [string],
               "aiInsights": string
             }`

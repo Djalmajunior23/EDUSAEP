@@ -11,6 +11,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { processCommand as processEduJarvisCommand } from "./src/server/eduJarvis/processCommand";
 import { EduJarvisCore } from "./src/server/eduJarvis/eduJarvisCore";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 import fs from "fs";
 
@@ -56,6 +57,26 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Rate Limiting for security
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: { success: false, error: "Muitas solicitações deste IP, tente novamente mais tarde." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 50, // More restrictive for expensive AI calls
+    message: { success: false, error: "Limite de solicitações de IA atingido por hoje." },
+  });
+
+  // Apply rate limiter to API routes
+  app.use("/api/", apiLimiter);
+  app.use("/api/ai/", aiLimiter);
+  app.use("/api/edu-jarvis/", aiLimiter);
 
   // Use the cors package for robust CORS handling
   app.use(cors({
@@ -290,6 +311,88 @@ async function startServer() {
       error: `Método ${req.method} não permitido nesta rota. Use ${allowedMethod}.` 
     });
   };
+
+  // Health Check Endpoints
+  app.get("/status", async (_req, res) => {
+    try {
+      const dbStatus = await db.collection('_health').doc('check').get()
+        .then(() => "online")
+        .catch(() => "error");
+      
+      res.json({
+        status: "operational",
+        timestamp: new Date().toISOString(),
+        services: {
+          frontend: "online",
+          backend: "online",
+          database: dbStatus,
+          eduJarvis: "online"
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ status: "degraded", error: "Internal check failed" });
+    }
+  });
+
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const start = Date.now();
+      await db.collection('_health').doc('check').set({ lastCheck: admin.firestore.FieldValue.serverTimestamp() });
+      const latency = Date.now() - start;
+      
+      res.json({
+        success: true,
+        status: "ok",
+        uptime: process.uptime(),
+        latency: `${latency}ms`,
+        environment: process.env.NODE_ENV || 'development'
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, status: "error" });
+    }
+  });
+
+  app.get("/api/edu-jarvis/health", (_req, res) => {
+    res.json({
+      success: true,
+      agent: "EduJarvis Orchestrator",
+      status: "ready",
+      version: "2.0.0-ultra",
+      capabilities: [
+        "Tutor", "Copiloto", "Gerador Atividades", "Corretor", "Analisador BI"
+      ]
+    });
+  });
+
+  app.get("/api/edu-jarvis/stats", async (_req, res) => {
+    try {
+      const logsSnap = await db.collection('aiUsageLogs')
+        .orderBy('timestamp', 'desc')
+        .limit(100)
+        .get();
+      
+      const stats = {
+        total: logsSnap.size,
+        success: 0,
+        error: 0,
+        latencyAvg: 0,
+        providers: {} as Record<string, number>
+      };
+
+      logsSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.success) stats.success++; else stats.error++;
+        stats.latencyAvg += data.latency || 0;
+        stats.providers[data.provider] = (stats.providers[data.provider] || 0) + 1;
+      });
+
+      if (stats.total > 0) stats.latencyAvg /= stats.total;
+
+      res.json({ success: true, stats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
 
   // API Routes
   app.post("/api/edu-jarvis/process", promptInjectionGuard, async (req, res) => {
