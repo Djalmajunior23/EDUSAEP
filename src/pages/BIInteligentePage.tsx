@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { analyticsSupabaseService } from '../services/supabase/analyticsService';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { TopCognitiveErrors } from '../components/analytics/TopCognitiveErrors';
 
 export default function BIInteligentePage({ user, userProfile }: any) {
   const [loading, setLoading] = useState(true);
@@ -142,6 +143,10 @@ export default function BIInteligentePage({ user, userProfile }: any) {
             )}
           </div>
         </ChartCard>
+      </div>
+
+      <div className="mt-8">
+        <TopCognitiveErrors />
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 p-8">

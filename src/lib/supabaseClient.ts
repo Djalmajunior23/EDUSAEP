@@ -1,16 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
-import { logger } from '../utils/logger';
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  logger.warn('SUPABASE', "Supabase credentials missing. Analytics features will operate in degraded mode.");
+  console.warn("Supabase não configurado corretamente.");
 }
 
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder'
+  supabaseUrl || "",
+  supabaseAnonKey || ""
 );
 
 export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
