@@ -5,8 +5,17 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-    ports:
-      - "3000:3000"
-    environment:
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    container_name: eduaicore_frontend
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eduaicore.rule=Host(`teacherjuniors.com.br`)"
+      - "traefik.http.routers.eduaicore.entrypoints=websecure"
+      - "traefik.http.routers.eduaicore.tls.certresolver=letsencrypt"
+      - "traefik.http.services.eduaicore.loadbalancer.server.port=80"
+    networks:
+      - traefik_public
+
+networks:
+  traefik_public:
+    external: true
