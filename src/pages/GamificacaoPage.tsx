@@ -31,7 +31,7 @@ export default function GamificacaoPage() {
       setRanking(data || []);
       
       // Compute user stats if needed from Supabase or just fallback
-      const meItem = data.find((d: any) => d.id === user?.uid);
+      const meItem = (data || []).find((d: any) => d.id === user?.uid);
       if (meItem) {
         setUserStats({ xp: meItem.total, level: Math.floor(meItem.total / 1000) + 1 });
       } else {

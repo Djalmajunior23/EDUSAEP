@@ -313,12 +313,12 @@ export function EduJarvisMessage({ message }: Props) {
                 </div>
                 <div className="p-4">
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {data.vulnerabilities.map((v: string, i: number) => (
+                    {data.vulnerabilities?.map((v: string, i: number) => (
                       <span key={i} className="px-2 py-1 bg-rose-50 dark:bg-rose-900/40 text-[9px] font-black text-rose-600 border border-rose-200 dark:border-rose-800 rounded uppercase">
                         {v.replace('_', ' ')}
                       </span>
                     ))}
-                    {data.vulnerabilities.length === 0 && (
+                    {(!data.vulnerabilities || data.vulnerabilities.length === 0) && (
                       <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-900/40 text-[9px] font-black text-emerald-600 border border-emerald-200 dark:border-emerald-800 rounded uppercase">
                         SEM VULNERABILIDADES
                       </span>

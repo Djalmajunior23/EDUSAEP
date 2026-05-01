@@ -31,43 +31,43 @@ REGRAS DE OURO PARA PRODUÇÃO PEDAGÓGICA:
         
         const actionPrompts: Record<string, string> = {
             "GERAR_AULA": `Gere uma Estrutura de Aula Completa e Dinâmica. 
-              Exigências Obrigatórias no JSON (campo 'data'):
+              Exigências Obrigatórias no JSON:
               - titulo (string).
               - objetivos (string[]).
               - topicos_principais (lista: { titulo: string, descricao: string }).
               - dinamica_engajamento (string: proposta de interação).
               - ferramenta_apoio (string: sugestão de IA ou software).`,
             "GERAR_ATIVIDADE_PRATICA": `Gere um Roteiro de Atividade Prática técnica/industrial. 
-              Exigências Obrigatórias no JSON (campo 'data'):
+              Exigências Obrigatórias no JSON:
               - titulo_pratica (string).
               - materiais_necessarios (string[]).
               - segurança (objeto: { epis: string[], riscos: string[] }).
               - passos (lista: { ordem: number, descricao: string }).
               - criterios_sucesso (string[]).`,
-            "GERAR_PLANO_AULA": `Gere um Plano de Aula Pedagógico de Alta Performance (Padrão Ultra). 
-              Exigências Obrigatórias no JSON (campo 'data'):
+            "GERAR_PLANO_AULA": `Gere um Plano de Aula Pedagógico SUPER DETALHADO E COMPLETO. 
+              Exigências Obrigatórias no JSON:
               - titulo (string: Título atrativo).
-              - cronograma (lista de objetos: { tempo: string, atividade: string, acao_professor: string, acao_aluno: string }).
-              - recursos (objeto: { materiais_fisicos: string[], ferramentas_digitais: string[], softwares: string[] }).
-              - avaliacao (objeto: { diagnostica: string, formativa: string, somativa: string }).
-              - objetivos_aprendizagem (lista: string[] baseados na Taxonomia de Bloom).
-              - metodologia (string: ex: PBL, Metodologias Ativas).`,
+              - cronograma_detalhado (lista de objetos: { tempo_minutos: number, fase: string, atividade: string, acao_professor: string, acao_aluno: string }).
+              - recursos_educacionais (objeto: { materiais_fisicos: string[], ferramentas_digitais: string[], softwares_recomendados: string[], leituras: string[] }).
+              - metodos_avaliacao (objeto: { diagnostica: { metodo: string, o_que_verificar: string }, formativa: { metodo: string, monitoramento: string }, somativa: { metodo: string, criterios_sucesso: string[] } }).
+              - objetivos_aprendizagem (lista de strings baseados na Taxonomia de Bloom).
+              - metodologia (string: ex: Metodologias Ativas, PBL).`,
             "GERAR_AULA_INVERTIDA": `Planeje uma estratégia de Aula Invertida (Flipped Classroom) completa e engajadora. 
-              Exigências Obrigatórias no JSON (campo 'data'):
+              Exigências Obrigatórias no JSON:
               - tema_central (string).
-              - pre_aula (objeto: { curadoria: { tipo: "video" | "leitura" | "podcast", descricao: string, link: string }[], atividade_verificacao: string }).
-              - em_sala (objeto: { desafio_pbl: string, dinámica_grupo: string, recursos_necessarios: string[] }).
-              - consolidacao (string: atividade de fechamento).`,
-            "GERAR_ESTUDO_CASO": `Crie um Estudo de Caso Profissional baseado em cenários REAIS e complexos de mercado (Dilemas Éticos/Técnicos). 
-              Exigências Obrigatórias no JSON (campo 'data'):
+              - pre_aula (objeto: { materiais_estudo: { tipo: "video" | "leitura" | "podcast", descricao: string, link_exemplo: string }[], desafio_verificacao: string }).
+              - em_sala (objeto: { desafio_pratico: string, dinâmica_colaborativa: string, recursos_necessarios: string[] }).
+              - consolidacao (string: atividade de fechamento e reflexão).`,
+            "GERAR_ESTUDO_CASO": `Crie um Estudo de Caso Profissional baseado em cenários REAIS e complexos (Dilemas Éticos/Técnicos). 
+              Exigências Obrigatórias no JSON:
               - titulo_caso (string).
-              - contexto_industrial (descrição rica do cenário e empresa).
-              - problema_central (detalhe da falha, conflito ou dilema técnico).
-              - dados_e_kpis (objeto: KPIs impactados ou logs de erro mockados).
-              - perguntas_norteadoras (lista: 3 questões nível Bloom superior: Analisar/Criar).
-              - guia_facilitador (string: dicas para o professor conduzzir a discussão).`,
+              - contexto_real (descrição rica do cenário, empresa e mercado).
+              - problema_central (detalhe a fundo da falha, conflito ou dilema técnico real).
+              - dados_kpis (objeto detalhando indicadores impactados ou logs de erro).
+              - perguntas_norteadoras (lista: 3 a 5 questões para Analisar, Avaliar ou Criar).
+              - guia_professor (string: dicas para o professor orientar a discussão e resolução).`,
             "GERAR_RUBRICA": `Gere uma Rubrica de Avaliação por Competências de alto nível. 
-              Exigências Obrigatórias no JSON (campo 'data'):
+              Exigências Obrigatórias no JSON:
               - criterios (lista: { nome: string, peso: number, niveis: { insuficiente: string, basico: string, pleno: string, avancado: string } }).`,
             "SUGERIR_INTERVENCAO": "Analise as lacunas e gere um roteiro de intervenção pedagógica personalizada."
         };
@@ -86,11 +86,13 @@ CONTEXTO PEDAGÓGICO:
 ${JSON.stringify(context, null, 2)}
 
 IMPORTANTE: 
-1. Gere o conteúdo técnico detalhado conforme as REGRAS DE OURO.
-2. No JSON de retorno, inclua obrigatoriamente um campo "response" contendo a versão formatada em Markdown elegante de todo o material gerado (para exibição direta ao usuário).
-3. Inclua também os campos estruturados (ex: cronograma_detalhado, recursos, etc) para processamento via sistema.
-
-RETORNE APENAS O JSON ESTRUTURADO.
+1. Gere o conteúdo técnico detalhado conforme as REGRAS DE OURO e as Exigências de JSON fornecidas.
+2. Formate a resposta OBRIGATORIAMENTE em JSON válido. O JSON principal deve conter os dados estruturados solicitados E um campo "response" com o texto formatado em Markdown para exibição.
+Exemplo de Estrutura Esperada:
+{
+  "response": "# Plano de Aula... (markdown gerado formatado)",
+  "data": { ... conteúdo estruturado aqui dentro conforme as exigências da AÇÃO ... }
+}
 `;
 
         const aiResponse = await callAI({ 
