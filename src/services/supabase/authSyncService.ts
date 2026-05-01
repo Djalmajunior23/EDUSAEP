@@ -1,4 +1,4 @@
-import { supabase } from "../supabaseClient";
+import { supabase } from "../../lib/supabaseClient";
 
 /**
  * Sincroniza o usuário do Firebase com o Supabase

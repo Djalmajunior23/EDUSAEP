@@ -3970,7 +3970,7 @@ function AppContent() {
                       userProfile={userProfile}
                       allowedRoles={["TEACHER", "ADMIN", "COORDINATOR"]}
                     >
-                      <BIInteligentePage />
+                      <BIInteligentePage user={user} userProfile={userProfile} />
                     </ProtectedRoute>
                   }
                 />

@@ -11,7 +11,7 @@ import {
 import { analyticsSupabaseService } from '../services/supabase/analyticsService';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
 
-export default function BIInteligentePage() {
+export default function BIInteligentePage({ user, userProfile }: any) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [compAverages, setCompAverages] = useState<any[]>([]);
@@ -28,17 +28,22 @@ export default function BIInteligentePage() {
   }, [isConfigured]);
 
   const fetchData = async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      // IDs de exemplo, em produção pegaria do contexto da turma/aluno
-      const averages = await analyticsSupabaseService.getClassAverageByCompetency('turma-demo');
-      const evolution = await analyticsSupabaseService.getStudentEvolution('aluno-demo');
+      // Tenta buscar dados reais baseados no perfil do usuário
+      // Se não houver turma vinculada, usa demo para visualização inicial
+      const targetTurma = userProfile?.turmaId || 'turma-demo';
+      const targetAluno = userProfile?.role === 'STUDENT' ? user.uid : 'aluno-demo';
+
+      const averages = await analyticsSupabaseService.getClassAverageByCompetency(targetTurma);
+      const evolution = await analyticsSupabaseService.getStudentEvolution(targetAluno);
       
       setCompAverages(averages);
       setEvolutionData(evolution);
     } catch (err: any) {
-      setError("Erro ao carregar dados do Supabase BI.");
+      setError("Erro ao carregar dados analíticos. Verifique se as tabelas foram migradas para o Supabase.");
     } finally {
       setLoading(false);
     }

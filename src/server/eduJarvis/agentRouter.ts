@@ -29,6 +29,7 @@ export function detectIntent(command?: string): string {
   if (lowerCmd.includes("estudo de caso")) return "GERAR_ESTUDO_CASO";
   if (lowerCmd.includes("rubrica")) return "GERAR_RUBRICA";
   if (lowerCmd.includes("aula") && lowerCmd.includes("gerar")) return "GERAR_AULA";
+  if (lowerCmd.includes("dúvida") || lowerCmd.includes("explicar") || lowerCmd.includes("o que é")) return "EXPLICAR_CONTEUDO";
   if (lowerCmd.includes("atividade") || lowerCmd.includes("exercício")) return "GERAR_ATIVIDADE";
   if (lowerCmd.includes("intervenção") || lowerCmd.includes("ajuda")) return "SUGERIR_INTERVENCAO";
   if (lowerCmd.includes("corrigir") || lowerCmd.includes("correção")) return "CORRIGIR_RESPOSTA";

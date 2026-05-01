@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Users, BookOpen, TrendingUp, LayoutDashboard, 
-  CheckSquare, Target, ArrowRight, Database, Brain, History, FolderPlus 
+  CheckSquare, Target, ArrowRight, Database, Brain, History, FolderPlus, Trophy 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Database, CheckCircle, XCircle, Shield, Key, Server, RefreshCw } from 'lucide-react';
+import { Database, CheckCircle, XCircle, Shield, Key, Server, RefreshCw, Zap } from 'lucide-react';
 
 export default function SupabaseAdminStatusPage() {
   const [status, setStatus] = useState<any>({

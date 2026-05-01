@@ -218,6 +218,30 @@ export function TutorJarvisView() {
                     )}
                   </div>
                 )}
+
+                {msg.data?.planoEstudo && (
+                  <div className="mt-4 p-5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-blue-500 rounded-lg text-white">
+                        <BookOpen size={14} />
+                      </div>
+                      <p className="font-black text-blue-800 dark:text-blue-300 text-xs uppercase tracking-tighter">Plano de Estudo Gerado</p>
+                    </div>
+                    <h4 className="font-bold text-blue-900 dark:text-blue-100 mb-2">{msg.data.planoEstudo.titulo}</h4>
+                    <ul className="space-y-2 mb-4">
+                      {msg.data.planoEstudo.etapas.map((etapa: string, idx: number) => (
+                        <li key={idx} className="flex gap-2 items-start text-xs text-blue-800 dark:text-blue-200">
+                          <div className="w-4 h-4 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{idx + 1}</div>
+                          {etapa}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="p-3 bg-white/50 dark:bg-black/20 rounded-xl border border-blue-200/50 dark:border-blue-800/30">
+                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">Recomendação do Jarvis:</p>
+                      <p className="text-xs italic text-blue-900 dark:text-blue-100">{msg.data.planoEstudo.recomendacao}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}

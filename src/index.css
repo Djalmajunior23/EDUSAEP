@@ -16,6 +16,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply antialiased bg-gray-50 text-gray-900 transition-colors duration-300;
   }
@@ -23,6 +27,20 @@
   .dark body {
     @apply bg-gray-950 text-gray-100;
   }
+}
+
+/* Custom Scrollbar For Fluid UI */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 dark:bg-gray-800 rounded-full border-4 border-solid border-transparent bg-clip-padding hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors;
 }
 
 .markdown-body {

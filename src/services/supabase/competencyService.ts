@@ -15,9 +15,9 @@ export const competencySupabaseService = {
       .from('respostas_simulado')
       .select(`
         foi_correto,
-        questoes_analiticas(competencia_id, competencias(nome))
+        questoes_analiticas(competencia_id, competencias(nome)),
+        tentativas_simulado!inner(turma_id)
       `)
-      .innerJoin('tentativas_simulado', 'tentativa_id', 'id')
       .eq('tentativas_simulado.turma_id', turmaId);
 
     if (error) return [];

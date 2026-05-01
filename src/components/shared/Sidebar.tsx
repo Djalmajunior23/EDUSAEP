@@ -157,10 +157,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       
       { type: 'header', id: 'h-data', label: 'Dados e BI' },
       { id: 'reports', label: 'Relatórios', icon: BarChart3, path: '/reports' },
+      { id: 'bi-inteligente', label: 'BI Inteligente', icon: TrendingUp, path: '/bi-inteligente', description: 'Análise Supabase', badge: 'ULTRA' },
       { id: 'tri-analysis', label: 'Análise TRI', icon: Target, path: '/tri-analysis' },
       { id: 'data-import', label: 'Importação SIAC', icon: Database, path: '/data-import' },
       
       { type: 'header', id: 'h-sys', label: 'Sistema' },
+      { id: 'supabase-status', label: 'Status Supabase', icon: ZapIcon, path: '/supabase-status', description: 'Infra híbida' },
       { id: 'security-hub', label: 'Cybersecurity', icon: Shield, path: '/security-hub', description: 'EuAiCore SecOps' },
       { id: 'system-governance', label: 'Governança IA', icon: Shield, path: '/system-governance' },
       { id: 'admin-users', label: 'Usuários', icon: Users, path: '/admin-users' },
@@ -210,7 +212,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 activeId === item.id || location.pathname === item.path ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500 group-hover:text-emerald-500"
               )} />
               <div className="text-left flex-1 overflow-hidden">
-                <p className="truncate">{item.label}</p>
+                <div className="flex items-center gap-1.5 overflow-hidden">
+                  <p className="truncate">{item.label}</p>
+                  {item.badge && (
+                    <span className="text-[8px] font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded-md leading-none shrink-0">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
                 {item.description && <p className="text-[10px] opacity-60 font-normal truncate">{item.description}</p>}
               </div>
             </button>

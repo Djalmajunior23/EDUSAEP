@@ -16,6 +16,7 @@ import { memoryAgent } from './agents/memoryAgent';
 import { visionAgent } from './agents/visionAgent';
 import { biAgent } from './agents/biAgent';
 import { automationAgent } from './agents/automationAgent';
+import { studentAgent } from './agents/studentAgent';
 import { securityAgent } from './security/securityAgent';
 import { logAudit } from './security/auditLogger';
 import { questionOptimizerAgent } from './agents/questionOptimizerAgent';
@@ -178,15 +179,27 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         };
         break;
       case "EXPLICAR_CONTEUDO":
+      case "CRIAR_PLANO_ESTUDO":
       case "COMANDO_GERAL":
       default:
-        const aiRes = await pedagogicalAgent(command || "", enhancedContext);
-        result = { 
-          success: true,
-          response: aiRes.text, 
-          action: 'COMANDO_GERAL',
-          metadata: responseMetadata
-        };
+        if (userRole === "STUDENT" || userRole === "ALUNO") {
+          const studentResult = await studentAgent({ ...request, action: intent as any, context: enhancedContext });
+          result = {
+            success: true,
+            response: studentResult.resposta || "Tutor gerou uma resposta.",
+            data: studentResult,
+            action: intent as any,
+            metadata: responseMetadata
+          };
+        } else {
+          const aiRes = await pedagogicalAgent(command || "", enhancedContext);
+          result = { 
+            success: true,
+            response: aiRes.text, 
+            action: intent || 'COMANDO_GERAL',
+            metadata: responseMetadata
+          };
+        }
         break;
     }
 

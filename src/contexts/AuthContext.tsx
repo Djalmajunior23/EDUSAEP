@@ -15,6 +15,7 @@ import {
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../services/errorService';
+import { syncFirebaseUserToSupabase } from '../services/supabase/authSyncService';
 
 interface AuthContextType {
   user: User | null;
@@ -79,6 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setUserProfile(data);
         setIsAuthReady(true);
+        
+        // Sincronização Híbrida (Firebase -> Supabase)
+        syncFirebaseUserToSupabase(user, data).catch(err => 
+          console.warn("Supabase Sync Error:", err)
+        );
       } else {
         // Create profile if it doesn't exist
         const isFirstUser = user.email === 'djalmabatistajunior@gmail.com';
