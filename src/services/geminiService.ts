@@ -6,7 +6,7 @@ import { db, auth } from "../firebase";
 import { UserRole } from "../types";
 import { normalizeImportError } from "../utils/normalizeImportError";
 import { simpleRegexParser } from "../utils/simpleRegexParser";
-import { safeArray, safeJoin } from "../utils/safeData";
+import { safeArray, safeJoin } from "../utils/safeUtils";
 import { z } from 'zod';
 
 

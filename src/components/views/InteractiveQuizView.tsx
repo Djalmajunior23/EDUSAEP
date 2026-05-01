@@ -93,7 +93,7 @@ export function InteractiveQuizView() {
 
     try {
       await quizService.submitAttempt(attempt);
-      await gamificationService.awardPoints(user.uid, 50, 50); // Award 50 XP/Points
+      await gamificationService.awardPoints(user.uid, 50, `Participação no Quiz: ${selectedQuiz.title}`); 
       setQuizFinished(true);
       fetchData();
     } catch (err) {

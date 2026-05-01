@@ -70,8 +70,8 @@ export function HistoryView({
     });
   }, [history, searchTerm, viewMode, sortOption]);
 
-  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
-  const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil((filteredHistory?.length || 0) / itemsPerPage);
+  const paginatedHistory = (filteredHistory || []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     setCurrentPage(1);

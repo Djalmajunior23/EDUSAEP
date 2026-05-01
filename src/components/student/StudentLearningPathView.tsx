@@ -420,7 +420,7 @@ export function StudentLearningPathView({ userProfile }: { userProfile: any }) {
 
             <button 
               onClick={async () => {
-                await gamificationEngine.awardXP(userProfile.uid, 500);
+                await gamificationEngine.awardXP(userProfile.uid, 500, `Conclusão da fase: ${path.fases[activePhase].nome}`);
                 if (activePhase < path.fases.length - 1) {
                   setActivePhase(activePhase + 1);
                 } else {

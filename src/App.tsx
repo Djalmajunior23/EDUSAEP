@@ -207,6 +207,7 @@ import SupabaseAdminStatusPage from "./pages/SupabaseAdminStatusPage";
 import { EduJarvisUltraDashboard } from "./components/eduJarvis/EduJarvisUltraDashboard";
 import { TutorJarvisView } from "./components/eduJarvis/TutorJarvisView";
 import { ActivityGradingPage } from "./pages/professor/ActivityGradingPage";
+import SystemHealthPage from "./pages/SystemHealthPage";
 
 
 
@@ -3993,6 +3994,17 @@ function AppContent() {
                       allowedRoles={["ADMIN"]}
                     >
                       <SupabaseAdminStatusPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/system-health"
+                  element={
+                    <ProtectedRoute
+                      userProfile={userProfile}
+                      allowedRoles={["ADMIN"]}
+                    >
+                      <SystemHealthPage />
                     </ProtectedRoute>
                   }
                 />

@@ -35,7 +35,7 @@ export const labService = {
     });
 
     // Award initial XP for submission
-    await gamificationService.awardPoints(submission.studentId, 20, 50);
+    await gamificationService.awardPoints(submission.studentId, 20, 'Entrega de Laboratório Prático');
 
     return docRef.id;
   },

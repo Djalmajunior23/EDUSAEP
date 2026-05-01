@@ -35,9 +35,8 @@ export const quizService = {
     });
 
     // Award points based on score
-    const points = attempt.score * 10; // 10 points per correct answer
-    const experience = attempt.score * 20; // 20 XP per correct answer
-    await gamificationService.awardPoints(attempt.studentId, points, experience);
+    const totalXP = attempt.score * 30; // Combined points and experience
+    await gamificationService.awardPoints(attempt.studentId, totalXP, 'Conclusão de Quiz Interativo');
     
     // Check for quiz master achievement if they completed multiple quizzes
     // (Logic for checking count can be added here or in gamificationService)

@@ -10,9 +10,10 @@ import { Skeleton } from '../common/Skeleton';
 import { DropoutRiskCard } from '../shared/DropoutRiskCard';
 import { StudentLearningPath } from '../shared/StudentLearningPath';
 import { StudentProgressCard } from '../student/StudentProgressCard';
+import { RankingWidget } from '../gamification/RankingWidget';
 
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { safeArray, safeString, safeDate } from '../../utils/safeData';
+import { safeArray, safeString, safeDate } from '../../utils/safeUtils';
 
 interface StudentDashboardViewProps {
   user: User | null;
@@ -153,7 +154,7 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
   const criticalComps = latestDecision?.competencies?.filter((c: any) => c.level === 'CRITICAL') || [];
 
   return (
-    <ErrorBoundary componentName="StudentDashboard">
+    <ErrorBoundary moduleName="StudentDashboard">
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
       
       {/* Rescue Alert Section */}
@@ -340,6 +341,8 @@ export function StudentDashboardView({ user, userProfile }: StudentDashboardView
 
         {/* Right Col: Timeline & Activity List placeholder */}
         <div className="space-y-6">
+          <RankingWidget limit={5} showCurrentUserId={user?.uid} />
+          
           <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
               <BookOpen size={18} className="text-emerald-500" /> Atividades Pendentes

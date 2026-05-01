@@ -26,7 +26,8 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>(() => {
     const saved = localStorage.getItem(`exam_progress_${exam.id}`);
-    return saved ? JSON.parse(saved) : new Array(exam.questions.length).fill(-1);
+    const questionsLength = exam.questions?.length || 0;
+    return saved ? JSON.parse(saved) : new Array(questionsLength).fill(-1);
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -38,7 +39,7 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
     localStorage.setItem(`exam_progress_${exam.id}`, JSON.stringify(answers));
   }, [answers, exam.id]);
 
-  if (exam.questions.length === 0) {
+  if (!exam.questions || exam.questions.length === 0) {
     return (
       <div className="max-w-4xl mx-auto p-12 text-center space-y-4">
         <h2 className="text-2xl font-bold text-gray-900">Este simulado não possui questões.</h2>

@@ -51,7 +51,7 @@ import { n8nEvents } from "../../services/n8nService";
 import { useAuth } from "../../contexts/AuthContext";
 
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { safeArray, safeString, safeDate } from '../../utils/safeData';
+import { safeArray, safeString, safeDate } from '../../utils/safeUtils';
 
 interface AlunoViewProps {
   result: DiagnosticResult | null;
@@ -487,7 +487,7 @@ export function AlunoView({
     );
 
   return (
-    <ErrorBoundary componentName="AlunoView">
+    <ErrorBoundary moduleName="AlunoView">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -657,7 +657,7 @@ export function AlunoView({
               <TrendingUp size={20} className="text-emerald-600" /> Histórico de
               Evolução
             </h3>
-            <div className="h-[300px] w-full">
+            <div className="h-[320px] min-h-[320px] w-full">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <LineChart data={evolutionData}>
                   <CartesianGrid

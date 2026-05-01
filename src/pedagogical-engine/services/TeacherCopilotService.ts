@@ -123,7 +123,14 @@ export class TeacherCopilotService {
       });
       
       const cleanJson = response.text?.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(cleanJson || '[]');
+      try {
+        return JSON.parse(cleanJson || '[]');
+      } catch (parseErr) {
+        console.error("Erro ao parsear prioridades JSON:", parseErr);
+        return [
+          { title: "Verificar Alunos em Risco", desc: "Acesse o painel de saúde para agir sobre alertas críticos.", type: "urgente" }
+        ];
+      }
     } catch (err) {
       console.error("Erro gerando prioridades", err);
       // Fallback
@@ -175,7 +182,13 @@ export class TeacherCopilotService {
       });
       
       const cleanJson = response.text?.replace(/```json/g, '').replace(/```/g, '').trim();
-      const pblData = JSON.parse(cleanJson || '{}');
+      let pblData: any;
+      try {
+        pblData = JSON.parse(cleanJson || '{}');
+      } catch (parseErr) {
+        console.error("Erro ao parsear PBL JSON:", parseErr);
+        throw new Error("A IA retornou um formato de Estudo de Caso inválido.");
+      }
 
       // Salva no Firestore direto como LearningSituation
       const docRef = await addDoc(collection(db, 'learning_situations'), {

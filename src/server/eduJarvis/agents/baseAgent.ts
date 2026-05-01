@@ -4,6 +4,8 @@ export interface AgentContext {
     userId: string;
     role: string;
     classId?: string;
+    studentProfile?: any;
+    memorySummary?: string;
     metadata: Record<string, any>;
 }
 

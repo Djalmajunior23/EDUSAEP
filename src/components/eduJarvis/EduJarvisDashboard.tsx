@@ -70,7 +70,7 @@ export function EduJarvisDashboard() {
             <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">Distribuição de Intenções</h3>
             <BarChart3 size={18} className="text-indigo-500" />
           </div>
-          <div className="h-64">
+          <div className="h-64 w-full min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metrics}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />

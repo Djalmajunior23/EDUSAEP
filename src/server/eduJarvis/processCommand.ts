@@ -17,6 +17,8 @@ import { visionAgent } from './agents/visionAgent';
 import { biAgent } from './agents/biAgent';
 import { automationAgent } from './agents/automationAgent';
 import { studentAgent } from './agents/studentAgent';
+import { questionAgent } from './agents/questionAgent';
+import { gamificationAgent } from './agents/gamificationAgent';
 import { securityAgent } from './security/securityAgent';
 import { logAudit } from './security/auditLogger';
 import { questionOptimizerAgent } from './agents/questionOptimizerAgent';
@@ -55,9 +57,15 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
   await logAudit(userId, userRole, intent, 'permitido', 'baixo');
 
   // 3. Recuperar Memória Pedagógica
-  const memory = await memoryAgent.getMemory(userId);
   const memorySummary = await memoryAgent.getMemorySummary(userId);
-  const enhancedContext = { ...context, memory, memorySummary };
+  
+  const enhancedContext: any = { 
+    userId, 
+    role: userRole, 
+    metadata: context || {},
+    memorySummary,
+    studentProfile: context?.studentProfile || {}
+  };
 
   let result: EduJarvisResponse;
 
@@ -130,9 +138,10 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         break;
       case "IMPORTAR_QUESTOES":
         const questionsImported = await importAgent(command || "", enhancedContext);
+        const questionsCount = Array.isArray(questionsImported) ? questionsImported.length : 0;
         result = { 
           success: true,
-          response: `EduJarvis processou ${questionsImported.length} questões com sucesso.`, 
+          response: `EduJarvis processou ${questionsCount} questões com sucesso.`, 
           data: questionsImported, 
           action: 'IMPORTAR_QUESTOES',
           metadata: responseMetadata
@@ -160,10 +169,45 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
           metadata: responseMetadata
         };
         break;
+      case "GERAR_ATIVIDADE":
+      case "ANALYZE_QUALITY":
+        const questionResult = await questionAgent.process({ ...request, action: intent as any }, { userId, role: userRole, metadata: enhancedContext });
+        result = {
+          success: true,
+          ...questionResult,
+          metadata: responseMetadata
+        };
+        break;
       case "CORRIGIR_RESPOSTA":
       case "AVALIAR_CONTEUDO":
       case "IDENTIFICAR_ERROS":
         const evalResult = await evaluatorAgent({ ...request, action: intent as any });
+        
+        // Gatilho Automático de Gamificação após avaliação
+        if (userId && (intent === 'CORRIGIR_RESPOSTA' || intent === 'AVALIAR_CONTEUDO')) {
+          try {
+            const gamifResult = await gamificationAgent.process({
+              userId,
+              action: 'CONCLUIR_ATIVIDADE',
+              context: {
+                activityCompleted: true,
+                lastPerformanceScore: evalResult.score || 0,
+                isHighQuality: (evalResult.score && evalResult.score >= 80),
+                teacherFeedbackPositive: (evalResult.score && evalResult.score >= 90),
+                intent
+              }
+            } as any, enhancedContext);
+            
+            // Anexa dados de gamificação à resposta para o frontend exibir animações/badges
+            evalResult.gamification = gamifResult;
+            if (gamifResult.badgesGained?.length > 0) {
+              evalResult.feedback += `\n\n🏆 **Novas Conquistas:** ${gamifResult.badgesGained.join(', ')}!`;
+            }
+          } catch (gErr) {
+            console.error("Erro ao processar gamificação após avaliação:", gErr);
+          }
+        }
+
         result = {
           success: true,
           ...evalResult,
@@ -180,6 +224,35 @@ export async function processCommand(request: EduJarvisRequest): Promise<EduJarv
         break;
       case "EXPLICAR_CONTEUDO":
       case "CRIAR_PLANO_ESTUDO":
+        if (userRole === "STUDENT" || userRole === "ALUNO") {
+          const studentResult = await studentAgent({ ...request, action: intent as any, context: enhancedContext });
+          result = {
+            success: true,
+            response: studentResult.resposta || "Tutor gerou uma resposta.",
+            data: studentResult,
+            action: intent as any,
+            metadata: responseMetadata
+          };
+        } else {
+          const aiRes = await pedagogicalAgent(command || "", enhancedContext);
+          result = { 
+            success: true,
+            response: aiRes.text, 
+            action: intent || 'COMANDO_GERAL',
+            metadata: responseMetadata
+          };
+        }
+        break;
+      case "GAMIFICACAO":
+        const gamificationResult = await gamificationAgent.process({ ...request, action: 'suggest_challenge' }, enhancedContext as any);
+        result = {
+          success: true,
+          response: gamificationResult.response || "Gamificação atualizada.",
+          data: gamificationResult.data,
+          action: 'GAMIFICACAO',
+          metadata: responseMetadata
+        };
+        break;
       case "COMANDO_GERAL":
       default:
         if (userRole === "STUDENT" || userRole === "ALUNO") {

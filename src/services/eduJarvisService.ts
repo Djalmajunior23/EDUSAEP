@@ -1,87 +1,59 @@
-import { auth } from '../firebase';
-import { EduJarvisRequest, EduJarvisResponse, Intent, UserRole } from '../types/eduJarvisTypes';
+import { EduJarvisRequest, EduJarvisResponse } from '../types/eduJarvisTypes';
+import { logger } from '../utils/logger';
+
+const API_ENDPOINT = '/api/edu-jarvis/process';
+const MODULE = 'JARVIS_SERVICE';
 
 /**
- * EduJarvis Service - Frontend Proxy for AI Operations.
- * Ensures the backend is the only point of contact with AI providers.
+ * Service to communicate with EduJarvis Backend
+ * Includes robust error handling and fallback patterns for production.
  */
-export class EduJarvis {
-  /**
-   * Sends a structured command to the EduJarvis backend.
-   */
-  public static async execute(command: string, options: {
-    context?: any;
-    image?: string;
-    role?: UserRole;
-  } = {}): Promise<EduJarvisResponse> {
-    const user = (auth as any).currentUser;
-    if (!user) throw new Error("Ação não permitida: Usuário não autenticado");
+export async function sendJarvisCommand(request: EduJarvisRequest): Promise<EduJarvisResponse> {
+  try {
+    logger.debug(MODULE, `Sending command: ${request.action || 'AUTO'}`, request.command);
+    
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request)
+    });
 
-    const payload: EduJarvisRequest = {
-      command,
-      userId: user.uid,
-      userRole: options.role || (localStorage.getItem('user_role') as UserRole) || 'TEACHER',
-      context: options.context,
-      image: options.image
+    if (!response.ok) {
+      if (response.status === 405) {
+        throw new Error("Servidor não aceitou a requisição (405). Verifique a rota da API.");
+      }
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || `Erro no servidor: ${response.status}`);
+    }
+
+    const data = await response.json();
+    logger.debug(MODULE, 'Response received successfully');
+    return data;
+  } catch (error) {
+    logger.error(MODULE, "EduJarvis Service Failure", error);
+    
+    // Fallback Production Pattern
+    return {
+      success: false,
+      response: "Desculpe, o EduJarvis está passando por uma manutenção rápida. Por favor, tente novamente em instantes.",
+      action: 'FALLBACK_TRIGGERED',
+      metadata: { createdAt: new Date().toISOString(), error_fallback: error instanceof Error ? error.message : 'Network Error' }
     };
-
-    try {
-      const response = await fetch('/api/edu-jarvis/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Erro de comunicação backend' }));
-        throw new Error(err.error || `Erro ${response.status} ao processar comando EduJarvis`);
-      }
-
-      const json = await response.json();
-      if (!json.success) {
-        throw new Error(json.error || 'Erro ao processar comando EduJarvis');
-      }
-
-      return json;
-    } catch (error: any) {
-      console.error("[EduJarvis Service] Execution Error:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Helper for pedagogical content generation.
-   */
-  public static async pedagogicalCommand(prompt: string, context?: any): Promise<string> {
-    const res = await this.execute(prompt, { context });
-    return res.response || "";
-  }
-
-  /**
-   * Specialist for question import enrichment.
-   */
-  public static async importQuestions(rawText: string, context?: any): Promise<any[]> {
-    const res = await this.execute(`/importar ${rawText}`, { context });
-    if (res.data && Array.isArray(res.data)) {
-      return res.data;
-    }
-    return [];
-  }
-
-  /**
-   * Analyze student or class performance.
-   */
-  public static async analyzePerformance(id: string, type: 'STUDENT' | 'CLASS', data: any): Promise<EduJarvisResponse> {
-    const command = type === 'STUDENT' ? `/analisar-aluno ${id}` : `/analisar-turma ${id}`;
-    return await this.execute(command, { context: data });
   }
 }
 
-// Backward compatibility or easier access
-export const sendJarvisCommand = (req: any) => EduJarvis.execute(req.command, { 
-  context: req.context, 
-  image: req.image,
-  role: req.userRole
-});
+/**
+ * Backward compatibility object for legacy code
+ */
+export const EduJarvis = {
+  execute: async (command: string, options: any) => {
+    return sendJarvisCommand({
+      command,
+      action: options.action,
+      context: options.context,
+      userId: options.userId || 'legacy_user'
+    });
+  }
+};

@@ -1,0 +1,461 @@
+src/components/professor/PainelInsightsIA.tsx:  if (insights.length === 0) {
+src/components/professor/PainelInsightsIA.tsx:                    <span className="text-xs font-bold">{analysis.alunos_em_risco?.length || 0} Alunos em Risco</span>
+src/components/professor/PainelInsightsIA.tsx:                    <span className="text-xs font-bold">{analysis.pontos_fortes?.length || 0} Pontos Fortes</span>
+src/components/professor/StudentCompetencyModal.tsx:               <p className="text-2xl font-black text-emerald-800">{fortes.length}</p>
+src/components/professor/StudentCompetencyModal.tsx:               <p className="text-2xl font-black text-amber-800">{atencoes.length}</p>
+src/components/professor/StudentCompetencyModal.tsx:               <p className="text-2xl font-black text-red-800">{criticos.length}</p>
+src/components/professor/StudentCompetencyModal.tsx:                  {data.competencies.length === 0 && (
+src/components/professor/StudentCompetencyModal.tsx:            {fortes.length > 0 && (
+src/components/professor/StudentCompetencyModal.tsx:            {criticos.length > 0 && (
+src/components/professor/ExamsManagementView.tsx:    if (!exam.questions || exam.questions.length === 0) return exam.questions;
+src/components/professor/ExamsManagementView.tsx:      for (let i = 0; i < questionIds.length; i += 30) {
+src/components/professor/ExamsManagementView.tsx:      if (!questions || questions.length === 0) {
+src/components/professor/ExamsManagementView.tsx:        totalQuestions: savedQuestions.length,
+src/components/professor/ExamsManagementView.tsx:        totalPoints: savedQuestions.length * 10,
+src/components/professor/ExamsManagementView.tsx:      if (!currentExam.id && autoFill && finalQuestions.length === 0) {
+src/components/professor/ExamsManagementView.tsx:        totalQuestions: finalQuestions.length,
+src/components/professor/ExamsManagementView.tsx:        totalPoints: finalQuestions.length * 10,
+src/components/professor/ExamsManagementView.tsx:      if (exam.questions.length > 0 && typeof exam.questions[0] === 'object') {
+src/components/professor/ExamsManagementView.tsx:        {filteredExams.length === 0 && (
+src/components/professor/ExamsManagementView.tsx:                       <label className="block text-sm font-bold text-gray-700">Questões Selecionadas ({currentExam.questions?.length || 0})</label>
+src/components/professor/ExamsManagementView.tsx:                      {currentExam.questions && currentExam.questions.length > 0 ? (
+src/components/professor/ExamsManagementView.tsx:                    {selectedExamForDetails.questions && selectedExamForDetails.questions.length > 0 ? (
+src/components/professor/ExamsManagementView.tsx:                  {currentExam?.questions?.length || 0} questões selecionadas
+src/components/professor/exam/BatchCorrectionAssistant.tsx:      toast.success(`Correção em lote concluída: ${results.filter(r => r.success).length} sucesso(s)`);
+src/components/professor/exam/BatchCorrectionAssistant.tsx:        disabled={loading || submissions.length === 0}
+src/components/professor/exam/BatchCorrectionAssistant.tsx:        Processar {submissions.length} Submissões
+src/components/professor/exam/BatchCorrectionAssistant.tsx:      {results.length > 0 && (
+src/components/professor/exam/BatchCorrectionAssistant.tsx:          <p>Processamento concluído. {results.filter(r => r.success).length} de {results.length} processadas com sucesso.</p>
+src/components/professor/AdvancedDashboard.tsx:            {disciplinePerformance && Array.isArray(disciplinePerformance) && disciplinePerformance.length > 0 ? (
+src/components/professor/AdvancedDashboard.tsx:            {studentEvolution && Array.isArray(studentEvolution) && studentEvolution.length > 0 ? (
+src/components/professor/DigitalTwinExplorer.tsx:                        <span className="text-4xl font-black text-gray-900">{result?.bottlenecks.length}</span>
+src/components/professor/DigitalTwinExplorer.tsx:      {historicalTimeline.length > 0 && (
+src/components/professor/command-center/PedagogicalEngineSimulator.tsx:        {logs.length === 0 ? (
+src/components/professor/command-center/CommandCenterPanels.tsx:      {competencies.length === 0 ? (
+src/components/professor/GoogleFormsExportView.tsx:            toast.success(`${results.data.length} questões importadas!`);
+src/components/professor/GoogleFormsExportView.tsx:          toast.success(`${json.length} questões importadas!`);
+src/components/professor/GoogleFormsExportView.tsx:      {importedQuestions.length > 0 && (
+src/components/professor/GoogleFormsExportView.tsx:            <h3 className="text-xl font-bold text-gray-900">Questões Importadas ({importedQuestions.length})</h3>
+src/components/professor/GoogleFormsExportView.tsx:                  <p className="text-xs text-gray-500 mt-1">{exam.discipline} • {exam.questions?.length || 0} questões</p>
+src/components/professor/DiscursiveQuestionGenerator.tsx:                    {validationResult.sugestoes?.length > 0 && (
+src/components/professor/ExternalFormsView.tsx:            ) : filteredForms.length === 0 ? (
+src/components/professor/TRIDashboardView.tsx:      if (simulatedItems.length > 0) setSelectedItem(simulatedItems[0]);
+src/components/professor/ErrorEngineeringMap.tsx:    if (active && payload && payload.length) {
+src/components/professor/AdvancedQuestionGenerator.tsx:    toast.success(`${previewQuestions.length} questões adicionadas ao banco!`);
+src/components/professor/QuestionsBankView.tsx:    if (!text || text.trim().length === 0) {
+src/components/professor/QuestionsBankView.tsx:      if (!extractedQuestions || extractedQuestions.length === 0) {
+src/components/professor/QuestionsBankView.tsx:      logger.info(MODULE, `${savedIds.length} questões salvas com sucesso no Firestore.`);
+src/components/professor/QuestionsBankView.tsx:    if (filteredQuestions.length === 0) {
+src/components/professor/QuestionsBankView.tsx:      toast.success(`${newQuestions.length} variações geradas com sucesso e salvas como rascunho!`);
+src/components/professor/QuestionsBankView.tsx:        {selectedQuestionIds.length > 0 && (
+src/components/professor/QuestionsBankView.tsx:                checked={selectedQuestionIds.length === filteredQuestions.length}
+src/components/professor/QuestionsBankView.tsx:                  if (selectedQuestionIds.length === filteredQuestions.length) {
+src/components/professor/QuestionsBankView.tsx:              <span className="text-sm font-bold">{selectedQuestionIds.length} questões selecionadas</span>
+src/components/professor/QuestionsBankView.tsx:                  if (window.confirm(`Excluir ${selectedQuestionIds.length} questões permanentemente?`)) {
+src/components/professor/QuestionsBankView.tsx:                  {question.assets && question.assets.length > 0 && (
+src/components/professor/QuestionsBankView.tsx:                                {analysisResult.result.sugestaoReformulacaoAlternativas && analysisResult.result.sugestaoReformulacaoAlternativas.length > 0 && (
+src/components/professor/QuestionsBankView.tsx:        {filteredQuestions.length === 0 && (
+src/components/professor/QuestionsBankView.tsx:                      <Zap size={18} className="text-indigo-600" /> Recursos da Questão ({editedQuestion.assets?.length || 0})
+src/components/professor/QuestionsBankView.tsx:                  {editedQuestion.assets && editedQuestion.assets.length > 0 ? (
+src/components/professor/QuestionsBankView.tsx:                  {safeArray(editedQuestion.alternativas).length > 0 ? (
+src/components/professor/LessonManagementView.tsx:      if (classesData.length > 0) setSelectedClassId(classesData[0].id);
+src/components/professor/LessonManagementView.tsx:      if (studentIds.length === 0) {
+src/components/professor/LessonManagementView.tsx:        totalStudents: studentIds.length,
+src/components/professor/LessonManagementView.tsx:        submissionsCount: submissions.length,
+src/components/professor/LessonManagementView.tsx:        diagnosticsCount: diagnostics.length
+src/components/professor/LessonManagementView.tsx:            ) : filteredPlans.length === 0 ? (
+src/components/professor/TeacherActivitiesManager.tsx:        if (studentIds.length > 0) {
+src/components/professor/TeacherActivitiesManager.tsx:          {activities.length === 0 ? (
+src/components/professor/TeacherActivitiesManager.tsx:            <h3 className="font-bold text-gray-900 mb-4 px-2">Entregas ({submissions.length})</h3>
+src/components/professor/TeacherActivitiesManager.tsx:              {submissions.length === 0 ? (
+src/components/professor/TeacherActivitiesManager.tsx:                  {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
+src/components/professor/TeacherActivitiesDashboard.tsx:      if (acts.length > 0) {
+src/components/professor/TeacherActivitiesDashboard.tsx:  const totalActivities = activities.length;
+src/components/professor/TeacherActivitiesDashboard.tsx:  const totalSubmissions = submissions.length;
+src/components/professor/TeacherActivitiesDashboard.tsx:    graded: submissions.filter(s => s.status === 'graded').length,
+src/components/professor/TeacherActivitiesDashboard.tsx:    grading: submissions.filter(s => s.status === 'submitted' || s.status === 'late').length,
+src/components/professor/TeacherActivitiesDashboard.tsx:    returned: submissions.filter(s => s.status === 'returned').length,
+src/components/professor/TeacherActivitiesDashboard.tsx:  const averageGrade = gradedSubmissions.length > 0 
+src/components/professor/TeacherActivitiesDashboard.tsx:    ? (gradedSubmissions.reduce((acc, curr) => acc + (curr.grade || 0), 0) / gradedSubmissions.length).toFixed(1)
+src/components/professor/TeacherActivitiesDashboard.tsx:    const avg = actGraded.length > 0 
+src/components/professor/TeacherActivitiesDashboard.tsx:      ? actGraded.reduce((acc, curr) => acc + (curr.grade || 0), 0) / actGraded.length 
+src/components/professor/TeacherActivitiesDashboard.tsx:      name: act.title.length > 20 ? act.title.substring(0, 20) + '...' : act.title,
+src/components/professor/TeacherActivitiesDashboard.tsx:      entregas: actSubs.length,
+src/components/professor/TeacherActivitiesDashboard.tsx:                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+src/components/professor/ConsolidatedReportView.tsx:    if (!filteredHistory || filteredHistory.length === 0) return null;
+src/components/professor/ConsolidatedReportView.tsx:    const overallAverage = filteredHistory.length > 0 ? totalAccuracySum / filteredHistory.length : 0;
+src/components/professor/ConsolidatedReportView.tsx:        if (partsA.length < 2 || partsB.length < 2) return 0;
+src/components/professor/ConsolidatedReportView.tsx:      totalDiagnostics: filteredHistory.length,
+src/components/professor/ConsolidatedReportView.tsx:              {reportData.strengths.length === 0 && <p className="text-sm text-gray-500">Dados insuficientes.</p>}
+src/components/professor/ConsolidatedReportView.tsx:              {reportData.weaknesses.length === 0 && <p className="text-sm text-gray-500">Dados insuficientes.</p>}
+src/components/professor/ResourcesManagerView.tsx:    if (acceptedFiles.length === 0) return;
+src/components/professor/ResourcesManagerView.tsx:          { label: 'Total de Arquivos', value: resources.length, icon: File, color: 'text-blue-600', bg: 'bg-blue-50' },
+src/components/professor/ResourcesManagerView.tsx:                  {resource.sharedWithClasses.length > 0 && (
+src/components/professor/ResourcesManagerView.tsx:          {filteredResources.length === 0 && (
+src/components/professor/TeacherLearningSituationsView.tsx:      if (saData.length > 0) {
+src/components/professor/TeacherLearningSituationsView.tsx:          <p className="text-gray-500 mb-6">Total de entregas: {saSubmissions.length}</p>
+src/components/professor/TeacherLearningSituationsView.tsx:            {saSubmissions.length === 0 && (
+src/components/professor/TeacherLearningSituationsView.tsx:          const subsCount = submissions[sa.id!]?.length || 0;
+src/components/professor/TeacherLearningSituationsView.tsx:        {situations.length === 0 && (
+src/components/professor/CognitiveErrorAnalysisView.tsx:    if (submissions.length === 0) {
+src/components/professor/CognitiveErrorAnalysisView.tsx:      if (unanalyzedSubs.length === 0) {
+src/components/professor/CognitiveErrorAnalysisView.tsx:            if (result.errors && result.errors.length > 0) {
+src/components/professor/CognitiveErrorAnalysisView.tsx:    if (studentAnalyses.length === 0) {
+src/components/professor/CognitiveErrorAnalysisView.tsx:        totalErrors: aggregatedErrors.length,
+src/components/professor/CognitiveErrorAnalysisView.tsx:    if (activeAnalyses.length === 0) {
+src/components/professor/CognitiveErrorAnalysisView.tsx:        totalStudents: uniqueStudents.length,
+src/components/professor/CognitiveErrorAnalysisView.tsx:        totalErrors: aggregatedErrors.length,
+src/components/professor/CognitiveErrorAnalysisView.tsx:              <p className="text-3xl font-bold text-gray-900 mt-1">{analyses.length}</p>
+src/components/professor/CognitiveErrorAnalysisView.tsx:                {analyses.reduce((acc, curr) => acc + (curr.errors?.length || 0), 0)}
+src/components/professor/CognitiveErrorAnalysisView.tsx:                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+src/components/professor/CognitiveErrorAnalysisView.tsx:          {filteredAnalyses.length === 0 ? (
+src/components/professor/ClassObservatoryView.tsx:                {data.studentsAtRisk.length} Alertas
+src/components/professor/ClassObservatoryView.tsx:              {data.studentsAtRisk.length === 0 && (
+src/components/professor/PedagogicalDecisionsWidget.tsx:      const highRisk = risksSnap.docs.filter(d => d.data().level === 'HIGH' || d.data().riskLevel === 'Crítico').length;
+src/components/professor/PedagogicalDecisionsWidget.tsx:          {decisions.length > 0 ? (
+src/components/professor/ClassHeatmapDashboard.tsx:                {comp.studentsWithDifficulty.length > 0 && (
+src/components/professor/ClassHeatmapDashboard.tsx:                    {comp.studentsWithDifficulty.length} em risco
+src/components/professor/ClassHeatmapDashboard.tsx:            {selectedCompetency.studentsWithDifficulty.length === 0 ? (
+src/components/professor/TeacherSimulatorsManagerView.tsx:                        stages: aiStages.stages && Array.isArray(aiStages.stages) && aiStages.stages.length > 0 ? aiStages.stages : [{
+src/components/professor/ProfessorInsights.tsx:    if (!selectedClassId || classData.length === 0) return;
+src/components/professor/ProfessorInsights.tsx:      if (data.length > 0 && !selectedClassId) {
+src/components/professor/ProfessorInsights.tsx:    if (!selectedClassId || classData.length === 0) return;
+src/components/professor/ProfessorInsights.tsx:      if (studentIds.length === 0) {
+src/components/professor/ProfessorInsights.tsx:        totalStudents: studentIds.length,
+src/components/professor/ProfessorInsights.tsx:        submissionsCount: submissions.length,
+src/components/professor/ProfessorInsights.tsx:        diagnosticsCount: diagnostics.length
+src/components/professor/ProfessorInsights.tsx:            disabled={isGeneratingSIPA || classData.length === 0}
+src/components/professor/ProfessorInsights.tsx:            disabled={isGeneratingPlan || classData.length === 0}
+src/components/professor/PedagogicalRecommendations.tsx:        totalStudents: students.length,
+src/components/professor/PedagogicalRecommendations.tsx:        submissionsCount: submissions.length,
+src/components/professor/PedagogicalRecommendations.tsx:        averageScore: submissions.length > 0 
+src/components/professor/PedagogicalRecommendations.tsx:          ? submissions.reduce((acc, curr: any) => acc + (curr.score / curr.maxScore), 0) / submissions.length 
+src/components/professor/QuestionOptimizerView.tsx:      if (selectedAnalysis.suggestedAlternativas && selectedAnalysis.suggestedAlternativas.length > 0) {
+src/components/professor/QuestionOptimizerView.tsx:      if (selectedAnalysis.suggestedCriterios && selectedAnalysis.suggestedCriterios.length > 0) {
+src/components/professor/QuestionOptimizerView.tsx:                {rankedQuestions.length} questões
+src/components/professor/QuestionOptimizerView.tsx:              {rankedQuestions.length === 0 ? (
+src/components/professor/QuestionOptimizerView.tsx:                      {selectedAnalysis.originalAlternativas && selectedAnalysis.originalAlternativas.length > 0 ? (
+src/components/professor/QuestionOptimizerView.tsx:                      {selectedAnalysis.suggestedAlternativas && selectedAnalysis.suggestedAlternativas.length > 0 ? (
+src/components/professor/QuestionOptimizerView.tsx:                          {selectedAnalysis.suggestedCriterios && selectedAnalysis.suggestedCriterios.length > 0 && (
+src/components/professor/TeacherRubricsManager.tsx:    if (!editingRubric.criteria || editingRubric.criteria.length === 0) {
+src/components/professor/TeacherRubricsManager.tsx:          {rubrics.length === 0 ? (
+src/components/professor/TeacherRubricsManager.tsx:                  {rubric.criteria.length} critério(s) definidos
+src/components/professor/SystemGovernancePortal.tsx:                  {events.length > 0 ? events.map((event, i) => (
+src/components/professor/TeacherCopilotDashboard.tsx:            ) : Array.isArray(priorities) && priorities.length === 0 ? (
+src/components/professor/TeacherCopilotDashboard.tsx:          {messages.length < 3 && (
+src/components/professor/PedagogicalSummaryCard.tsx:        const critical = risksSnap.docs.filter(d => d.data().level === 'HIGH' || d.data().riskLevel === 'Crítico').length;
+src/components/professor/PedagogicalSummaryCard.tsx:          topAction: decisionsSnap.docs.length > 0 ? decisionsSnap.docs[0].data().title : 'Nenhuma ação pendente'
+src/components/professor/MassRescueDashboard.tsx:            {groups.length === 0 ? (
+src/components/dashboard/PainelRecomendacoes.tsx:        {recommendations.length === 0 && <p className="text-gray-500">Nenhuma recomendação pendente.</p>}
+src/components/dashboard/DashboardCharts.tsx:  if (active && payload && payload.length) {
+src/components/dashboard/PainelInsightsIA.tsx:        diagnosticsCount: diagnostics.length,
+src/components/dashboard/PainelInsightsIA.tsx:        {insights.length === 0 && !isGenerating && (
+src/components/views/ExercisesView.tsx:      ) : filteredExercises.length === 0 ? (
+src/components/views/AlunoView.tsx:        totalErrors: aggregatedErrors.length,
+src/components/views/AlunoView.tsx:                    ).length || 0),
+src/components/views/AlunoView.tsx:        {studentHistory.length > 1 && (
+src/components/views/AlunoView.tsx:                      stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+src/components/views/AlunoView.tsx:                {comp.questoes && comp.questoes.length > 0 && (
+src/components/views/StudentExamsView.tsx:    if (takingExam.maxAttempts && userSubmissions.length >= takingExam.maxAttempts) {
+src/components/views/StudentExamsView.tsx:                      <span className="text-[10px] font-bold">{exam.questions.length} Questões</span>
+src/components/views/StudentExamsView.tsx:          {exams.length === 0 && (
+src/components/views/StudyPlanView.tsx:      if (submissions.length === 0 && diagnostics.length === 0) {
+src/components/views/StudyPlanView.tsx:        priorityTopics: priorityTopics.length > 0 ? priorityTopics : [{ topic: 'Revisão Geral', reason: 'Nenhuma fase foi estruturada', priority: 'Média' }],
+src/components/views/StudyPlanView.tsx:              {studyPlan.phases && studyPlan.phases.length > 0 ? (
+src/components/views/AdminUsersView.tsx:        if (rows.length === 0) {
+src/components/views/AdminUsersView.tsx:                  ) : filteredUsers.length === 0 ? (
+src/components/views/AdaptiveExamView.tsx:        if (list.length < 5) {
+src/components/views/AdaptiveExamView.tsx:    if (currentIndex < questions.length - 1) {
+src/components/views/AdaptiveExamView.tsx:      const score = answers.filter(a => a.isCorrect).length;
+src/components/views/AdaptiveExamView.tsx:        total: questions.length,
+src/components/views/AdaptiveExamView.tsx:    const score = answers.filter(a => a.isCorrect).length;
+src/components/views/AdaptiveExamView.tsx:            <p className="text-5xl font-black text-emerald-600">{score}/{questions.length}</p>
+src/components/views/AdaptiveExamView.tsx:            <p className="text-5xl font-black text-blue-600">{Math.round((score / questions.length) * 100)}%</p>
+src/components/views/AdaptiveExamView.tsx:          <p className="text-xl font-black text-emerald-600">{currentIndex + 1} de {questions.length}</p>
+src/components/views/AdaptiveExamView.tsx:          animate={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+src/components/views/AdaptiveExamView.tsx:            {currentIndex === questions.length - 1 ? 'Finalizar Simulado' : 'Próxima Questão'} <ArrowRight size={20} />
+src/components/views/GamificationDashboardView.tsx:              {profile?.achievements.length} / {ACHIEVEMENTS.length} Desbloqueadas
+src/components/views/ReportsView.tsx:    if (!history.length) return [];
+src/components/views/ReportsView.tsx:      if (sorted.length >= 2) {
+src/components/views/ReportsView.tsx:      if(parts.length === 3) {
+src/components/views/ReportsView.tsx:      if(parts.length === 3) {
+src/components/views/ReportsView.tsx:    if (chartData.length === 0) return;
+src/components/views/ReportsView.tsx:            disabled={chartData.length === 0}
+src/components/views/ReportsView.tsx:            disabled={chartData.length === 0}
+src/components/views/ReportsView.tsx:                  const avg = Math.round(data.reduce((acc, curr) => acc + curr.acuracia, 0) / data.length);
+src/components/views/ReportsView.tsx:      {suggestedStudents.length > 0 && showSuggestions && (
+src/components/views/ReportsView.tsx:        {chartData.length > 0 ? (
+src/components/views/ReportsView.tsx:                  {data && Array.isArray(data) && data.length > 0 ? (
+src/components/views/LabsView.tsx:    if (!newLab.title || !newLab.steps?.length || !user?.uid) {
+src/components/views/LabsView.tsx:              {labs.length === 0 ? (
+src/components/views/LabsView.tsx:                        <Timer size={14} /> {lab.steps.length} ETAPAS
+src/components/views/LabsView.tsx:                      const steps = [...(newLab.steps || []), { title: 'Etapa ' + ((newLab.steps?.length || 0) + 1), instruction: '', expectedOutcome: '' }];
+src/components/views/HistoryView.tsx:  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
+src/components/views/HistoryView.tsx:    if (selectedIds.size === paginatedHistory.length) {
+src/components/views/HistoryView.tsx:          {isProfessor && filteredHistory.length > 0 && (
+src/components/views/HistoryView.tsx:              {filteredHistory.length} resultados encontrados
+src/components/views/HistoryView.tsx:              {selectedIds.size === paginatedHistory.length ? <CheckSquare size={16} /> : <Square size={16} />}
+src/components/views/HistoryView.tsx:              {selectedIds.size === paginatedHistory.length ? 'Desmarcar Todos' : 'Selecionar Todos na Página'}
+src/components/views/HistoryView.tsx:      {filteredHistory.length === 0 ? (
+src/components/views/HistoryView.tsx:                Página {currentPage} de {totalPages} • {filteredHistory.length} resultados
+src/components/views/StudentDashboardView.tsx:                    {safeArray<any>(criticalComps).length > 0 && (
+src/components/views/StudentDashboardView.tsx:              {safeArray<any>(diagnostics).length === 0 ? (
+src/components/views/ProfessorDashboardView.tsx:        const totalSubmissions = results.length;
+src/components/views/ProfessorDashboardView.tsx:                ) : safeArray<any>(stats.recentActivity).length === 0 ? (
+src/components/views/ChatView.tsx:    if (!user || messages.length === 0) return;
+src/components/views/ChatView.tsx:        {messages.length === 0 && (
+src/components/views/DiagnosticResultView.tsx:              <p className="text-4xl font-black">{result.diagnostico_por_competencia.filter(c => c.acuracia < 0.6).length}</p>
+src/components/views/InteractiveLibraryView.tsx:          {items.length === 0 && (
+src/components/views/InteractiveQuizView.tsx:    setUserAnswers(new Array(quiz.questions.length).fill(-1));
+src/components/views/InteractiveQuizView.tsx:      feedback: `Você acertou ${score} de ${selectedQuiz.questions.length} questões.`
+src/components/views/InteractiveQuizView.tsx:    if (!newQuiz.title || !newQuiz.questions?.length || !user?.uid) {
+src/components/views/InteractiveQuizView.tsx:              {quizzes.length === 0 ? (
+src/components/views/InteractiveQuizView.tsx:                          <Brain size={12} /> {quiz.questions.length} QUESTÕES
+src/components/views/InteractiveQuizView.tsx:                  <p className="text-gray-500 font-medium">de {selectedQuiz.questions.length} questões</p>
+src/components/views/InteractiveQuizView.tsx:                  <div className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">{currentQuestionIdx + 1} DE {selectedQuiz.questions.length}</div>
+src/components/views/InteractiveQuizView.tsx:                    animate={{ width: `${((currentQuestionIdx) / selectedQuiz.questions.length) * 100}%` }}
+src/components/views/InteractiveQuizView.tsx:                  {currentQuestionIdx < selectedQuiz.questions.length - 1 ? (
+src/components/views/InteractiveQuizView.tsx:                  <h3 className="text-lg font-black text-gray-900">Questões ({newQuiz.questions?.length})</h3>
+src/components/views/InteractiveQuizView.tsx:                {(!newQuiz.questions || newQuiz.questions.length === 0) && (
+src/components/views/SimulatorsView.tsx:      if (currentStage < selectedSim.stages.length - 1) {
+src/components/views/SimulatorsView.tsx:    if (!newSim.title || !newSim.stages?.length || !user?.uid) {
+src/components/views/SimulatorsView.tsx:              {simulators.length === 0 ? (
+src/components/views/SimulatorsView.tsx:                    <span>{Math.round(((currentStage) / selectedSim.stages.length) * 100)}%</span>
+src/components/views/SimulatorsView.tsx:                      animate={{ width: `${(currentStage / selectedSim.stages.length) * 100}%` }}
+src/components/views/CorrectionPlanView.tsx:        {plans.length === 0 && (
+src/components/views/ExamTakingView.tsx:    return saved ? JSON.parse(saved) : new Array(exam.questions.length).fill(-1);
+src/components/views/ExamTakingView.tsx:  if (exam.questions.length === 0) {
+src/components/views/ExamTakingView.tsx:    if (currentQuestionIdx < exam.questions.length - 1) {
+src/components/views/ExamTakingView.tsx:          if (result.errors && result.errors.length > 0) {
+src/components/views/ExamTakingView.tsx:            <p className="text-xs text-gray-500">Questão {currentQuestionIdx + 1} de {exam.questions.length}</p>
+src/components/views/ExamTakingView.tsx:            style={{ width: `${((currentQuestionIdx + 1) / exam.questions.length) * 100}%` }}
+src/components/views/ExamTakingView.tsx:            currentQuestionIdx === exam.questions.length - 1 ? (
+src/components/views/TasksView.tsx:        {tasks.length === 0 ? (
+src/components/views/AIGovernanceView.tsx:      if (data.length > 0) {
+src/components/views/AIGovernanceView.tsx:        const successes = data.filter(l => l.success).length;
+src/components/views/AIGovernanceView.tsx:          totalRequests: data.length,
+src/components/views/AIGovernanceView.tsx:          successRate: (successes / data.length) * 100,
+src/components/views/AIGovernanceView.tsx:          avgLatency: totalLat / data.length,
+src/components/views/AIGovernanceView.tsx:        {providers.length === 0 && (
+src/components/views/AIGovernanceView.tsx:              {logs.length === 0 && <p className="text-gray-600">Nenhuma atividade registrada ainda...</p>}
+src/components/student/StudentLearningChatbot.tsx:      if (history.length === 0) {
+src/components/student/StudentLearningChatbot.tsx:      {messages.length <= 2 && (
+src/components/student/StudentLearningPathView.tsx:    const totalItems = items.length;
+src/components/student/StudentLearningPathView.tsx:    const completedInPhase = items.filter(item => completedItems.has(`${idx}-${item}`)).length;
+src/components/student/StudentLearningPathView.tsx:      if (diagnostics.length === 0) {
+src/components/student/StudentLearningPathView.tsx:                if (activePhase < path.fases.length - 1) {
+src/components/student/PedagogicalGoalsTracker.tsx:        {goals.length === 0 ? (
+src/components/student/StudentInsights.tsx:    if (!studentId || submissions.length === 0) {
+src/components/student/StudentInsights.tsx:        totalSubmissions: submissions.length,
+src/components/student/StudentInsights.tsx:        averageScore: submissions.reduce((acc, sub) => acc + (sub.score / sub.maxScore), 0) / submissions.length,
+src/components/student/StudentInsights.tsx:        if (data.length > 0 && latestSub?.competencyResults) {
+src/components/student/StudentInsights.tsx:            disabled={generatingPDF || submissions.length === 0}
+src/components/student/StudentInsights.tsx:            {radarData && Array.isArray(radarData) && radarData.length > 0 ? (
+src/components/student/StudentInsights.tsx:            {submissions && Array.isArray(submissions) && submissions.length > 0 ? (
+src/components/student/StudentInsights.tsx:      {radarData.length > 0 && (
+src/components/student/StudentInsights.tsx:          {submissions.length === 0 ? (
+src/components/student/CorrectionPlanView.tsx:      ) : plans.length === 0 ? (
+src/components/student/CorrectionPlanView.tsx:                   <span>{plan.wrongQuestionsKeys?.length || 0} questões para revisar</span>
+src/components/student/CorrectionPlanView.tsx:                   <span>{plan.competenciesToRetake?.length || 0} competências críticas</span>
+src/components/student/StudentLearningSituationsView.tsx:        {situations.length === 0 && (
+src/components/student/StudentActivitiesManager.tsx:    if (selectedActivity.submissionType !== 'text' && attachments.length === 0 && !content.trim()) {
+src/components/student/StudentActivitiesManager.tsx:          {activities.length === 0 ? (
+src/components/student/StudentActivitiesManager.tsx:                      if (oversizedFiles.length > 0) {
+src/components/student/StudentActivitiesManager.tsx:                      if (filesArray.length > selectedActivity.maxAttachments) {
+src/components/student/StudentActivitiesManager.tsx:                {attachments.length > 0 && (
+src/components/student/GamificationWidget.tsx:  const levelTitle = levelNames[Math.min(levelNames.length - 1, Math.floor(numericLevel / 5))];
+src/components/student/GamificationWidget.tsx:            <div className="text-sm font-bold text-purple-700">{profile.achievements.length}</div>
+src/components/student/GamificationWidget.tsx:        {profile.achievements.length > 0 && (
+src/components/student/AdaptiveExam.tsx:      const score = (history.filter(h => h.isCorrect).length / maxQuestions) * 100;
+src/components/student/RecommendationsView.tsx:                {recommendation.competenciasCriticas.length > 0 ? (
+src/components/student/RecommendationsView.tsx:            {recommendation.atividadesPraticas && recommendation.atividadesPraticas.length > 0 && (
+src/components/admin/AdminAIProviderManager.tsx:      if (data.length > 0) {
+src/components/admin/AdminAIProviderManager.tsx:        const successes = data.filter(l => l.success).length;
+src/components/admin/AdminAIProviderManager.tsx:          totalRequests: data.length,
+src/components/admin/AdminAIProviderManager.tsx:          successRate: (successes / data.length) * 100,
+src/components/admin/AdminAIProviderManager.tsx:          avgLatency: totalLat / data.length,
+src/components/admin/AdminAIProviderManager.tsx:        {providers.length === 0 && (
+src/components/admin/SAEPItemGenerator.tsx:    if (!generatedQuestion.enunciado || generatedQuestion.enunciado.trim().length === 0) {
+src/components/admin/SAEPItemGenerator.tsx:      if (!generatedQuestion.alternativas || !Array.isArray(generatedQuestion.alternativas) || generatedQuestion.alternativas.length < 2) {
+src/components/admin/SAEPItemGenerator.tsx:      const emptyAlternatives = generatedQuestion.alternativas.some((a: any) => !a.texto || a.texto.trim().length === 0);
+src/components/admin/SAEPItemGenerator.tsx:      if (!generatedQuestion.respostaEsperada || generatedQuestion.respostaEsperada.trim().length === 0) {
+src/components/admin/InstitutionalTemplateManager.tsx:        {templates.length === 0 ? (
+src/components/admin/AIGovernanceView.tsx:    const totalCalls = logs.length;
+src/components/admin/AIGovernanceView.tsx:    const successCalls = logs.filter(l => l.success).length;
+src/components/admin/AIGovernanceView.tsx:              const success = provLogs.filter(l => l.success).length;
+src/components/admin/AIGovernanceView.tsx:              const rate = provLogs.length > 0 ? (success / provLogs.length) * 100 : 100;
+src/components/admin/DisciplinesManagementView.tsx:            ) : filteredDisciplines.length === 0 && !isCreating ? (
+src/components/admin/FeatureFlagManager.tsx:                  <span className="text-xs font-medium">{flag.allowedUsers.length || 'Nenhum'}</span>
+src/components/admin/ClassesManagementView.tsx:          ) : students.length === 0 ? (
+src/components/admin/ClassesManagementView.tsx:            ) : filteredClasses.length === 0 && !isCreating ? (
+src/components/shared/HeatmapLearning.tsx:      if (data.length > 0 && !selectedTurmaId) setSelectedTurmaId(data[0].id);
+src/components/shared/StudentLearningPath.tsx:        {topics.length > 0 && (
+src/components/shared/StudentLearningPath.tsx:        {activities.length > 0 && (
+src/components/eduJarvis/TutorJarvisView.tsx:        {messages.length === 0 && (
+src/components/eduJarvis/TutorJarvisView.tsx:                {msg.data?.suggestedMissions && msg.data.suggestedMissions.length > 0 && (
+src/components/eduJarvis/TutorJarvisView.tsx:                {msg.data?.badgesToUnlock && msg.data.badgesToUnlock.length > 0 && (
+src/components/eduJarvis/EduJarvisUltraDashboard.tsx:              {logs.length > 0 ? logs.map((log, i) => (
+src/components/eduJarvis/EduJarvisQuickActions.tsx:  if (actions.length === 0) return null;
+src/components/eduJarvis/EduJarvisMessage.tsx:                    {data.vulnerabilities.length === 0 && (
+src/components/eduJarvis/EduJarvisChat.tsx:      {messages.length === 0 && (
+src/components/communication/CommunicationCenter.tsx:                <h4 className="text-xl font-bold text-gray-900">Comentários ({comments.length})</h4>
+src/components/communication/CommunicationCenter.tsx:            ) : items.length === 0 ? (
+src/components/analytics/ClassHealthDashboard.tsx:      if (data.length > 0) setSelectedClassId(data[0].id);
+src/components/analytics/RiskStudentsPanel.tsx:          {students.length === 0 ? (
+src/components/common/QuestionRenderer.tsx:              {Array.isArray(question.criteriosAvaliacao) && question.criteriosAvaliacao.length > 0 && (
+src/components/common/QuestionRenderer.tsx:          {Array.isArray(question.alternativas) && question.alternativas.length > 0 ? (
+src/components/ProtectedRoute.tsx:  if (allowedRoles && allowedRoles.length > 0) {
+src/components/notifications/NotificationCenter.tsx:        ) : filteredNotifications.length === 0 ? (
+src/components/notifications/NotificationBell.tsx:        {notifications.length > 0 && (
+src/components/notifications/NotificationBell.tsx:            {notifications.length > 9 ? '9+' : notifications.length}
+src/components/notifications/NotificationBell.tsx:                {notifications.length > 0 && (
+src/components/notifications/NotificationBell.tsx:                {notifications.length === 0 ? (
+src/components/import/StudentImportUploader.tsx:      if (!Array.isArray(data) || data.length === 0) {
+src/components/import/StudentImportUploader.tsx:      const rowsWithErrors = mappedData.filter(r => r.validationErrors.length > 0);
+src/components/import/StudentImportUploader.tsx:      if (mappedData.length === 0) {
+src/components/import/StudentImportUploader.tsx:      } else if (rowsWithErrors.length > 0) {
+src/components/import/StudentImportUploader.tsx:        toast.warning(`${rowsWithErrors.length} linhas possuem avisos ou erros.`);
+src/components/import/StudentImportUploader.tsx:        toast.success(`${mappedData.length} alunos identificados com sucesso.`);
+src/components/import/StudentImportUploader.tsx:    if (previewData.length === 0) return;
+src/components/import/StudentImportUploader.tsx:        {importResult.errors?.length > 0 && (
+src/components/import/StudentImportUploader.tsx:            ) : previewData.length > 0 ? (
+src/components/import/StudentImportUploader.tsx:                  <h3 className="font-bold text-gray-900 mb-3">Pré-visualização ({previewData.length} registros)</h3>
+src/components/import/StudentImportUploader.tsx:                          <tr key={idx} className={row.validationErrors.length > 0 ? 'bg-red-50' : ''}>
+src/components/import/StudentImportUploader.tsx:                  {previewData.length > 10 && (
+src/components/import/StudentImportUploader.tsx:                    <p className="text-center text-xs text-gray-500 mt-2">Mostrando 10 de {previewData.length} registros.</p>
+src/components/import/ExerciseImportUploader.tsx:      if (mappedData.length === 0) {
+src/components/import/ExerciseImportUploader.tsx:        toast.success(`${mappedData.length} exercícios identificados.`);
+src/components/import/ExerciseImportUploader.tsx:    if (previewData.length === 0) return;
+src/components/import/ExerciseImportUploader.tsx:        {importResult.errors?.length > 0 && (
+src/components/import/ExerciseImportUploader.tsx:            ) : previewData.length > 0 ? (
+src/components/import/ExerciseImportUploader.tsx:                  <h3 className="font-bold text-gray-900 mb-3">Pré-visualização ({previewData.length} questões)</h3>
+src/components/import/ExerciseImportUploader.tsx:                            <td className="p-3 text-gray-500">{row.alternativas.length} opções</td>
+src/components/import/ExerciseImportUploader.tsx:                  {previewData.length > 5 && (
+src/components/observatory/ObservatorioAlunoView.tsx:      {data.riskData.factors.length > 0 && (
+src/components/observatory/MapaCompetencias.tsx:  if (!data || data.length === 0) {
+src/components/observatory/ObservatorioTurmaView.tsx:            {data.recentAlerts.length === 0 && (
+src/components/portfolio/EvidencePortfolioView.tsx:            {items.length === 0 ? (
+src/utils/simpleRegexParser.ts:    if (trimmed.length < 10) return;
+src/utils/simpleRegexParser.ts:    if (enunciadoLines.length > 0) {
+src/utils/simpleRegexParser.ts:        alternativas: alternativas.length > 0 ? alternativas : [
+src/utils/simpleRegexParser.ts:        respostaCorreta: gabarito || (alternativas.length > 0 ? alternativas[0].id : 'A'),
+src/server/pedagogical/gamificationEngine.ts:  if (profile?.criticalCompetencies?.length > 0) {
+src/server/eduJarvis/agents/memoryAgent.ts:      if (memory.length === 0) return "Nenhuma interação anterior registrada.";
+src/server/eduJarvis/agents/assessmentAgent.ts:  if (questoes.length === 0 && !parsedResponse.erro) {
+src/server/eduJarvis/agents/assessmentAgent.ts:    quantidadeQuestoes: questoes.length,
+src/server/eduJarvis/agents/assessmentAgent.ts:    response: `Gerei o simulado "**${parsedResponse.titulo || 'Simulado'}**" com sucesso.\nSalvo como rascunho com ${questoes.length} questões.\nVocê pode revisá-lo na seção de Gestão de Avaliações.`,
+src/server/eduJarvis/agents/questionAgent.ts:    if (parsed.questoes && parsed.questoes.length > 0) {
+src/server/eduJarvis/agents/questionAgent.ts:      for (let i = 0; i < parsed.questoes.length; i++) {
+src/server/eduJarvis/agents/studentAgent.ts:    if (Object.keys(studentProfile).length === 0) {
+src/server/eduJarvis/processCommand.ts:          response: `EduJarvis processou ${questionsImported.length} questões com sucesso.`, 
+src/server/eduJarvis/security/securityAgent.ts:  const isSuspicious = command.length > 2000 || command.includes('<script>') || command.includes('DROP TABLE');
+src/server/eduJarvis/engine/aiEngine.ts:    const activityCount = interactions.length;
+src/server/adaptive-exam/adaptiveExamEngine.ts:    performances.length > 0
+src/server/adaptive-exam/adaptiveExamEngine.ts:      ? performances.reduce((acc, p) => acc + (p.mastery ?? 0), 0) / performances.length
+src/server/firebaseAdmin.ts:if (!admin.apps.length) {
+src/server/bi/intelligentBIEngine.ts:    records.length > 0
+src/server/bi/intelligentBIEngine.ts:      ? records.reduce((acc, r) => acc + r.mastery, 0) / records.length
+src/services/supabase/simuladoAnalyticsService.ts:      if (params.respostas && params.respostas.length > 0) {
+src/services/triService.ts:  const correctCount = answers.filter(a => a.correct).length;
+src/services/triService.ts:  const totalCount = answers.length;
+src/services/examService.ts:    if (!result || !result.questions || !Array.isArray(result.questions) || result.questions.length === 0) {
+src/services/examService.ts:      totalQuestions: result.questions.length,
+src/services/examService.ts:      totalPoints: result.questions.length * 10,
+src/services/questionService.ts:        if (!data.criteriosAvaliacao || !Array.isArray(data.criteriosAvaliacao) || data.criteriosAvaliacao.length === 0) {
+src/services/questionService.ts:        if (!data.alternativas || !Array.isArray(data.alternativas) || data.alternativas.length < 2) {
+src/services/questionService.ts:    for (let i = 0; i < text.length; i++) {
+src/services/groupingService.ts:      if (studentSubs.length === 0) {
+src/services/groupingService.ts:      const avg = studentSubs.reduce((acc, curr) => acc + (curr.score / curr.maxScore), 0) / studentSubs.length;
+src/services/groupingService.ts:      if (ids.length > 0) {
+src/services/groupingService.ts:        results.push({ id: groupRef.id, name, count: ids.length });
+src/services/riskPredictionService.ts:        submissions: submissionsData.length,
+src/services/recommendationService.ts:        competencias: criticalCompetencies.length > 0 ? criticalCompetencies : ['Aprofundamento Geral'],
+src/services/recommendationService.ts:        nivel: criticalCompetencies.length > 0 ? 'medio' : 'dificil',
+src/services/recommendationService.ts:      if (criticalCompetencies.length > 0) {
+src/services/recommendationService.ts:    if (criticalCompetencies.length > 0) {
+src/services/recommendationService.ts:      prioridade = criticalCompetencies.length > 2 ? 'Alta' : 'Média';
+src/services/geminiService.ts:    if (keys.length === 1) {
+src/services/geminiService.ts:      if ((healed.match(/"/g) || []).length % 2 !== 0) {
+src/services/geminiService.ts:      const openBraces = (healed.match(/{/g) || []).length;
+src/services/geminiService.ts:      const closeBraces = (healed.match(/}/g) || []).length;
+src/services/geminiService.ts:      const openBrackets = (healed.match(/\[/g) || []).length;
+src/services/geminiService.ts:      const closeBrackets = (healed.match(/\]/g) || []).length;
+src/services/geminiService.ts:  if (!Array.isArray(parsed) || parsed.length === 0) {
+src/services/geminiService.ts:      if ((currentChunk.length + item.length) > chunkSize && currentChunk.length > 0) {
+src/services/geminiService.ts:      if ((currentChunk.length + paragraph.length) > chunkSize && currentChunk.length > 0) {
+src/services/geminiService.ts:    if (chunks.length === 0 && text.length > 0) {
+src/services/geminiService.ts:      for (let i = 0; i < text.length; i += chunkSize) {
+src/services/geminiService.ts:      if (Array.isArray(result) && result.length > 0) {
+src/services/geminiService.ts:${params.resourceTypes && params.resourceTypes.length > 0 ? `- Incluir recursos visuais/formatos: ${params.resourceTypes.join(', ')}. ${params.resourceDescription ? `Detalhes específicos que devem aparecer: ${params.resourceDescription}` : ''}` : ''}
+src/services/geminiService.ts:  if (!parsed || !parsed.enunciado || !Array.isArray(parsed.alternativas) || parsed.alternativas.length < 2) {
+src/services/exportService.ts:  if (stats.riskClusters && stats.riskClusters.length > 0) {
+src/services/importService.ts:      totalRows: data.length,
+src/services/importService.ts:    for (let i = 0; i < data.length; i++) {
+src/services/importService.ts:      totalRows: data.length,
+src/services/importService.ts:    for (let i = 0; i < data.length; i++) {
+src/services/teacherDashboardService.ts:        if(arr.length > 0) return arr;
+src/services/ai/PedagogicalIntelligenceService.ts:              nivelRisco: result.data.alunosEmRisco?.length > 0 ? "alto" : "baixo"
+src/services/configService.ts:    if (flag.allowedRoles.length > 0 && !flag.allowedRoles.includes(userRole)) {
+src/services/configService.ts:    if (flag.allowedUsers.length > 0 && flag.allowedUsers.includes(userId)) {
+src/services/configService.ts:    for (let i = 0; i < str.length; i++) {
+src/services/pedagogicalEngine.ts:    if (students.length === 0) {
+src/services/pedagogicalEngine.ts:    const studentsAtHighRisk = decisions.filter((d) => d.risk.level === 'HIGH').length;
+src/services/pedagogicalEngine.ts:    const studentsAtMediumRisk = decisions.filter((d) => d.risk.level === 'MEDIUM').length;
+src/services/pedagogicalEngine.ts:      students.length,
+src/services/pedagogicalEngine.ts:    if (criticalCompetencies.length > 0) {
+src/services/pedagogicalEngine.ts:    ).length;
+src/services/pedagogicalEngine.ts:  if (values.length === 0) return 0;
+src/services/pedagogicalEngine.ts:  return values.reduce((sum, value) => sum + value, 0) / values.length;
+src/services/qualityControlService.ts:    if (uniqueComp.size < 2 && questions.length > 5) {
+src/services/qualityControlService.ts:      isValid: issues.length === 0,
+src/services/analyticsHubService.ts:    const avgPerformance = submissions.length > 0 
+src/services/analyticsHubService.ts:      ? submissions.reduce((acc, curr) => acc + (curr.score / curr.maxScore), 0) / submissions.length * 100
+src/services/analyticsHubService.ts:    const deliveryRate = (submissions.length / (studentCount * 3)) * 100; // Assuming 3 activities target
+src/services/observatoryService.ts:    const averageGrade = submissions.length > 0 ? totalGrade / submissions.length : 0;
+src/services/observatoryService.ts:    if (recentGrades.length >= 2) {
+src/services/observatoryService.ts:      const last = recentGrades[recentGrades.length - 1].grade;
+src/services/observatoryService.ts:      const prev = recentGrades[recentGrades.length - 2].grade;
+src/services/mappingService.ts:  if (!questions || questions.length === 0) return [];
+src/services/mappingService.ts:  const res = await EduJarvis.execute(`Mapeie competências para estas ${questions.length} questões.`, {
+src/services/dashboardService.ts:    const totalActivities = activities.length;
+src/services/dashboardService.ts:      const avgGrade = gradedSubmissions.length > 0 
+src/services/dashboardService.ts:        ? gradedSubmissions.reduce((acc, curr) => acc + (curr.grade || 0), 0) / gradedSubmissions.length 
+src/services/dashboardService.ts:      const submissionRate = totalActivities > 0 ? (studentSubmissions.length / totalActivities) * 100 : 0;
+src/services/dashboardService.ts:      const forumPosts = forumComments.filter(c => c.userId === student.id).length;
+src/services/dashboardService.ts:      if (reasons.length >= 2 || avgGrade < 50) riskLevel = 'high';
+src/services/dashboardService.ts:      else if (reasons.length === 1 || avgGrade < 70) riskLevel = 'medium';
+src/services/dashboardService.ts:    const averageSubmissionRate = students.length > 0 
+src/services/dashboardService.ts:          const subCount = submissions.filter(s => s.studentId === curr.id).length;
+src/services/dashboardService.ts:        }, 0) / students.length
+src/services/dashboardService.ts:    const forumParticipation = students.length > 0 
+src/services/dashboardService.ts:      ? (new Set(forumComments.map(c => c.userId)).size / students.length) * 100 
+src/services/dashboardService.ts:    const averageGrade = submissions.filter(s => s.status === 'graded').length > 0
+src/services/dashboardService.ts:      ? submissions.filter(s => s.status === 'graded').reduce((acc, curr) => acc + (curr.grade || 0), 0) / submissions.filter(s => s.status === 'graded').length
+src/services/dashboardService.ts:    const totalAlunos = users.length;
+src/services/dashboardService.ts:          for (let i = 1; i < baseData.length; i++) {
+src/services/dashboardService.ts:          for (let i = 1; i < baseData.length; i++) {
+src/services/chatService.ts:  const lastMessage = messages[messages.length - 1].text;
+src/services/useGamification.ts:        for (let i = LEVELS.length - 1; i >= 0; i--) {
+src/pages/BIInteligentePage.tsx:            {compAverages.length > 0 ? (
+src/pages/BIInteligentePage.tsx:            {evolutionData.length > 0 ? (
+src/pages/GamificacaoPage.tsx:            ) : ranking.length > 0 ? (
+src/pages/professor/ActivityGradingPage.tsx:                {sub.aiAnalysis.errosConceituais?.length > 0 && (
+src/pages/professor/ActivityGradingPage.tsx:        {submissions.length === 0 && <p className="text-gray-500">Nenhuma entrega encontrada para esta atividade.</p>}
+src/App.tsx:    if (data.length === 0) {
+src/App.tsx:      toast.info(`Processando ${studentNames.length} alunos...`);
+src/App.tsx:          if (results && results.length > 0) {
+src/App.tsx:      if (allResults.length === 0) {
+src/App.tsx:      if (allResults.length > 1) {
+src/App.tsx:        toast.success(`${allResults.length} diagnósticos gerados com sucesso!`);
+src/App.tsx:        d.competencia.length > 20
+src/App.tsx:    if (!result || !history.length) return [];
+src/App.tsx:                                          {data.length > 0
+src/App.tsx:                                            ? `${data.length} linhas carregadas`
+src/App.tsx:                              disabled={loading || data.length === 0}
+src/App.tsx:                                      {data.length > 0 &&
+src/App.tsx:                                {data.length === 0 && (
+src/App.tsx:                              {results.length > 1 && (
+src/App.tsx:                          {userProfile?.role !== "STUDENT" && userProfile?.role !== "MONITOR" && result.summary.alertas_dados?.length > 0 && (
+src/App.tsx:                            {(evolutionData.length > 1 ||
+src/App.tsx:                                {evolutionData.length > 1 ? (
+src/App.tsx:                                        {comp.conhecimentos_fracos.length ===

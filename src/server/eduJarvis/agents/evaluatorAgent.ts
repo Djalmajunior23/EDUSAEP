@@ -56,5 +56,14 @@ RETORNE APENAS O JSON ESTRUTURADO.
     responseFormat: 'json'
   });
   
-  return JSON.parse(result.text);
+  try {
+    return JSON.parse(result.text || '{}');
+  } catch (e) {
+    console.error("[EvaluatorAgent] JSON parse error:", e);
+    return {
+      score: 0,
+      feedback: "Desculpe, não consegui processar a avaliação no momento devido a um erro técnico no formato da resposta.",
+      error: "Invalid JSON response"
+    };
+  }
 }

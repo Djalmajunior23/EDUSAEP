@@ -107,7 +107,9 @@ export function EduJarvisPanel({ userRole, contextData, isOpen, onClose }: Props
         id: (Date.now() + 1).toString(),
         content: response.response,
         role: 'assistant',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        payload: response.data,
+        action: response.action as any
       };
 
       setMessages((prev) => [...prev, assistantMessage]);

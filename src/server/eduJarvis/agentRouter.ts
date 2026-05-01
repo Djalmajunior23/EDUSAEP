@@ -12,6 +12,7 @@ import { assessmentAgent } from "./agents/assessmentAgent";
 import { performanceAgent } from "./agents/performanceAgent";
 import { learningPathAgent } from "./agents/learningPathAgent";
 import { interventionAgent } from "./agents/interventionAgent";
+import { gamificationAgent } from "./agents/gamificationAgent";
 
 export function detectIntent(command?: string): string {
   if (!command) return "COMANDO_GERAL";
@@ -30,7 +31,9 @@ export function detectIntent(command?: string): string {
   if (lowerCmd.includes("rubrica")) return "GERAR_RUBRICA";
   if (lowerCmd.includes("aula") && lowerCmd.includes("gerar")) return "GERAR_AULA";
   if (lowerCmd.includes("dúvida") || lowerCmd.includes("explicar") || lowerCmd.includes("o que é")) return "EXPLICAR_CONTEUDO";
+  if (lowerCmd.includes("ranking") || lowerCmd.includes("pontos") || lowerCmd.includes("medalha") || lowerCmd.includes("missão") || lowerCmd.includes("gamificacao")) return "GAMIFICACAO";
   if (lowerCmd.includes("atividade") || lowerCmd.includes("exercício")) return "GERAR_ATIVIDADE";
+  if (lowerCmd.includes("analisar qualidade") || lowerCmd.includes("auditoria de questão")) return "ANALYZE_QUALITY";
   if (lowerCmd.includes("intervenção") || lowerCmd.includes("ajuda")) return "SUGERIR_INTERVENCAO";
   if (lowerCmd.includes("corrigir") || lowerCmd.includes("correção")) return "CORRIGIR_RESPOSTA";
   if (lowerCmd.includes("avaliar") || lowerCmd.includes("avaliação")) return "AVALIAR_CONTEUDO";
@@ -46,7 +49,7 @@ export async function routeToAgent(request: EduJarvisRequest) {
     professor: (req) => professorAgent.process(req, { userId: req.userId, role: req.userRole, metadata: {} }),
     student: studentAgent,
     evaluator: evaluatorAgent,
-    question: questionAgent,
+    question: (req) => questionAgent.process(req, { userId: req.userId || 'system', role: req.userRole || 'ADMIN', metadata: req.context || {} }),
     bi: biAgent,
     tutor: tutorAgent,
     fallback: fallbackAgent,
@@ -55,7 +58,8 @@ export async function routeToAgent(request: EduJarvisRequest) {
     assessment: assessmentAgent,
     performance: performanceAgent,
     learningPath: learningPathAgent,
-    intervention: interventionAgent
+    intervention: interventionAgent,
+    gamification: (req) => gamificationAgent.process(req, req.context)
   };
 
   // Logic to handle auto-detection if agent is not specified or is 'auto'
@@ -67,7 +71,9 @@ export async function routeToAgent(request: EduJarvisRequest) {
     else if (intent.includes("RISCO") || intent.includes("DESEMPENHO")) targetAgentName = "performance";
     else if (intent.includes("BI")) targetAgentName = "bi";
     else if (intent.includes("CORRIGIR") || intent.includes("ERRO")) targetAgentName = "evaluator";
-    else if (intent.includes("RUBRICA") || intent.includes("AULA") || intent.includes("CASO")) targetAgentName = "pedagogical";
+    else if (intent.includes("RUBRICA") || intent.includes("AULA") || intent.includes("CASO")) targetAgentName = "professor"; // Re-mapped to professor for advanced logic
+    else if (intent.includes("GAMIFICACAO")) targetAgentName = "gamification";
+    else if (intent.includes("DÚVIDA") || intent.includes("EXPLICAR")) targetAgentName = "student";
     else if (intent.includes("ATIVIDADE")) targetAgentName = "question";
     else targetAgentName = "fallback";
   }
@@ -76,3 +82,4 @@ export async function routeToAgent(request: EduJarvisRequest) {
 
   return await selectedAgent(request);
 }
+

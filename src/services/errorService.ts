@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import { logger } from '../utils/logger';
 
 export enum OperationType {
   CREATE = 'create',
@@ -35,7 +36,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   // it's likely because they just logged out and an onSnapshot listener fired.
   // We should ignore this to prevent crashing the app during logout.
   if (!auth.currentUser && errorMessage.includes('Missing or insufficient permissions')) {
-    console.debug('Ignored permission error during logout for path:', path);
+    logger.debug('FIRESTORE', `Ignored permission error during logout for path: ${path}`);
     return;
   }
 
@@ -58,5 +59,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   }
   
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  logger.error('FIRESTORE', `Firestore Operation Error [${operationType}] on ${path}`, errInfo);
 }

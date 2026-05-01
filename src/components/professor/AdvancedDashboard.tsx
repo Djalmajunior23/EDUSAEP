@@ -568,7 +568,7 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
         <ChartCard title="Desempenho por Disciplina" subtitle="Média de acertos por unidade curricular">
           <div className="h-[320px] min-h-[320px] w-full">
             {disciplinePerformance && Array.isArray(disciplinePerformance) && disciplinePerformance.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={disciplinePerformance}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -589,7 +589,7 @@ export function AdvancedDashboard({ userProfile, selectedModel, stats, disciplin
         <ChartCard title="Evolução Temporal" subtitle="Progresso médio da turma ao longo do semestre">
           <div className="h-[320px] min-h-[320px] w-full">
             {studentEvolution && Array.isArray(studentEvolution) && studentEvolution.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <LineChart data={studentEvolution}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />

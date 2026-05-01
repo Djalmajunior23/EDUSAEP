@@ -185,7 +185,8 @@ export function AdaptiveExam({ examId, competency, onComplete, selectedModel = "
       });
       
       // Shadow Gamification: Give XP
-      await gamificationEngine.awardXP('SIMULATION_COMPLETED', score > 70 ? 1.5 : 1.0);
+      const xpAmount = 100 * (score > 70 ? 1.5 : 1.0);
+      await gamificationEngine.awardXP(auth.currentUser.uid, xpAmount, 'SIMULADO_ADAPTATIVO_CONCLUIDO');
 
       onComplete(score);
     } catch (error) {

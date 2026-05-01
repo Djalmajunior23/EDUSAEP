@@ -46,12 +46,16 @@ import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
 import { Question } from '../../types/questionTypes';
-import { safeArray, safeJoin, safeString, safeDate } from '../../utils/safeData';
+import { safeArray, safeJoin, safeString, safeDate } from '../../utils/safeUtils';
 import { AdvancedQuestionGenerator } from './AdvancedQuestionGenerator';
 import { QuestionRenderer } from '../common/QuestionRenderer';
 import { Eye, ChevronUp as ChevronUpIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import Fuse from 'fuse.js';
+
+import { logger } from '../../utils/logger';
+
+const MODULE = 'QUESTIONS_BANK_VIEW';
 
 // Configuração do worker do PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -334,10 +338,10 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
     setImportProgress(0);
     
     try {
-      console.log("[Import] Iniciando importação");
+      logger.info(MODULE, "Iniciando processo de importação");
       
       // 1. Extração manual (Parser Fallback)
-      console.log("[Parser] Iniciando extração manual");
+      logger.info(MODULE, "Executando parser manual de questões");
       const extractedQuestions = simpleRegexParser(text);
       
       if (!extractedQuestions || extractedQuestions.length === 0) {
@@ -359,16 +363,13 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       }));
 
       // 3. Salvar no Firestore antes da IA (Garante que os dados não se percam)
-      console.log("[Import] Questões extraídas, salvando no banco...");
       const savedIds = await saveImportedQuestions(questionsBase);
-      console.log("[Import] Questões salvas antes da IA:", savedIds.length);
 
       // 4. Tentar IA opcionalmente para enriquecimento com EduJarvis
       const enableAI = AI_CONFIG.enableAI;
       if (enableAI) {
         try {
           toast.info("O EduJarvis está analisando e enriquecendo as questões...");
-          console.log("[EduJarvis] Solicitando processamento inteligente");
           
           const jarvisRes = await sendJarvisCommand({
             command: `/importar o seguinte conteúdo de questões:\n${text}`,
@@ -379,18 +380,13 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
           });
           
           if (jarvisRes.data && Array.isArray(jarvisRes.data)) {
-            console.log("[Import] EduJarvis retornou dados enriquecidos, atualizando banco...");
             await updateQuestionsWithAI(savedIds, jarvisRes.data);
             toast.success("EduJarvis processou e enriqueciu as questões com sucesso!");
-          } else {
-            console.warn("[Import] EduJarvis não retornou dados estruturados:", jarvisRes);
           }
         } catch (aiError) {
-          console.warn("[Import] EduJarvis falhou no enriquecimento. As questões foram mantidas com dados básicos.", aiError);
-          toast.warning(`EduJarvis encontrou dificuldades: ${aiError instanceof Error ? aiError.message : 'Erro na IA'}. As questões foram salvas, mas precisam de revisão manual.`);
+          toast.warning(`EduJarvis encontrou dificuldades. As questões foram salvas básicas.`);
         }
       } else {
-        console.info("[Import] IA desativada por configuração. Mantendo dados do parser manual.");
         toast.info("Importação concluída sem IA.");
       }
 
@@ -463,7 +459,7 @@ export function QuestionsBankView({ user, userProfile, selectedModel }: { user: 
       });
 
       await batch.commit();
-      console.log(`[Firestore] ${savedIds.length} questões salvas com sucesso.`);
+      logger.info(MODULE, `${savedIds.length} questões salvas com sucesso no Firestore.`);
       fetchQuestions();
       return savedIds;
     } catch (error) {

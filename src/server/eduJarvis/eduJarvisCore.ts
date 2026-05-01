@@ -2,6 +2,9 @@ import { EduJarvisRequest, EduJarvisResponse, AgentType } from "../../types/eduJ
 import { generatePromptHash, getAICache, saveAICache } from "./aiCache";
 import { logAIUsage } from "./aiLogger";
 import { routeToAgent } from "./agentRouter";
+import { logger } from "../../utils/logger";
+
+const MODULE = 'JARVIS_CORE';
 
 export class EduJarvisCore {
     
@@ -108,7 +111,7 @@ export class EduJarvisCore {
             }
 
             // 3. AI Agent Routing
-            console.log(`[EduJarvis 2.0] Roteando para agente: ${request.agent} - Ação: ${request.action}`);
+            logger.info(MODULE, `Routing request - Agent: ${request.agent}, Action: ${request.action}`);
             const data = await routeToAgent(request);
 
             // 4. Save to Cache
@@ -144,7 +147,7 @@ export class EduJarvisCore {
             };
 
         } catch (error: any) {
-            console.error("[EduJarvis Orchestrator] Agent Error, trying fallback:", error.message);
+            logger.error(MODULE, `Agent error, trying fallback: ${error.message}`);
             
             try {
                 // Tenta rotear para o fallbackAgent se o agente específico falhar
@@ -166,7 +169,7 @@ export class EduJarvisCore {
                     }
                 };
             } catch (fallbackError: any) {
-                console.error("[EduJarvis Orchestrator] Critical Failure:", fallbackError);
+                logger.error(MODULE, "Critical Failure in Orchestrator", fallbackError);
                 await logAIUsage({
                     userId,
                     agent: request.agent as string,

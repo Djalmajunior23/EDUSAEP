@@ -1,4 +1,7 @@
 import admin from 'firebase-admin';
+import { logger } from '../../../utils/logger';
+
+const MODULE = 'AUTOMATION_AGENT';
 
 export async function automationAgent(intent: string, payload: any) {
   const db = admin.firestore();
@@ -12,8 +15,7 @@ export async function automationAgent(intent: string, payload: any) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  // Nota: Na vida real, aqui faríamos um fetch para a URL do n8n cadastrada nas configurações da escola.
-  console.log(`[Automation Agent] Webhook trigger created for intent: ${intent}`);
+  logger.info(MODULE, `Webhook trigger created for intent: ${intent}`);
 
   return {
     webhookId: webhookRef.id,

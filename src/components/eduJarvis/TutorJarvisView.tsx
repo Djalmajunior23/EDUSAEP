@@ -14,7 +14,8 @@ import {
   HelpCircle,
   Lightbulb,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  TrendingUp
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
@@ -227,7 +228,10 @@ export function TutorJarvisView() {
                       </div>
                       <p className="font-black text-blue-800 dark:text-blue-300 text-xs uppercase tracking-tighter">Plano de Estudo Gerado</p>
                     </div>
-                    <h4 className="font-bold text-blue-900 dark:text-blue-100 mb-2">{msg.data.planoEstudo.titulo}</h4>
+                    <h4 className="font-bold text-blue-900 dark:text-blue-100 mb-1">{msg.data.planoEstudo.titulo}</h4>
+                    {msg.data.planoEstudo.objetivo && (
+                      <p className="text-[10px] text-blue-700 dark:text-blue-300 mb-3 italic">Objetivo: {msg.data.planoEstudo.objetivo}</p>
+                    )}
                     <ul className="space-y-2 mb-4">
                       {msg.data.planoEstudo.etapas.map((etapa: string, idx: number) => (
                         <li key={idx} className="flex gap-2 items-start text-xs text-blue-800 dark:text-blue-200">
@@ -236,10 +240,63 @@ export function TutorJarvisView() {
                         </li>
                       ))}
                     </ul>
-                    <div className="p-3 bg-white/50 dark:bg-black/20 rounded-xl border border-blue-200/50 dark:border-blue-800/30">
-                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">Recomendação do Jarvis:</p>
-                      <p className="text-xs italic text-blue-900 dark:text-blue-100">{msg.data.planoEstudo.recomendacao}</p>
+                    <div className="flex justify-between items-center bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-blue-200/50 dark:border-blue-800/30">
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={10} className="text-blue-600" />
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight">{msg.data.planoEstudo.tempoEstimadoTotal || 'Tempo não estimado'}</span>
+                      </div>
+                      <p className="text-[10px] italic text-blue-900 dark:text-blue-100">{msg.data.planoEstudo.recomendacao}</p>
                     </div>
+                  </div>
+                )}
+
+                {msg.data?.recommendedDifficulty && (
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg w-fit">
+                    <TrendingUp size={10} />
+                    Status de Flow: Dificuldade {msg.data.recommendedDifficulty === 'easy' ? 'Tutorial' : msg.data.recommendedDifficulty === 'medium' ? 'Equilibrada' : 'Boss Fight'}
+                  </div>
+                )}
+
+                {msg.data?.suggestedMissions && msg.data.suggestedMissions.length > 0 && (
+                  <div className="mt-4 p-5 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-800/50 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-amber-500 rounded-lg text-white">
+                        <Trophy size={14} />
+                      </div>
+                      <p className="font-black text-amber-800 dark:text-amber-300 text-xs uppercase tracking-tighter">Missões Disponíveis</p>
+                    </div>
+                    <div className="space-y-3">
+                      {msg.data.suggestedMissions.map((mission: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-white/50 dark:bg-black/20 rounded-xl border border-amber-200/50 dark:border-amber-800/30">
+                          <div className="flex justify-between items-start mb-1">
+                            <div>
+                                <h5 className="font-bold text-amber-900 dark:text-amber-100 text-xs">{mission.title}</h5>
+                                {mission.reasoning && <p className="text-[9px] text-amber-600 italic leading-tight">{mission.reasoning}</p>}
+                            </div>
+                            <span className="text-[10px] font-black bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded shrink-0">+{mission.reward} XP</span>
+                          </div>
+                          <p className="text-[10px] text-amber-800 dark:text-amber-200 mt-1">{mission.description}</p>
+                          <button 
+                            onClick={() => setInput(`Aceito a missão: ${mission.title}`)}
+                            className="mt-2 text-[10px] font-bold text-amber-600 hover:text-amber-800 uppercase tracking-widest flex items-center gap-1"
+                          >
+                            Aceitar Quest <ChevronRight size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {msg.data?.badgesToUnlock && msg.data.badgesToUnlock.length > 0 && (
+                  <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+                    {msg.data.badgesToUnlock.map((badge: any, idx: number) => (
+                      <div key={idx} className="shrink-0 p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white text-center w-28 shadow-lg">
+                        <div className="text-2xl mb-1">{badge.icon || '🏅'}</div>
+                        <p className="text-[10px] font-black uppercase leading-tight mb-1">{badge.name}</p>
+                        <p className="text-[8px] opacity-80 leading-none">{badge.requirement}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

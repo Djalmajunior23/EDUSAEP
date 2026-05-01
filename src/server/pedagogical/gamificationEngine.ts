@@ -46,3 +46,36 @@ export async function generateMissions(studentId: string, profile: any): Promise
 
   return missions;
 }
+
+export async function getGlobalRanking(limit: number = 10) {
+  const db = admin.firestore();
+  
+  // Busca os top alunos por XP
+  const gamifSnap = await db.collection('gamificacao')
+    .orderBy('xp', 'desc')
+    .limit(limit)
+    .get();
+
+  const ranking: any[] = [];
+
+  for (const doc of gamifSnap.docs) {
+    const data = doc.data();
+    const userId = doc.id;
+    
+    // Busca nome e avatar no perfil
+    const profileSnap = await db.collection('profiles').doc(userId).get();
+    const profile = profileSnap.exists ? profileSnap.data() : { name: "Usuário Desconhecido" };
+
+    ranking.push({
+      userId,
+      name: profile?.name || "Usuário",
+      photoURL: profile?.photoURL || null,
+      xp: data.xp || 0,
+      level: data.level || 1,
+      badgesCount: (data.badges || []).length,
+      streak: data.streak || 0
+    });
+  }
+
+  return ranking;
+}

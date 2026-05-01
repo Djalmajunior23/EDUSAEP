@@ -304,36 +304,17 @@ async function startServer() {
     next();
   };
 
-  // AI Generation proxy error handler helper
-  const handleMethodNotAllowed = (allowedMethod: string) => (req: any, res: any) => {
-    res.status(405).json({ 
-      success: false, 
-      error: `Método ${req.method} não permitido nesta rota. Use ${allowedMethod}.` 
-    });
+  const validatePostMethod = (req: any, res: any, next: any) => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ 
+        success: false, 
+        error: `Método ${req.method} não permitido nesta rota. Use POST.` 
+      });
+    }
+    next();
   };
 
   // Health Check Endpoints
-  app.get("/status", async (_req, res) => {
-    try {
-      const dbStatus = await db.collection('_health').doc('check').get()
-        .then(() => "online")
-        .catch(() => "error");
-      
-      res.json({
-        status: "operational",
-        timestamp: new Date().toISOString(),
-        services: {
-          frontend: "online",
-          backend: "online",
-          database: dbStatus,
-          eduJarvis: "online"
-        }
-      });
-    } catch (error) {
-      res.status(500).json({ status: "degraded", error: "Internal check failed" });
-    }
-  });
-
   app.get("/api/health", async (_req, res) => {
     try {
       const start = Date.now();
@@ -345,52 +326,10 @@ async function startServer() {
         status: "ok",
         uptime: process.uptime(),
         latency: `${latency}ms`,
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'production'
       });
     } catch (e) {
       res.status(500).json({ success: false, status: "error" });
-    }
-  });
-
-  app.get("/api/edu-jarvis/health", (_req, res) => {
-    res.json({
-      success: true,
-      agent: "EduJarvis Orchestrator",
-      status: "ready",
-      version: "2.0.0-ultra",
-      capabilities: [
-        "Tutor", "Copiloto", "Gerador Atividades", "Corretor", "Analisador BI"
-      ]
-    });
-  });
-
-  app.get("/api/edu-jarvis/stats", async (_req, res) => {
-    try {
-      const logsSnap = await db.collection('aiUsageLogs')
-        .orderBy('timestamp', 'desc')
-        .limit(100)
-        .get();
-      
-      const stats = {
-        total: logsSnap.size,
-        success: 0,
-        error: 0,
-        latencyAvg: 0,
-        providers: {} as Record<string, number>
-      };
-
-      logsSnap.forEach(doc => {
-        const data = doc.data();
-        if (data.success) stats.success++; else stats.error++;
-        stats.latencyAvg += data.latency || 0;
-        stats.providers[data.provider] = (stats.providers[data.provider] || 0) + 1;
-      });
-
-      if (stats.total > 0) stats.latencyAvg /= stats.total;
-
-      res.json({ success: true, stats });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -427,7 +366,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/ai/completions", promptInjectionGuard, async (req, res) => {
+  app.post("/api/ai/completions", validatePostMethod, promptInjectionGuard, async (req, res) => {
     try {
       const { prompt, systemInstruction, responseFormat, responseSchema, task, userId, userRole, model } = req.body;
       if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
@@ -462,18 +401,6 @@ async function startServer() {
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  });
-
-  app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
-
-  app.all("/api/edu-jarvis/process", (req, res, next) => {
-    if (req.method !== 'POST') return handleMethodNotAllowed('POST')(req, res);
-    next();
-  });
-
-  app.all("/api/ai/completions", (req, res, next) => {
-    if (req.method !== 'POST') return handleMethodNotAllowed('POST')(req, res);
-    next();
   });
 
   // Final catch-all for API to prevent fallthrough to Vite/Static (which cause 405s)

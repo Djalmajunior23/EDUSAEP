@@ -42,7 +42,12 @@ Responda APENAS o JSON puro, sem markdown, começando com [ e terminando com ].
     if (result.success && result.text) {
       // Limpa possíveis markdowns se a IA teimar em colocar
       const cleanJson = result.text.replace(/```json|```/g, '').trim();
-      return JSON.parse(cleanJson);
+      try {
+        return JSON.parse(cleanJson);
+      } catch (e) {
+        console.error("[EduJarvis ImportAgent] JSON Parse Error:", e);
+        throw new Error("A IA retornou um formato de dados inválido na importação.");
+      }
     }
     throw new Error(result.error || "IA falhou em estruturar as questões");
   } catch (error: any) {

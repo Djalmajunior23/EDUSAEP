@@ -19,6 +19,6 @@ export const simulatorService = {
   },
 
   async finishSimulator(userId: string, simulatorId: string, xp: number): Promise<void> {
-    await gamificationService.awardPoints(userId, xp / 2, xp);
+    await gamificationService.awardPoints(userId, xp, 'Simulador Concluído');
   }
 };

@@ -29,6 +29,8 @@ interface ItemMetrics {
   totalResponses: number;
 }
 
+import { ErrorBoundary } from '../common/ErrorBoundary';
+
 export const TRIDashboardView: React.FC = () => {
   const [items, setItems] = useState<ItemMetrics[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,8 @@ export const TRIDashboardView: React.FC = () => {
   if (loading) return <div className="p-20 text-center">Carregando análise pedagógica...</div>;
 
   return (
-    <div className="p-6 space-y-8 bg-white dark:bg-gray-950 min-h-screen">
+    <ErrorBoundary moduleName="TRIDashboard">
+      <div className="p-6 space-y-8 bg-white dark:bg-gray-950 min-h-screen">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -161,7 +164,7 @@ export const TRIDashboardView: React.FC = () => {
                 </div>
 
                 <div className="h-[400px] min-h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={curveData}>
                       <defs>
                         <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
@@ -260,5 +263,6 @@ export const TRIDashboardView: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+  </ErrorBoundary>
+);
 };

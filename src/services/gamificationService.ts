@@ -1,148 +1,154 @@
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { GamificationProfile, Achievement } from '../types';
-import { toast } from 'sonner';
+
+export interface GamificationProfile {
+  studentId: string;
+  points: number;
+  level: number;
+  experience: number;
+  achievements: string[];
+  streak: number;
+  lastActivityAt: any;
+  badges?: string[];
+}
+
+export interface RankingEntry {
+  userId: string;
+  name: string;
+  photoURL: string | null;
+  xp: number;
+  level: number;
+  badgesCount: number;
+  streak: number;
+}
 
 export const XP_PER_LEVEL = 1000;
 
-export const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'first_activity',
-    title: 'Primeiros Passos',
-    description: 'Concluiu sua primeira atividade na plataforma.',
-    icon: '🎯',
-    xpReward: 50,
-    type: 'engagement'
-  },
-  {
-    id: 'five_activities',
-    title: 'Explorador Dedicado',
-    description: 'Concluiu 5 atividades com sucesso.',
-    icon: '🧭',
-    xpReward: 200,
-    type: 'academic'
-  },
-  {
-    id: 'quiz_master',
-    title: 'Mestre dos Quizzes',
-    description: 'Respondeu a 3 quizzes interativos.',
-    icon: '🧠',
-    xpReward: 150,
-    type: 'academic'
-  },
-  {
-    id: 'high_performer',
-    title: 'Alta Performance',
-    description: 'Manteve uma média acima de 90% em 3 avaliações seguidas.',
-    icon: '⚡',
-    xpReward: 500,
-    type: 'academic'
-  }
+export const ACHIEVEMENTS = [
+  { id: 'first_login', title: 'Pioneiro', description: 'Realizou o primeiro acesso à plataforma.', icon: '🚀' },
+  { id: 'first_activity', title: 'Mão na Massa', description: 'Concluiu a primeira atividade.', icon: '✍️' },
+  { id: 'streak_3', title: 'Foco Total', description: 'Manteve 3 dias seguidos de estudo.', icon: '🔥' },
+  { id: 'level_10', title: 'Veterano', description: 'Alcançou o nível 10.', icon: '🎖️' }
 ];
 
-export const getNextLevel = (xp: number) => Math.floor(xp / XP_PER_LEVEL) + 1;
-
-export const LevelConfig = {
-  XP_PER_LEVEL,
-  MAX_LEVEL: 100
-};
-
-export type { GamificationProfile } from '../types';
-
 export const gamificationService = {
-  async getProfile(studentId: string): Promise<GamificationProfile | null> {
-    const docRef = doc(db, 'gamification_profiles', studentId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return docSnap.data() as GamificationProfile;
+  async getProfile(userId: string): Promise<GamificationProfile> {
+    const stats = await this.getStudentStats(userId);
+    if (!stats) {
+      return { 
+        studentId: userId,
+        level: 1, 
+        experience: 0, 
+        points: 0, 
+        streak: 0, 
+        achievements: [],
+        badges: [],
+        lastActivityAt: new Date().toISOString()
+      };
     }
     
+    return {
+      studentId: userId,
+      points: stats.xp || 0,
+      level: stats.level || 1,
+      experience: stats.xp || 0,
+      achievements: stats.badges || [],
+      streak: stats.streak || 0,
+      lastActivityAt: stats.lastUpdate || new Date().toISOString(),
+      badges: stats.badges || []
+    };
+  },
+
+  async createProfile(userId: string): Promise<GamificationProfile> {
     const newProfile: GamificationProfile = {
-      studentId,
-      points: 0,
+      studentId: userId,
       level: 1,
       experience: 0,
-      achievements: [],
+      points: 0,
       streak: 0,
-      lastActivityAt: serverTimestamp()
+      achievements: [],
+      badges: [],
+      lastActivityAt: new Date().toISOString()
     };
-    
-    await setDoc(docRef, newProfile);
+    try {
+      await setDoc(doc(db, 'gamificacao', userId), {
+        xp: 0,
+        level: 1,
+        streak: 0,
+        badges: [],
+        lastUpdate: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Error creating gamification profile:", e);
+    }
     return newProfile;
   },
 
-  // Alias for getProfile that matches some components
-  async createProfile(studentId: string): Promise<GamificationProfile> {
-    const profile = await this.getProfile(studentId);
-    return profile || {
-      studentId,
-      points: 0,
-      level: 1,
-      experience: 0,
-      achievements: [],
-      streak: 0,
-      lastActivityAt: serverTimestamp()
-    } as GamificationProfile;
-  },
-
-  async awardPoints(studentId: string, points: number, experience: number): Promise<void> {
-    const profile = await this.getProfile(studentId);
-    if (!profile) return;
-
-    const newExp = profile.experience + experience;
-    const newPoints = profile.points + points;
-    const newLevel = getNextLevel(newExp);
-
-    const docRef = doc(db, 'gamification_profiles', studentId);
-    await updateDoc(docRef, {
-      points: newPoints,
-      experience: newExp,
-      level: newLevel,
-      lastActivityAt: serverTimestamp()
-    });
-
-    if (newLevel > profile.level) {
-      toast.success(`Parabéns! Você alcançou o nível ${newLevel}!`);
+  async awardPoints(userId: string, points: number, reason?: string) {
+    try {
+      const docRef = doc(db, 'gamificacao', userId);
+      await updateDoc(docRef, {
+        xp: increment(points),
+        lastUpdate: serverTimestamp()
+      });
+      console.log(`[Gamification] Awarded ${points} points to ${userId}${reason ? ` for ${reason}` : ''}`);
+    } catch (e) {
+      console.error("Error awarding points:", e);
     }
   },
 
-  // Compatibility aliases
-  async awardXP(studentId: string, amount: number): Promise<void> {
-    await this.awardPoints(studentId, 0, amount);
+  async awardXP(userId: string, xp: number, reason?: string) {
+    return this.awardPoints(userId, xp, reason);
   },
 
-  async addXP(studentId: string, amount: number): Promise<void> {
-    await this.awardPoints(studentId, 0, amount);
+  async getRanking(listLimit: number = 10): Promise<RankingEntry[]> {
+    try {
+      const gamifRef = collection(db, 'gamificacao');
+      const q = query(gamifRef, orderBy('xp', 'desc'), limit(listLimit));
+      const querySnapshot = await getDocs(q);
+      
+      const ranking: RankingEntry[] = [];
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data();
+        const userId = docSnapshot.id;
+        
+        const profileRef = doc(db, 'profiles', userId);
+        const profileSnap = await getDoc(profileRef);
+        const profileData = profileSnap.exists() ? profileSnap.data() : { name: "Usuário Desconhecido" };
+        
+        ranking.push({
+          userId,
+          name: profileData.name || "Usuário",
+          photoURL: profileData.photoURL || null,
+          xp: data.xp || 0,
+          level: data.level || 1,
+          badgesCount: (data.badges || []).length,
+          streak: data.streak || 0
+        });
+      }
+      
+      return ranking;
+    } catch (error) {
+      console.error("[GamificationService] Error fetching ranking:", error);
+      return [];
+    }
   },
 
-  async checkAndAwardAchievement(studentId: string, achievementId: string): Promise<void> {
-    const profile = await this.getProfile(studentId);
-    if (!profile) return;
-
-    if (profile.achievements.includes(achievementId)) return;
-
-    const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
-    if (!achievement) return;
-
-    const newAchievements = [...profile.achievements, achievementId];
-    const docRef = doc(db, 'gamification_profiles', studentId);
-    
-    await updateDoc(docRef, {
-      achievements: newAchievements,
-      experience: profile.experience + achievement.xpReward
-    });
-
-    toast.success(`Conquista Desbloqueada: ${achievement.title}!`, {
-      description: achievement.description
-    });
-  },
-
-  // Alias for checkAndAwardAchievement
-  async awardBadge(studentId: string, badgeId: string): Promise<void> {
-    await this.checkAndAwardAchievement(studentId, badgeId);
+  async getStudentStats(userId: string) {
+    try {
+      const docRef = doc(db, 'gamificacao', userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data();
+      }
+      return null;
+    } catch (error) {
+      console.error("[GamificationService] Error fetching student stats:", error);
+      return null;
+    }
   }
 };
 
-// Compatibility aliases
+// Aliasing for backward compatibility with components that import gamificationEngine
 export const gamificationEngine = gamificationService;

@@ -17,7 +17,8 @@ import { PedagogicalSummaryCard } from '../professor/PedagogicalSummaryCard';
 import { handleFirestoreError, OperationType } from '../../services/errorService';
 
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { safeArray, safeString, safeDate } from '../../utils/safeData';
+import { safeArray, safeString, safeDate } from '../../utils/safeUtils';
+import { RankingWidget } from '../gamification/RankingWidget';
 
 interface ProfessorDashboardViewProps {
   user: User | null;
@@ -51,11 +52,11 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
           getDocs(resultsQuery)
         ]);
         
-        const results = resultsSnap.docs.map(doc => doc.data());
+        const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         const totalSubmissions = results.length;
-        const totalScore = results.reduce((acc, curr) => acc + (curr.score || 0), 0);
-        const totalMaxScore = results.reduce((acc, curr) => acc + (curr.maxScore || 100), 0);
+        const totalScore = results.reduce((acc, curr: any) => acc + (Number(curr.score) || 0), 0);
+        const totalMaxScore = results.reduce((acc, curr: any) => acc + (Number(curr.maxScore) || 100), 0);
         const avgScore = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
 
         setStats({
@@ -63,7 +64,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
           totalExams: examsSnap.size,
           totalSubmissions,
           avgScore,
-          recentActivity: resultsSnap.docs.slice(0, 5).map(doc => ({ id: doc.id, ...doc.data() }))
+          recentActivity: results.slice(0, 5)
         });
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'dashboard_stats');
@@ -76,7 +77,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
   }, [user]);
   
   return (
-    <ErrorBoundary componentName="ProfessorDashboard">
+    <ErrorBoundary moduleName="ProfessorDashboard">
       <div className="space-y-10 py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -290,6 +291,7 @@ export function ProfessorDashboardView({ user, userProfile }: ProfessorDashboard
             </div>
 
             <div className="space-y-6">
+              <RankingWidget limit={5} />
               <PedagogicalSummaryCard />
               <PedagogicalDecisionsWidget />
               <RiskStudentsPanel />

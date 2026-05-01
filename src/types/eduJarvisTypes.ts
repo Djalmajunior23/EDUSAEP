@@ -7,6 +7,7 @@ export interface EduJarvisMessageType {
   createdAt: string;
   type?: 'text' | 'learning_path' | 'intervention' | 'report' | 'vision_analysis' | 'chart';
   payload?: any;
+  action?: string;
 }
 
 export type AgentType =
@@ -22,8 +23,8 @@ export type AgentType =
 export type CostMode = "economico" | "normal" | "avancado";
 
 export interface EduJarvisRequest {
-  userId: string;
-  userRole: UserRole;
+  userId?: string;
+  userRole?: UserRole;
   command?: string;
   context?: Record<string, any>;
   image?: string; // Base64 image

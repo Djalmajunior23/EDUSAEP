@@ -27,32 +27,49 @@ REGRAS DE OURO PARA PRODUÇÃO PEDAGÓGICA:
 `,
     process: async (request: EduJarvisRequest, context: AgentContext) => {
         const db = admin.firestore();
-        const { action, input } = request;
+        const { action, input, command } = request;
         
         const actionPrompts: Record<string, string> = {
-            "GERAR_AULA": "Gere uma estrutura de aula completa com objetivos de aprendizagem claros, conteúdo técnico robusto e dinâmica de participação.",
-            "GERAR_ATIVIDADE_PRATICA": "Gere uma atividade prática técnica industrial. Inclua roteiro detalhado, normas de segurança (EPIs/EPCs) e checklist de conformidade.",
-            "GERAR_PLANO_AULA": `Gere um Plano de Aula Pedagógico de Alta Performance (Padrão SENAI/SAEP). 
-              Exigências Obrigatórias no JSON:
-              - cronograma_detalhado (minuto a minuto com descrição da ação do professor e do aluno).
-              - recursos_necessarios (lista exaustiva de equipamentos, insumos e softwares).
-              - metodologia_aplicada (ex: PBL, Sala Invertida, Gamificação).
-              - plano_avaliacao (detalhar os 3 tipos: Diagnóstica, Formativa e Somativa com critérios de êxito).`,
-            "GERAR_AULA_INVERTIDA": `Planeje uma estratégia de Aula Invertida completa e engajadora. 
-              Exigências Obrigatórias no JSON:
-              - materiais_pre_aula (curadoria técnica: vídeos, artigos, simuladores).
-              - guia_estudo_autonomo (perguntas para o aluno responder antes da aula).
-              - desafio_em_sala (situação-problema complexa para trabalho em grupo).
-              - recursos_sala (o que o professor precisa preparar para o desafio).`,
-            "GERAR_ESTUDO_CASO": `Crie um Estudo de Caso Profissional baseado em cenários reais de mercado. 
-              Exigências Obrigatórias no JSON:
-              - titulo_caso (atrativo e técnico).
-              - contexto_industrial (descrição do setor, empresa fictícia e cenário de crise/problema).
-              - dados_tecnicos (KPIs, logs de erro, variações financeiras ou falhas de segurança).
-              - problema_central (o dilema que deve ser resolvido).
-              - perguntas_desafio (3 questões complexas nível Bloom superior).`,
-            "GERAR_RUBRICA": "Gere uma Rubrica de Avaliação por Competências. Níveis: Insuficiente, Básico, Pleno, Avançado. Detalhe indicadores de desempenho.",
-            "SUGERIR_INTERVENCAO": "Analise as lacunas e gere um roteiro de intervenção pedagógica personalizada, focando em reforço de conceitos e novas dinâmicas."
+            "GERAR_AULA": `Gere uma Estrutura de Aula Completa e Dinâmica. 
+              Exigências Obrigatórias no JSON (campo 'data'):
+              - titulo (string).
+              - objetivos (string[]).
+              - topicos_principais (lista: { titulo: string, descricao: string }).
+              - dinamica_engajamento (string: proposta de interação).
+              - ferramenta_apoio (string: sugestão de IA ou software).`,
+            "GERAR_ATIVIDADE_PRATICA": `Gere um Roteiro de Atividade Prática técnica/industrial. 
+              Exigências Obrigatórias no JSON (campo 'data'):
+              - titulo_pratica (string).
+              - materiais_necessarios (string[]).
+              - segurança (objeto: { epis: string[], riscos: string[] }).
+              - passos (lista: { ordem: number, descricao: string }).
+              - criterios_sucesso (string[]).`,
+            "GERAR_PLANO_AULA": `Gere um Plano de Aula Pedagógico de Alta Performance (Padrão Ultra). 
+              Exigências Obrigatórias no JSON (campo 'data'):
+              - titulo (string: Título atrativo).
+              - cronograma (lista de objetos: { tempo: string, atividade: string, acao_professor: string, acao_aluno: string }).
+              - recursos (objeto: { materiais_fisicos: string[], ferramentas_digitais: string[], softwares: string[] }).
+              - avaliacao (objeto: { diagnostica: string, formativa: string, somativa: string }).
+              - objetivos_aprendizagem (lista: string[] baseados na Taxonomia de Bloom).
+              - metodologia (string: ex: PBL, Metodologias Ativas).`,
+            "GERAR_AULA_INVERTIDA": `Planeje uma estratégia de Aula Invertida (Flipped Classroom) completa e engajadora. 
+              Exigências Obrigatórias no JSON (campo 'data'):
+              - tema_central (string).
+              - pre_aula (objeto: { curadoria: { tipo: "video" | "leitura" | "podcast", descricao: string, link: string }[], atividade_verificacao: string }).
+              - em_sala (objeto: { desafio_pbl: string, dinámica_grupo: string, recursos_necessarios: string[] }).
+              - consolidacao (string: atividade de fechamento).`,
+            "GERAR_ESTUDO_CASO": `Crie um Estudo de Caso Profissional baseado em cenários REAIS e complexos de mercado (Dilemas Éticos/Técnicos). 
+              Exigências Obrigatórias no JSON (campo 'data'):
+              - titulo_caso (string).
+              - contexto_industrial (descrição rica do cenário e empresa).
+              - problema_central (detalhe da falha, conflito ou dilema técnico).
+              - dados_e_kpis (objeto: KPIs impactados ou logs de erro mockados).
+              - perguntas_norteadoras (lista: 3 questões nível Bloom superior: Analisar/Criar).
+              - guia_facilitador (string: dicas para o professor conduzzir a discussão).`,
+            "GERAR_RUBRICA": `Gere uma Rubrica de Avaliação por Competências de alto nível. 
+              Exigências Obrigatórias no JSON (campo 'data'):
+              - criterios (lista: { nome: string, peso: number, niveis: { insuficiente: string, basico: string, pleno: string, avancado: string } }).`,
+            "SUGERIR_INTERVENCAO": "Analise as lacunas e gere um roteiro de intervenção pedagógica personalizada."
         };
 
         const actionText = actionPrompts[action || ""] || "Auxilie na criação de conteúdos e planos pedagógicos.";
@@ -60,6 +77,7 @@ REGRAS DE OURO PARA PRODUÇÃO PEDAGÓGICA:
         const prompt = `
 AÇÃO ESPECÍFICA: ${action}
 ORIENTAÇÃO TÉCNICA: ${actionText}
+OBJETIVO/TEMA SOLICITADO: "${command || "Geral"}"
 
 DADOS DE ENTRADA:
 ${JSON.stringify(input, null, 2)}
@@ -81,7 +99,17 @@ RETORNE APENAS O JSON ESTRUTURADO.
             costMode: request.costMode || "normal",
             responseFormat: 'json'
         });
-        const result = JSON.parse(aiResponse.text);
+        
+        let result: any = {};
+        try {
+            result = JSON.parse(aiResponse.text || '{}');
+        } catch (e) {
+            console.error("[ProfessorAgent] Failed to parse AI JSON:", e);
+            result = { 
+                response: aiResponse.text || "Desculpe, tive um problema ao formatar a resposta.",
+                error: "Invalid JSON response"
+            };
+        }
 
         // Persistência das produções pedagógicas
         await db.collection('materiais_pedagogicos').add({

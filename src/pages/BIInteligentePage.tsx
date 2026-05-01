@@ -17,7 +17,7 @@ export default function BIInteligentePage({ user, userProfile }: any) {
   const [compAverages, setCompAverages] = useState<any[]>([]);
   const [evolutionData, setEvolutionData] = useState<any[]>([]);
 
-  const isConfigured = isSupabaseConfigured();
+  const isConfigured = isSupabaseConfigured;
 
   useEffect(() => {
     if (isConfigured) {

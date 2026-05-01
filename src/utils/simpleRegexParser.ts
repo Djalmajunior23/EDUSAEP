@@ -1,9 +1,11 @@
+import { logger } from './logger';
+
 /**
  * Parser simples baseado em regex para extrair questões de texto quando a IA falha.
  * Tenta identificar blocos que parecem questões (Enunciado + Alternativas).
  */
 export function simpleRegexParser(text: string): any[] {
-  console.log("[Parser] Iniciando extração manual (fallback)");
+  logger.debug('PARSER', "Iniciando extração manual (fallback)");
   const questions: any[] = [];
   
   // Divide por itens ou quebras duplas

@@ -143,7 +143,7 @@ export function StudentActivitiesManager({ userProfile }: { userProfile: any }) 
 
       // Award gamification points
       const points = 100 + (!isLate ? 50 : 0);
-      await gamificationService.awardPoints(userProfile.uid, points, points);
+      await gamificationService.awardPoints(userProfile.uid, points, `Entrega de atividade: ${selectedActivity.title}`);
 
       toast.success(isLate ? "Atividade enviada com atraso!" : "Atividade enviada com sucesso!");
       setContent('');

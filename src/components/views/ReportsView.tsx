@@ -38,7 +38,7 @@ export function ReportsView({ history }: ReportsViewProps) {
   }, [history]);
 
   const suggestedStudents = useMemo(() => {
-    if (!history.length) return [];
+    if (!history || !history.length) return [];
     
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
