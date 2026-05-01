@@ -1,15 +1,15 @@
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export const competencySupabaseService = {
   async getAllCompetencies() {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
     const { data, error } = await supabase.from('competencias').select('*');
     if (error) return [];
     return data;
   },
 
   async getCompetencyStats(turmaId: string) {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
     // Esta consulta idealmente seria uma view agregada no Postgres
     const { data, error } = await supabase
       .from('respostas_simulado')

@@ -1,10 +1,10 @@
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 /**
  * Sincroniza o usuário do Firebase com o Supabase
  */
 export async function syncFirebaseUserToSupabase(user: any, profile: any) {
-  if (!supabase) return null;
+  if (!supabase || !isSupabaseConfigured) return null;
 
   try {
     const { data, error } = await supabase
@@ -32,7 +32,7 @@ export async function syncFirebaseUserToSupabase(user: any, profile: any) {
  * Busca o perfil do Supabase pelo Firebase UID
  */
 export async function getSupabaseProfile(firebaseUid: string) {
-  if (!supabase) return null;
+  if (!supabase || !isSupabaseConfigured) return null;
   const { data, error } = await supabase
     .from('profiles_supabase')
     .select('*')

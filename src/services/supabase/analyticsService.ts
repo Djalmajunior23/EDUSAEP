@@ -1,11 +1,11 @@
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export const analyticsSupabaseService = {
   /**
    * Média da turma por competência
    */
   async getClassAverageByCompetency(turmaId: string) {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
     
     try {
       // Exemplo de consulta agregada via RPC ou view se disponível, 
@@ -46,7 +46,7 @@ export const analyticsSupabaseService = {
    * Evolução do Aluno
    */
   async getStudentEvolution(alunoId: string) {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
     const { data, error } = await supabase
       .from('tentativas_simulado')
       .select('data_tentativa, nota_final, percentual_acerto')

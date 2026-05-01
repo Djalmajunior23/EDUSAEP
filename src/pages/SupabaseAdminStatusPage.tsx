@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { Database, CheckCircle, XCircle, Shield, Key, Server, RefreshCw, Zap } from 'lucide-react';
 
 export default function SupabaseAdminStatusPage() {
@@ -15,7 +15,7 @@ export default function SupabaseAdminStatusPage() {
     setLoading(true);
     const start = Date.now();
     try {
-      if (!supabase) throw new Error("Supabase client não inicializado. Verifique VITE_SUPABASE_URL.");
+      if (!isSupabaseConfigured || !supabase) throw new Error("Supabase não configurado. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
 
       // Teste simples de query
       const { data, error } = await supabase.from('profiles_supabase').select('count', { count: 'exact', head: true });

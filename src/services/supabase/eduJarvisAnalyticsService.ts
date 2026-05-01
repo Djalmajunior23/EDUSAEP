@@ -1,4 +1,4 @@
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export const eduJarvisAnalyticsService = {
   /**
@@ -12,7 +12,7 @@ export const eduJarvisAnalyticsService = {
     resultado: any,
     promptVersion?: string
   }) {
-    if (!supabase) return null;
+    if (!supabase || !isSupabaseConfigured) return null;
 
     const { data, error } = await supabase
       .from('analises_edu_jarvis')
@@ -40,7 +40,7 @@ export const eduJarvisAnalyticsService = {
    * Busca histórico de análises
    */
   async getAnalysisHistory(turmaId?: string, alunoId?: string) {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
     
     let query = supabase.from('analises_edu_jarvis').select('*');
     

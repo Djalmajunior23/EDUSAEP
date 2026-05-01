@@ -1,4 +1,4 @@
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export const simuladoAnalyticsService = {
   /**
@@ -19,7 +19,7 @@ export const simuladoAnalyticsService = {
       tempoMs: number
     }>
   }) {
-    if (!supabase) return null;
+    if (!supabase || !isSupabaseConfigured) return null;
 
     try {
       // 1. Salva a tentativa principal
@@ -67,7 +67,7 @@ export const simuladoAnalyticsService = {
    * Histórico por aluno
    */
   async getStudentHistory(alunoId: string) {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
     const { data, error } = await supabase
       .from('tentativas_simulado')
       .select('*')

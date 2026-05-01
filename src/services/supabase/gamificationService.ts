@@ -1,4 +1,4 @@
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export const gamificationSupabaseService = {
   /**
@@ -11,7 +11,7 @@ export const gamificationSupabaseService = {
     motivo: string,
     tipo: 'acerto' | 'sequencia' | 'missao'
   }) {
-    if (!supabase) return null;
+    if (!supabase || !isSupabaseConfigured) return null;
 
     const { data, error } = await supabase
       .from('gamificacao_pontos')
@@ -33,7 +33,7 @@ export const gamificationSupabaseService = {
    * Busca ranking de gamificação da turma
    */
   async getRanking(turmaId?: string) {
-    if (!supabase) return [];
+    if (!supabase || !isSupabaseConfigured) return [];
 
     // Esta consulta precisaria de Join se quisermos nomes
     const { data, error } = await supabase
