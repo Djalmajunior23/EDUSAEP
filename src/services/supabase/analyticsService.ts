@@ -53,7 +53,8 @@ export const analyticsSupabaseService = {
       .eq('aluno_id', alunoId)
       .order('data_tentativa', { ascending: true });
 
-    if (error) return [];
+    if (error || !data) return [];
+
     return data.map(d => ({
       date: new Date(d.data_tentativa).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
       score: d.nota_final || d.percentual_acerto

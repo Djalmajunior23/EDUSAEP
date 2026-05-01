@@ -45,7 +45,7 @@ export const gamificationSupabaseService = {
       `)
       .order('pontos', { ascending: false });
 
-    if (error) return [];
+    if (error || !data) return [];
     
     // Agrupa pontos por aluno se houver múltiplos registros
     const rankingMap: Record<string, any> = {};
@@ -53,11 +53,17 @@ export const gamificationSupabaseService = {
       const id = item.aluno_id;
       if (!rankingMap[id]) {
         rankingMap[id] = { 
-          nome: item.profiles_supabase?.display_name || 'Aluno', 
-          total: 0 
+          id: id,
+          userId: id,
+          name: item.profiles_supabase?.display_name || 'Aluno', 
+          xp: 0,
+          total: 0,
+          badgesCount: 0,
+          streak: 0
         };
       }
       rankingMap[id].total += item.pontos;
+      rankingMap[id].xp += item.pontos;
     });
 
     return Object.values(rankingMap).sort((a, b) => b.total - a.total);

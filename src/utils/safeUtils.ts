@@ -72,9 +72,7 @@ export async function safeAsync<T>(
   try {
     return await promise;
   } catch (error) {
-    // Dynamic import to avoid circular dependency
-    const { logger } = await import('./logger');
-    logger.error(moduleName, "Async operation failed", error);
+    console.error(`[EduAI:${moduleName}] ❌ Async operation failed`, error || '');
     return fallback;
   }
 }

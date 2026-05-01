@@ -32,18 +32,16 @@ export default function BIInteligentePage({ user, userProfile }: any) {
     setLoading(true);
     setError(null);
     try {
-      // Tenta buscar dados reais baseados no perfil do usuário
-      // Se não houver turma vinculada, usa demo para visualização inicial
       const targetTurma = userProfile?.turmaId || 'turma-demo';
       const targetAluno = userProfile?.role === 'STUDENT' ? user.uid : 'aluno-demo';
 
       const averages = await analyticsSupabaseService.getClassAverageByCompetency(targetTurma);
       const evolution = await analyticsSupabaseService.getStudentEvolution(targetAluno);
       
-      setCompAverages(averages);
-      setEvolutionData(evolution);
+      setCompAverages(averages || []);
+      setEvolutionData(evolution || []);
     } catch (err: any) {
-      setError("Erro ao carregar dados analíticos. Verifique se as tabelas foram migradas para o Supabase.");
+      setError("Erro ao carregar dados analíticos.");
     } finally {
       setLoading(false);
     }
@@ -51,10 +49,20 @@ export default function BIInteligentePage({ user, userProfile }: any) {
 
   if (!isConfigured) {
     return (
-      <div className="p-8 text-center bg-amber-50 rounded-3xl border border-amber-100">
+      <div className="p-8 text-center bg-amber-50 rounded-3xl border border-amber-100 mt-10">
         <Database className="mx-auto text-amber-500 mb-4" size={48} />
         <h2 className="text-xl font-bold text-amber-900 mb-2">Supabase Não Configurado</h2>
-        <p className="text-amber-800 text-sm">As novas funcionalidades analíticas requerem as chaves VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no seu ambiente.</p>
+        <p className="text-amber-800 text-sm">As novas funcionalidades analíticas requerem as chaves VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no seu ambiente. Solicite no Menu Configurações.</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center bg-rose-50 rounded-3xl border border-rose-100">
+        <AlertTriangle className="mx-auto text-rose-500 mb-4" size={48} />
+        <h2 className="text-xl font-bold text-rose-900 mb-2">Erro de Carregamento</h2>
+        <p className="text-rose-800 text-sm">{error}</p>
       </div>
     );
   }
@@ -110,7 +118,7 @@ export default function BIInteligentePage({ user, userProfile }: any) {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState message="Sem dados de competência no Supabase ainda." />
+              <EmptyState message="Sem dados de competência ainda." />
             )}
           </div>
         </ChartCard>

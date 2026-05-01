@@ -4,34 +4,55 @@ import {
   Trophy, Medal, Target, Zap, 
   ChevronRight, Star, Award, TrendingUp, History, User
 } from 'lucide-react';
-import { gamificationService, RankingEntry } from '../services/gamificationService';
+import { gamificationSupabaseService } from '../services/supabase/gamificationService';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function GamificacaoPage() {
   const [loading, setLoading] = useState(true);
-  const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [ranking, setRanking] = useState<any[]>([]);
   const { user } = useAuth();
   const [userStats, setUserStats] = useState<any>(null);
 
+  const isConfigured = isSupabaseConfigured;
+
   useEffect(() => {
-    loadGamification();
-  }, [user]);
+    if (isConfigured) {
+      loadGamification();
+    } else {
+      setLoading(false);
+    }
+  }, [isConfigured, user]);
 
   const loadGamification = async () => {
     setLoading(true);
     try {
-      const [rankingData, stats] = await Promise.all([
-        gamificationService.getRanking(10),
-        user ? gamificationService.getStudentStats(user.uid) : null
-      ]);
-      setRanking(rankingData);
-      setUserStats(stats);
+      const data = await gamificationSupabaseService.getRanking();
+      setRanking(data || []);
+      
+      // Compute user stats if needed from Supabase or just fallback
+      const meItem = data.find((d: any) => d.id === user?.uid);
+      if (meItem) {
+        setUserStats({ xp: meItem.total, level: Math.floor(meItem.total / 1000) + 1 });
+      } else {
+        setUserStats({ xp: 0, level: 1 });
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
+
+  if (!isConfigured) {
+    return (
+      <div className="p-8 text-center bg-gray-50 rounded-3xl border border-gray-100 mt-10">
+        <Award className="mx-auto text-gray-300 mb-4" size={48} />
+        <h2 className="text-xl font-bold text-gray-900">Supabase Não Configurado</h2>
+        <p className="text-gray-500 mt-2">Ative as credenciais do Supabase no Menu de Configuração para gerenciar ranking e gamificação.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8 min-h-screen bg-[#fafafa]">

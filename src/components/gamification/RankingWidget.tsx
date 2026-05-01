@@ -16,7 +16,7 @@ export function RankingWidget({ limit = 5, title = "Ranking de Engajamento", sho
   useEffect(() => {
     const load = async () => {
       const data = await gamificationService.getRanking(limit);
-      setRanking(data);
+      setRanking(data || []);
       setLoading(false);
     };
     load();
