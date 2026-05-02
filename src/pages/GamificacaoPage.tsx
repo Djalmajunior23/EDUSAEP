@@ -44,6 +44,8 @@ export default function GamificacaoPage() {
     }
   };
 
+  // Em vez de quebrar a página, mostramos um aviso não obstrutivo pra manter a interface e não dar impressão de crash
+  /*
   if (!isConfigured) {
     return (
       <div className="p-8 text-center bg-gray-50 rounded-3xl border border-gray-100 mt-10">
@@ -53,9 +55,22 @@ export default function GamificacaoPage() {
       </div>
     );
   }
+  */
 
   return (
     <div className="p-6 space-y-8 min-h-screen bg-[#fafafa]">
+      {!isConfigured && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-4">
+          <Award className="text-amber-500 shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="text-amber-900 font-bold text-sm">Modo de Demonstração</h3>
+            <p className="text-amber-800 text-xs mt-1">
+              As funcionalidades em tempo real de gamificação requerem as chaves <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> e <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.
+            </p>
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tighter">GAMIFICAÇÃO & <span className="text-amber-500">CONQUISTAS</span></h1>
@@ -181,7 +196,7 @@ export default function GamificacaoPage() {
               <div className="space-y-4 animate-pulse">
                 {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-gray-50 rounded-xl"></div>)}
               </div>
-            ) : ranking.length > 0 ? (
+            ) : ranking?.length > 0 ? (
               <div className="space-y-3">
                 {ranking.map((player, idx) => (
                   <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl transition-all ${player.userId === user?.uid ? 'bg-indigo-50 border border-indigo-100' : idx < 3 ? 'bg-amber-50/30' : 'hover:bg-gray-50'}`}>

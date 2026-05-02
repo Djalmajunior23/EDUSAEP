@@ -17,7 +17,7 @@ export function CommunicationCenter({ userProfile }: { userProfile: any }) {
   const [isCreating, setIsCreating] = useState(false);
   
   // New Item State
-  const [newItem, setNewItem] = useState({ title: '', content: '' });
+  const [newItem, setNewItem] = useState<{ title: string; content: string; imageUrl?: string }>({ title: '', content: '', imageUrl: '' });
 
   useEffect(() => {
     setLoading(true);
@@ -71,7 +71,7 @@ export function CommunicationCenter({ userProfile }: { userProfile: any }) {
       });
       toast.success(activeTab === 'announcements' ? "Aviso publicado!" : "Tópico criado!");
       setIsCreating(false);
-      setNewItem({ title: '', content: '' });
+      setNewItem({ title: '', content: '', imageUrl: '' });
     } catch (error) {
       console.error("Error creating item:", error);
       toast.error("Erro ao publicar.");
@@ -166,6 +166,16 @@ export function CommunicationCenter({ userProfile }: { userProfile: any }) {
                   onChange={e => setNewItem({...newItem, title: e.target.value})}
                   className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   placeholder="Título chamativo..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL da Imagem (Opcional)</label>
+                <input
+                  type="url"
+                  value={newItem.imageUrl || ''}
+                  onChange={e => setNewItem({...newItem, imageUrl: e.target.value})}
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="https://exemplo.com/imagem.png"
                 />
               </div>
               <div>
@@ -285,23 +295,45 @@ export function CommunicationCenter({ userProfile }: { userProfile: any }) {
                   key={item.id}
                   layoutId={item.id}
                   onClick={() => setSelectedItem(item)}
-                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
+                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group relative"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors mb-2">
-                        {item.title}
-                      </h3>
-                      <p className="text-gray-500 text-sm line-clamp-2 mb-4">{item.content}</p>
-                      <div className="flex items-center gap-4 text-xs text-gray-400">
-                        <span className="flex items-center gap-1"><User size={12} /> {item.authorName}</span>
-                        <span className="flex items-center gap-1"><Clock size={12} /> {item.createdAt?.toDate().toLocaleDateString()}</span>
-                        {activeTab === 'forum' && (
-                          <span className="flex items-center gap-1"><MessageCircle size={12} /> {item.commentCount || 0} comentários</span>
-                        )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                      {/* Primeira Coluna: Título e Meta */}
+                      <div className="pr-4 border-r border-gray-100">
+                        <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors mb-4">
+                          {item.title}
+                        </h3>
+                        <div className="flex flex-col gap-2 text-xs text-gray-400">
+                          <span className="flex items-center gap-2"><User size={14} className="text-indigo-400" /> {item.authorName}</span>
+                          <span className="flex items-center gap-2"><Clock size={14} className="text-emerald-400" /> {item.createdAt?.toDate().toLocaleDateString()}</span>
+                          {activeTab === 'forum' && (
+                            <span className="flex items-center gap-2"><MessageCircle size={14} className="text-blue-400" /> {item.commentCount || 0} comentários</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Segunda Coluna: Resumo e Imagem */}
+                      <div className="flex flex-col sm:flex-row gap-4 items-start h-full">
+                        <div className="flex-1">
+                          <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed">
+                            {item.content || 'Nenhum resumo disponível para este aviso.'}
+                          </p>
+                        </div>
+                        {/* Placeholder para uma imagem associada à notícia */}
+                        <div className="w-full sm:w-24 h-24 bg-gradient-to-br from-indigo-50 to-emerald-50 rounded-xl border border-indigo-100/50 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+                          {item.imageUrl ? (
+                             <img src={item.imageUrl} alt="Capa" className="w-full h-full object-cover" />
+                          ) : (
+                             <Megaphone className="text-indigo-200" size={32} />
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <ChevronRight className="text-gray-300 group-hover:text-indigo-400 transition-colors" />
+                    {/* Seta indicativa no hover */}
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
+                      <ChevronRight className="text-indigo-400 bg-indigo-50 rounded-full p-1" size={28} />
+                    </div>
                   </div>
                 </motion.div>
               ))

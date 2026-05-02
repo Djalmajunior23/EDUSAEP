@@ -1321,7 +1321,7 @@ function AppContent() {
   }, [result]);
 
   const evolutionData = useMemo(() => {
-    if (!result || !history.length) return [];
+    if (!result || !history?.length) return [];
 
     const getDate = (createdAt: any) => {
       if (!createdAt) return new Date(0);

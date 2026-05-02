@@ -90,6 +90,7 @@ export interface Announcement {
   id?: string;
   title: string;
   content: string;
+  imageUrl?: string;
   type: 'announcement' | 'forum';
   classId?: string;
   createdBy: string;
@@ -114,7 +115,10 @@ export type NotificationType =
   | 'activity_returned' 
   | 'calendar_event' 
   | 'system_alert'
-  | 'forum_reply';
+  | 'forum_reply'
+  | 'milestone_achieved'    // Competência concluída, Level Up (para aluno e professor)
+  | 'performance_alert'     // Queda de desempenho (para aluno e professor)
+  | 'engagement_alert';     // Atividades pendentes seguidas (para aluno e professor)
 
 export interface AppNotification {
   id?: string;

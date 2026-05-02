@@ -48,19 +48,12 @@ export default function BIInteligentePage({ user, userProfile }: any) {
     }
   };
 
-  if (!isConfigured) {
-    return (
-      <div className="p-8 text-center bg-amber-50 rounded-3xl border border-amber-100 mt-10">
-        <Database className="mx-auto text-amber-500 mb-4" size={48} />
-        <h2 className="text-xl font-bold text-amber-900 mb-2">Supabase Não Configurado</h2>
-        <p className="text-amber-800 text-sm">As novas funcionalidades analíticas requerem as chaves VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no seu ambiente. Solicite no Menu Configurações.</p>
-      </div>
-    );
-  }
+  // Se não estiver configurado, exibe um banner de aviso mas tenta renderizar a página
+  // com estado vazio ou dados simulados para não quebrar a experiência do usuário.
 
   if (error) {
     return (
-      <div className="p-8 text-center bg-rose-50 rounded-3xl border border-rose-100">
+      <div className="p-8 text-center bg-rose-50 rounded-3xl border border-rose-100 mt-10">
         <AlertTriangle className="mx-auto text-rose-500 mb-4" size={48} />
         <h2 className="text-xl font-bold text-rose-900 mb-2">Erro de Carregamento</h2>
         <p className="text-rose-800 text-sm">{error}</p>
@@ -70,6 +63,19 @@ export default function BIInteligentePage({ user, userProfile }: any) {
 
   return (
     <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
+      {!isConfigured && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-4">
+          <Database className="text-amber-500 shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="text-amber-900 font-bold text-sm">Supabase Não Configurado</h3>
+            <p className="text-amber-800 text-xs mt-1">
+              As novas funcionalidades analíticas e gráficos em tempo real requerem as chaves <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> e <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.
+              Você está visualizando um estado de demonstração.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tighter">BI INTELIGENTE <span className="text-indigo-600">ULTRA</span></h1>
@@ -102,7 +108,7 @@ export default function BIInteligentePage({ user, userProfile }: any) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <ChartCard title="Desempenho por Competência" subtitle="Média agregada de todas as avaliações da turma">
           <div className="w-full h-[320px] min-h-[320px]">
-            {compAverages.length > 0 ? (
+            {compAverages?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={compAverages}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -126,7 +132,7 @@ export default function BIInteligentePage({ user, userProfile }: any) {
 
         <ChartCard title="Evolução Temporal do Aprendizado" subtitle="Progresso individual ou da turma sugerido pelo BI">
           <div className="w-full h-[320px] min-h-[320px]">
-            {evolutionData.length > 0 ? (
+            {evolutionData?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={evolutionData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
