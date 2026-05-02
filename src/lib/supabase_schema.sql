@@ -112,11 +112,44 @@ CREATE INDEX idx_tentativas_turma ON public.tentativas_simulado(turma_id);
 CREATE INDEX idx_analises_aluno ON public.analises_edu_jarvis(aluno_id);
 CREATE INDEX idx_respostas_tentativa ON public.respostas_simulado(tentativa_id);
 
--- CONFIGURAÇÃO DE RLS (Row Level Security)
-ALTER TABLE public.profiles_supabase ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.turmas_supabase ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tentativas_simulado ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.analises_edu_jarvis ENABLE ROW LEVEL SECURITY;
+-- 9. ANALÍTICAS AVANÇADAS (Fase 1)
+CREATE TABLE public.competency_performance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aluno_id UUID REFERENCES public.profiles_supabase(id),
+    competencia_id UUID REFERENCES public.competencias(id),
+    taxa_acerto DECIMAL(5,4) DEFAULT 0,
+    total_questoes INTEGER DEFAULT 0,
+    nivel_proficiencia TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- 10. SIMULADO ADAPTATIVO (Fase 2)
+CREATE TABLE public.adaptive_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aluno_id UUID REFERENCES public.profiles_supabase(id),
+    status TEXT DEFAULT 'active', -- active, completed
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE public.student_proficiency (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aluno_id UUID REFERENCES public.profiles_supabase(id),
+    competencia_id UUID REFERENCES public.competencias(id),
+    score DECIMAL(5,2) DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE public.adaptive_recommendations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aluno_id UUID REFERENCES public.profiles_supabase(id),
+    tipo TEXT, -- 'reforco', 'avancado'
+    conteudo JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- ÍNDICES ADICIONAIS
+CREATE INDEX idx_perf_aluno ON public.competency_performance(aluno_id);
+CREATE INDEX idx_adaptive_sessions_aluno ON public.adaptive_sessions(aluno_id);
 
 -- POLÍTICAS BÁSICAS (Exemplos)
 -- Alunos podem ver seu próprio perfil
