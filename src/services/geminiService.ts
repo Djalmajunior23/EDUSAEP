@@ -1,12 +1,13 @@
 import { EduJarvis } from "./eduJarvisService";
 import { AI_CONFIG } from "../ai-config";
 import { toast } from "sonner";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { UserRole } from "../types";
 import { normalizeImportError } from "../utils/normalizeImportError";
 import { simpleRegexParser } from "../utils/simpleRegexParser";
 import { safeArray, safeJoin } from "../utils/safeUtils";
+import { logger } from "../utils/logger";
 import { z } from 'zod';
 
 
@@ -22,6 +23,17 @@ export const SchemaType = {
   OBJECT: "object",
 };
 const Type = SchemaType;
+
+/**
+ * Hash function for cache
+ */
+async function hashString(message: string): Promise<string> {
+  const msgUint8 = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
 
 /**
  * Converte o formato de contents da API do Gemini para uma string simples.
@@ -65,6 +77,26 @@ export async function generateContentWrapper(params: any): Promise<any> {
     const responseFormat = params.config?.responseMimeType === 'application/json' ? 'json' : 'text';
     const model = params.model;
     
+    // Check Cache
+    let cacheKey = '';
+    try {
+      const cacheDataStr = JSON.stringify({ prompt, systemInstruction, responseFormat, model });
+      cacheKey = await hashString(cacheDataStr);
+      const cacheRef = doc(db, 'ai_cache', cacheKey);
+      const cacheSnap = await getDoc(cacheRef);
+      if (cacheSnap.exists()) {
+        const cacheData = cacheSnap.data();
+        const now = Date.now();
+        const ttl = 24 * 60 * 60 * 1000; // 24 hours
+        if (now - cacheData.timestamp < ttl) {
+          logger.info('AICache', '🟢 Reutilizando resposta da IA do cache Firestore.');
+          return cacheData.response;
+        }
+      }
+    } catch (e) {
+      logger.warn('AICache', 'Falha ao ler cache', e);
+    }
+
     try {
       const response = await fetch('/api/ai/completions', {
         method: 'POST',
@@ -85,9 +117,24 @@ export async function generateContentWrapper(params: any): Promise<any> {
         throw new Error(err.error || `Erro ${response.status} da IA`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // Save Cache
+      try {
+        if (cacheKey) {
+          const cacheRef = doc(db, 'ai_cache', cacheKey);
+          await setDoc(cacheRef, {
+            response: result,
+            timestamp: Date.now()
+          });
+        }
+      } catch (e) {
+        logger.warn('AICache', 'Falha ao salvar no cache', e);
+      }
+
+      return result;
     } catch (error) {
-      console.error("[AI Generation proxy error]:", error);
+      logger.error('AI', '[AI Generation proxy error]:', error);
       throw error;
     }
   }

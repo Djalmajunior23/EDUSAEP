@@ -1,6 +1,7 @@
 import { notificationService } from './notificationService';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { logger } from '../utils/logger';
 
 export const pedagogicalAlertsService = {
   /**
@@ -93,11 +94,11 @@ export const pedagogicalAlertsService = {
       // Exemplo fictício de checagem do banco de dados (poderia consultar entregas pendentes ou histórico de avaliações)
       // Aqui integrariamos a lógica com os submits reais (submissions ou diagnostics).
       
-      console.log(`Checking metrics for student ${studentName} (${studentId}) to trigger pedagogical alerts...`);
+      logger.info('Alerts', `Checking metrics for student ${studentName} (${studentId}) to trigger pedagogical alerts...`);
       // Simulação: se este aluno tiver 3 tarefas atrasadas, dispare.
       // E assim por diante.
     } catch (error) {
-      console.error('Error checking student metrics for pedagogical alerts:', error);
+      logger.error('Alerts', 'Error checking student metrics for pedagogical alerts:', error);
     }
   }
 };

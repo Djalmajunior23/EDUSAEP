@@ -73,6 +73,23 @@ export function ExamTakingView({ exam, user, userProfile, onCancel, selectedMode
   };
 
   const handleSubmit = async () => {
+    // Validação de tempo
+    const now = new Date();
+    if (exam.startDate) {
+      const start = exam.startDate.toDate ? exam.startDate.toDate() : new Date(exam.startDate);
+      if (now < start) {
+        toast.error("O simulado ainda não começou.");
+        return;
+      }
+    }
+    if (exam.endDate) {
+      const end = exam.endDate.toDate ? exam.endDate.toDate() : new Date(exam.endDate);
+      if (now > end) {
+        toast.error("O prazo para esta avaliação já encerrou.");
+        return;
+      }
+    }
+
     if (answers.includes(-1)) {
       toast.warning("Enviando com questões sem resposta...");
     }

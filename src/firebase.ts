@@ -6,6 +6,7 @@ import {
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { logger } from './utils/logger';
 
 // Import the Firebase configuration
 import firebaseConfig from '../firebase-applet-config.json';
@@ -13,8 +14,14 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with the named database if it's provided
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+// Initialize Firestore
+let dbInstance: any;
+try {
+  dbInstance = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+} catch (error) {
+  logger.error('Firebase', 'Error initializing Firestore:', error);
+}
+export const db = dbInstance;
 
 /**
  * Verifica se a conexão com o Firestore está ativa.
@@ -46,7 +53,7 @@ export const cloudFunctions = {
         functionsInstance = getFunctions(app, 'us-central1');
         functionsInitialized = true;
       } catch (error) {
-        console.error("Error initializing Firebase Functions:", error);
+        logger.error("Firebase", "Error initializing Firebase Functions:", error);
       }
     }
     return functionsInstance;
@@ -66,7 +73,7 @@ export const storage = {
           storageInstance = getStorage(app);
         }
       } catch (error) {
-        console.warn("Firebase Storage service is not available. Please ensure it's enabled in the Firebase Console.", error);
+        logger.warn("Firebase", "Firebase Storage service is not available. Please ensure it's enabled in the Firebase Console.", error);
         storageInstance = null;
       }
     }

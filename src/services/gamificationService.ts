@@ -1,5 +1,6 @@
 import { collection, query, orderBy, limit, getDocs, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { logger } from '../utils/logger';
 
 export interface GamificationProfile {
   studentId: string;
@@ -79,7 +80,7 @@ export const gamificationService = {
         lastUpdate: serverTimestamp()
       });
     } catch (e) {
-      console.error("Error creating gamification profile:", e);
+      logger.error('Gamification', 'Error creating gamification profile:', e);
     }
     return newProfile;
   },
@@ -91,9 +92,9 @@ export const gamificationService = {
         xp: increment(points),
         lastUpdate: serverTimestamp()
       });
-      console.log(`[Gamification] Awarded ${points} points to ${userId}${reason ? ` for ${reason}` : ''}`);
+      logger.info('Gamification', `Awarded ${points} points to ${userId}${reason ? ` for ${reason}` : ''}`);
     } catch (e) {
-      console.error("Error awarding points:", e);
+      logger.error('Gamification', 'Error awarding points:', e);
     }
   },
 
@@ -130,7 +131,7 @@ export const gamificationService = {
       
       return ranking;
     } catch (error) {
-      console.error("[GamificationService] Error fetching ranking:", error);
+      logger.error('Gamification', 'Error fetching ranking:', error);
       return [];
     }
   },
@@ -144,7 +145,7 @@ export const gamificationService = {
       }
       return null;
     } catch (error) {
-      console.error("[GamificationService] Error fetching student stats:", error);
+      logger.error('Gamification', 'Error fetching student stats:', error);
       return null;
     }
   }

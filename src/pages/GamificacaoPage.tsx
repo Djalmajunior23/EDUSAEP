@@ -4,8 +4,7 @@ import {
   Trophy, Medal, Target, Zap, 
   ChevronRight, Star, Award, TrendingUp, History, User
 } from 'lucide-react';
-import { gamificationSupabaseService } from '../services/supabase/gamificationService';
-import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { gamificationService } from '../services/gamificationService';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function GamificacaoPage() {
@@ -14,26 +13,23 @@ export default function GamificacaoPage() {
   const { user } = useAuth();
   const [userStats, setUserStats] = useState<any>(null);
 
-  const isConfigured = isSupabaseConfigured;
-
   useEffect(() => {
-    if (isConfigured) {
+    if (user) {
       loadGamification();
     } else {
       setLoading(false);
     }
-  }, [isConfigured, user]);
+  }, [user]);
 
   const loadGamification = async () => {
     setLoading(true);
     try {
-      const data = await gamificationSupabaseService.getRanking();
+      const data = await gamificationService.getRanking();
       setRanking(data || []);
       
-      // Compute user stats if needed from Supabase or just fallback
-      const meItem = (data || []).find((d: any) => d.id === user?.uid);
-      if (meItem) {
-        setUserStats({ xp: meItem.total, level: Math.floor(meItem.total / 1000) + 1 });
+      const stats = await gamificationService.getStudentStats(user!.uid);
+      if (stats) {
+        setUserStats({ xp: stats.xp, level: stats.level });
       } else {
         setUserStats({ xp: 0, level: 1 });
       }
@@ -44,32 +40,8 @@ export default function GamificacaoPage() {
     }
   };
 
-  // Em vez de quebrar a página, mostramos um aviso não obstrutivo pra manter a interface e não dar impressão de crash
-  /*
-  if (!isConfigured) {
-    return (
-      <div className="p-8 text-center bg-gray-50 rounded-3xl border border-gray-100 mt-10">
-        <Award className="mx-auto text-gray-300 mb-4" size={48} />
-        <h2 className="text-xl font-bold text-gray-900">Supabase Não Configurado</h2>
-        <p className="text-gray-500 mt-2">Ative as credenciais do Supabase no Menu de Configuração para gerenciar ranking e gamificação.</p>
-      </div>
-    );
-  }
-  */
-
   return (
     <div className="p-6 space-y-8 min-h-screen bg-[#fafafa]">
-      {!isConfigured && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-4">
-          <Award className="text-amber-500 shrink-0 mt-1" size={24} />
-          <div>
-            <h3 className="text-amber-900 font-bold text-sm">Modo de Demonstração</h3>
-            <p className="text-amber-800 text-xs mt-1">
-              As funcionalidades em tempo real de gamificação requerem as chaves <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> e <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.
-            </p>
-          </div>
-        </div>
-      )}
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

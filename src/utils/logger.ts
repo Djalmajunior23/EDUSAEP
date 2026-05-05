@@ -13,9 +13,9 @@ class Logger {
     console.error(`${this.prefix(module)} ❌ ${message}`, error || '');
   }
 
-  warn(module: string, message: string) {
+  warn(module: string, message: string, data?: any) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn(`${this.prefix(module)} ⚠️ ${message}`);
+      console.warn(`${this.prefix(module)} ⚠️ ${message}`, data || '');
     }
   }
 
