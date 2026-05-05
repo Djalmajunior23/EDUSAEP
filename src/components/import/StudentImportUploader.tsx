@@ -20,6 +20,7 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processState, setProcessState] = useState<{ step: string; progress: number } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [importError, setImportError] = useState<{ message: string; details?: string; type: 'parsing' | 'importing' } | null>(null);
@@ -45,12 +46,16 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
 
     setFile(selectedFile);
     setIsProcessing(true);
+    setProcessState({ step: 'Lendo arquivo...', progress: 10 });
     setImportResult(null);
     setImportError(null);
 
     try {
       const data = await importService.parseFile(selectedFile);
       
+      setProcessState({ step: 'Convertendo campos e formatos...', progress: 40 });
+      await new Promise(r => setTimeout(r, 600));
+
       if (!Array.isArray(data) || data.length === 0) {
         throw new Error('O arquivo parece estar vazio ou não contém dados válidos.');
       }
@@ -84,6 +89,13 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
         return rowData;
       }).filter(row => Object.values(row._raw).some(v => v !== null && v !== '')); // Filter out completely empty rows
 
+      setProcessState({ step: 'Analisando consistência com IA...', progress: 70 });
+      await new Promise(r => setTimeout(r, 1000));
+
+      setProcessState({ step: 'Validando dados finais...', progress: 90 });
+      await new Promise(r => setTimeout(r, 400));
+      
+      setProcessState({ step: 'Pronto para importação.', progress: 100 });
       setPreviewData(mappedData);
       
       const rowsWithErrors = mappedData.filter(r => r.validationErrors.length > 0);
@@ -136,7 +148,9 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
         turmaId: selectedClass || null
       }));
 
-      const result = await importService.processStudentImport(dataToImport, userProfile.uid);
+      const result = await importService.processStudentImport(dataToImport, userProfile.uid, (current, total) => {
+        setProcessState({ step: `Importando registro ${current} de ${total}...`, progress: Math.floor((current / total) * 100) });
+      });
       setImportResult(result);
       
       if (result.errorCount > 0) {
@@ -318,9 +332,19 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
             </div>
 
             {isProcessing ? (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                <Loader2 className="animate-spin mb-4" size={32} />
-                <p>Analisando planilha...</p>
+              <div className="flex flex-col items-center justify-center p-8 bg-white border border-gray-100 rounded-xl shadow-sm">
+                <Loader2 className="animate-spin text-indigo-600 mb-6" size={40} />
+                <h3 className="font-bold text-gray-900 text-lg mb-2">Processando arquivo...</h3>
+                <p className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-6 max-w-sm text-center">
+                  {processState?.step || 'Analisando planilha...'}
+                </p>
+                <div className="w-full max-w-md bg-gray-100 rounded-full h-2.5 mb-2 overflow-hidden">
+                  <div 
+                    className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                    style={{ width: `${processState?.progress || 0}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-400">{processState?.progress || 0}% concluído</p>
               </div>
             ) : previewData.length > 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -380,7 +404,7 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                  <button onClick={reset} className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
+                  <button onClick={reset} disabled={isImporting} className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50">
                     Cancelar
                   </button>
                   <button 
@@ -389,9 +413,18 @@ export function StudentImportUploader({ userProfile }: { userProfile: any }) {
                     className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {isImporting ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                    Confirmar Importação
+                    {isImporting ? 'Importando...' : 'Confirmar Importação'}
                   </button>
                 </div>
+                {isImporting && processState && (
+                  <div className="mt-4 p-6 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <h4 className="font-bold text-indigo-900 mb-2">Importação em andamento</h4>
+                    <p className="text-sm font-medium text-indigo-700 mb-4">{processState.step}</p>
+                    <div className="w-full bg-indigo-200 rounded-full h-2.5 overflow-hidden">
+                      <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${processState.progress}%` }}></div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : null}
           </div>

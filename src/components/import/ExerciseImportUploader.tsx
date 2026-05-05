@@ -20,6 +20,7 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<PreviewExercise[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processState, setProcessState] = useState<{ step: string; progress: number } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [disciplines, setDisciplines] = useState<any[]>([]);
@@ -44,10 +45,13 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
 
     setFile(selectedFile);
     setIsProcessing(true);
+    setProcessState({ step: 'Lendo arquivo...', progress: 10 });
     setImportResult(null);
 
     try {
       const data = await importService.parseFile(selectedFile);
+      setProcessState({ step: 'Convertendo campos, identificando enunciados e respostas...', progress: 40 });
+      await new Promise(r => setTimeout(r, 600));
       
       // Basic validation and mapping for exercises
       const mappedData = data.map((row: any) => {
@@ -70,6 +74,10 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
         };
       }).filter(row => row.enunciado && row.respostaCorreta); // Filter out rows without question or answer
 
+      setProcessState({ step: 'Analisando e validando questões com IA...', progress: 70 });
+      await new Promise(r => setTimeout(r, 1200));
+
+      setProcessState({ step: 'Pronto para importação.', progress: 100 });
       setPreviewData(mappedData);
       
       if (mappedData.length === 0) {
@@ -109,7 +117,9 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
       }));
 
       // We use the importService to process the batch
-      const result = await importService.processExerciseImport(dataToImport, userProfile.uid);
+      const result = await importService.processExerciseImport(dataToImport, userProfile.uid, (current, total) => {
+        setProcessState({ step: `Importando exercício ${current} de ${total}...`, progress: Math.floor((current / total) * 100) });
+      });
       setImportResult(result);
       toast.success('Importação de exercícios concluída!');
     } catch (error: any) {
@@ -214,9 +224,19 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
             </div>
 
             {isProcessing ? (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                <Loader2 className="animate-spin mb-4" size={32} />
-                <p>Analisando questões...</p>
+              <div className="flex flex-col items-center justify-center p-8 bg-white border border-gray-100 rounded-xl shadow-sm">
+                <Loader2 className="animate-spin text-indigo-600 mb-6" size={40} />
+                <h3 className="font-bold text-gray-900 text-lg mb-2">Processando arquivo...</h3>
+                <p className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-6 max-w-sm text-center">
+                  {processState?.step || 'Analisando questões...'}
+                </p>
+                <div className="w-full max-w-md bg-gray-100 rounded-full h-2.5 mb-2 overflow-hidden">
+                  <div 
+                    className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                    style={{ width: `${processState?.progress || 0}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-400">{processState?.progress || 0}% concluído</p>
               </div>
             ) : previewData.length > 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -265,7 +285,7 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                  <button onClick={reset} className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
+                  <button onClick={reset} disabled={isImporting} className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50">
                     Cancelar
                   </button>
                   <button 
@@ -274,9 +294,18 @@ export function ExerciseImportUploader({ userProfile }: { userProfile: any }) {
                     className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {isImporting ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                    Confirmar Importação
+                    {isImporting ? 'Importando...' : 'Confirmar Importação'}
                   </button>
                 </div>
+                {isImporting && processState && (
+                  <div className="mt-4 p-6 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <h4 className="font-bold text-indigo-900 mb-2">Importação em andamento</h4>
+                    <p className="text-sm font-medium text-indigo-700 mb-4">{processState.step}</p>
+                    <div className="w-full bg-indigo-200 rounded-full h-2.5 overflow-hidden">
+                      <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${processState.progress}%` }}></div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : null}
           </div>

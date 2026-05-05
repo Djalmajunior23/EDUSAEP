@@ -60,7 +60,7 @@ export const importService = {
     });
   },
 
-  async processStudentImport(data: any[], createdBy: string) {
+  async processStudentImport(data: any[], createdBy: string, onProgress?: (current: number, total: number) => void) {
     const batchRef = await addDoc(collection(db, 'import_batches'), {
       type: 'students',
       status: 'processing',
@@ -87,12 +87,18 @@ export const importService = {
         errorCount++;
         errors.push({ row: i + 1, message: error.message });
       }
+      
+      if (onProgress) {
+        onProgress(i + 1, data.length);
+      }
+      // Small artificial delay to show progress visually if it's very fast
+      if (i % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
     return { batchId: batchRef.id, successCount, errorCount, errors };
   },
 
-  async processExerciseImport(data: any[], createdBy: string) {
+  async processExerciseImport(data: any[], createdBy: string, onProgress?: (current: number, total: number) => void) {
     const batchRef = await addDoc(collection(db, 'import_batches'), {
       type: 'exercises',
       status: 'processing',
@@ -133,6 +139,10 @@ export const importService = {
       } catch (error: any) {
         errorCount++;
         errors.push({ row: i + 1, message: error.message });
+      }
+
+      if (onProgress) {
+        onProgress(i + 1, data.length);
       }
     }
 
