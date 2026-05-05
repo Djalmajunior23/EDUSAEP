@@ -1014,6 +1014,21 @@ function AppContent() {
     testConnection();
   }, []);
 
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setIsAuthenticating(true);
+    try {
+      await loginWithGoogle();
+      toast.success("Login com Google realizado com sucesso!");
+    } catch (err: any) {
+      const msg = err.message || "Erro ao fazer login com Google.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -1477,10 +1492,15 @@ function AppContent() {
               <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
               {!user && (
                 <button
-                  onClick={loginWithGoogle}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
+                  onClick={handleGoogleLogin}
+                  disabled={isAuthenticating}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 disabled:opacity-50"
                 >
-                  <LogIn size={16} />
+                  {isAuthenticating ? (
+                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <LogIn size={16} />
+                  )}
                   Entrar
                 </button>
               )}
@@ -1746,7 +1766,7 @@ function AppContent() {
                 </div>
 
                 <button
-                  onClick={loginWithGoogle}
+                  onClick={handleGoogleLogin}
                   disabled={isAuthenticating}
                   className="w-full py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
                 >

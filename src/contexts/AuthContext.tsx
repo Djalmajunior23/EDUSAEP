@@ -124,8 +124,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error signing in with Google:", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error("O pop-up de login foi fechado antes de concluir.");
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error("O pop-up foi bloqueado pelo navegador. Por favor, permita pop-ups para este site ou abra o app em uma nova guia.");
+      }
       throw error;
     }
   };

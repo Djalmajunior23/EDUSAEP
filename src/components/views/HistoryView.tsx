@@ -32,7 +32,7 @@ export function HistoryView({
   const [currentPage, setCurrentPage] = useState(1);
   const [isBulkEdit, setIsBulkEdit] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc');
 
